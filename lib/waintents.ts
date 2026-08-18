@@ -1451,15 +1451,65 @@ export function matchSalarySet(body: string): number | null {
 const SAVED_ME = /\b(saved?|saving|savings)\b/i;
 const SAVED_ME_SUBJECT = /\b(me|us|my tax|so far|this year|anything)\b/i;
 
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B25, 18 August 2026. "AM I SAVING ENOUGH FOR MY TAX BILL" IS A SET ASIDE QUESTION AND THIS
+// LANE WAS ANSWERING IT WITH THE LEDGER OF WHAT LEKHIO HAS SAVED HIM.
+//
+// It has been true on WhatsApp since Run 2 and the savings packet spread it to /api/ask. A man
+// asking whether he is putting enough by was handed "The costs you have logged are keeping £1,374
+// off your tax bill this year", which is a confident, exact answer to a question he did not ask.
+//
+// 🔴 AND THE BACKLOG SAID THE NARROWING WAS IN SAVED_ME_SUBJECT. IT IS MEASURED AND IT IS WRONG.
+// Dropping "my tax" and "this year" from that list was BUILT and measured on a corpus of 26 real
+// savings phrasings and 13 set aside ones: it LOSES FOUR genuine savings questions ("how much have
+// you saved this year", "how much has lekhio saved this year", "what have you saved on my tax",
+// "what has this saved on my tax bill") and still lets two set aside ones through. Worse in both
+// directions, and it would have broken the anchor a control in test/sabotage-b19savings.mjs holds
+// on that exact line.
+//
+// ⚠️ THE SIGNAL IS NOT WHAT IS BEING SAVED. IT IS WHO IS DOING THE SAVING.
+//
+//   "have you saved me anything"   ->  US. This lane.
+//   "am i saving enough for tax"   ->  HIM. matchTotalsQuestion.
+//
+// So the guard is a first person subject governing the save verb, AND a sufficiency word after it.
+// The auxiliary alone is too blunt: "am i saving anything with lekhio" is this lane's question with
+// his own subject, and it was measured and kept.
+//
+// MEASURED, both directions, on the same two corpora: SET ASIDE refused went 1 of 13 to 13 of 13,
+// and SAVINGS kept stayed at 26 of 26. THE TRADE IS FREE. Every alternative earns its place, dropped
+// one at a time: without "am" 7 of 13, without "are" 11, without "should" 9, without "do" 12;
+// without "enough" 10, without "more" 12, without "for tax" 8. Nothing here is decoration.
+//
+// ⚠️ AND WHAT IT DOES NOT CLOSE, MEASURED RATHER THAN HOPED FOR. Of the 13, EIGHT reach
+// matchTotalsQuestion and get the set aside answer. The other five carry no tax word at all
+// ("am i saving enough this year") and fall through to the model. That is still better than a
+// precise answer to a different question, and test/laneparity.test.mjs section 12b asserts the
+// eight so a later change cannot move it in the dark.
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+const HE_IS_THE_SAVER = /\b(am|are|should|do)\s+(i|we)\b[\s\S]{0,24}?\bsav(e|es|ing)\b[\s\S]{0,20}?\b(enough|more|for (my |the )?tax)\b/i;
+
 export function isSavingsQuestion(body: string): boolean {
   const b = (body || '').toLowerCase().trim();
   if (!b || b.length > 90) return false;
 
+  // 🔴 B25: he is asking whether HE is putting enough by, which belongs to matchTotalsQuestion.
+  if (HE_IS_THE_SAVER.test(b)) return false;
+
   // "what have you saved me", "how much have you saved me", "have you saved me anything",
-  // "what am I saving", "how much has lekhio saved me this year"
+  // "how much has lekhio saved me this year", "how much have you saved this year"
+  //
+  // ⚠️ AND THE TWO THIS COMMENT USED TO CLAIM AND NEVER CAUGHT, CORRECTED IN PLACE 18 August 2026.
+  // It listed "what am I saving" and "is this worth 12.99" as examples it catches. It catches
+  // NEITHER, and it has said so since Run 2. "what am I saving" carries no subject from the list
+  // above, and the second arm below is the literal words "worth it", not an amount. The widening to
+  // hear `worth <amount>` was BUILT and MEASURED at 3 gained against 3 purchase questions lost
+  // ("is this drill worth 129", "is that tool worth 300 quid", "is the ladder worth 89.99") and
+  // REJECTED, which is B23's apostrophe trade exactly. The comment is fixed rather than the code,
+  // because the code is right and the comment was the thing telling the lie.
   if (SAVED_ME.test(b) && SAVED_ME_SUBJECT.test(b)) return true;
 
-  // "was it worth it", "is this worth 12.99", the same question, asked by a man about to cancel.
+  // "was it worth it", "is this worth it", the same question, asked by a man about to cancel.
   if (/\bworth it\b/.test(b)) return true;
 
   return false;

@@ -2113,6 +2113,108 @@ for (const [name, code] of ROUTERS) {
     && !/factUpdateNote\(\)[\s\S]{0,80}LANE_UNREADABLE/.test(sav));
 }
 
+// ---------------------------------------------------------------------------------------------
+// 12b. B25: HE IS ASKING WHETHER HE IS PUTTING ENOUGH BY, WHICH IS NOT WHAT THIS LANE ANSWERS.
+// ---------------------------------------------------------------------------------------------
+// 🔴 "am i saving enough for my tax bill" IS A SET ASIDE QUESTION and isSavingsQuestion claimed it.
+// True on WhatsApp since Run 2, spread to /api/ask by the savings packet. A man asking whether he
+// is putting enough by was handed the ledger of what Lekhio has saved him: a confident, exact,
+// two decimal answer to a question he did not ask, which is how a man stops trusting a number.
+//
+// ⚠️ THE BACKLOG SAID THE NARROWING WAS IN SAVED_ME_SUBJECT AND IT IS MEASURED AND WRONG. That was
+// built and run against both corpora below: it LOSES four genuine savings phrasings and still lets
+// two set aside ones through. The signal is not WHAT is being saved, it is WHO is doing the saving.
+// The argument and every measured number are in lib/waintents.ts above HE_IS_THE_SAVER.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== 12b. B25: the set aside question this lane used to claim ===\n');
+
+const B25_SET_ASIDE = [
+  'am i saving enough for my tax bill',
+  'am i saving enough this year',
+  'should i be saving more for my tax',
+  'am i saving enough for my tax',
+  'do i need to be saving more this year',
+  'are we saving enough for my tax bill',
+  'should i be saving anything for my tax',
+  'am i saving enough so far',
+  'should i be saving something for my tax',
+  'am i saving the right amount for my tax',
+  'should i be saving anything for tax',
+  'am i saving anything for the tax bill',
+  'are we saving enough so far',
+];
+
+// 🔴 THE OTHER DIRECTION, AND IT IS THE HALF A NARROWING BREAKS. Twenty six phrasings of the
+// question this lane exists for, including four that the SAVED_ME_SUBJECT narrowing would have
+// lost and four where HE is the grammatical subject and it is STILL this lane's question.
+const B25_KEEP = [
+  'what have you saved me',
+  'how much have you saved me',
+  'have you saved me anything',
+  'how much has lekhio saved me this year',
+  'was it worth it',
+  'is this worth it',
+  'what have you actually saved me',
+  'has this saved me anything',
+  'how much have you saved us',
+  'what have you saved me so far',
+  'how much have you saved me this year',
+  'what savings have you found me',
+  'have you saved me anything this year',
+  'how much tax have you saved me',
+  // The four the SAVED_ME_SUBJECT narrowing would have cost. If somebody reopens that idea, these
+  // go red first and the measurement is done for them.
+  'how much have you saved this year',
+  'how much has lekhio saved this year',
+  'what have you saved on my tax',
+  'what has this saved on my tax bill',
+  'how much has lekhio saved so far',
+  'what savings have you made me',
+  // 🔴 HIS OWN SUBJECT, AND STILL THIS LANE'S QUESTION. This is why the guard is not the auxiliary
+  // alone: "am i saving" is how a man asks BOTH questions, and only the sufficiency word tells them
+  // apart. A blunter guard was measured and it lost all four of these.
+  'am i saving anything with lekhio',
+  'are we saving anything with this',
+  'do i save anything with lekhio',
+  'am i actually saving anything using this',
+  'have i saved anything with you',
+  'what has lekhio saved me on my tax',
+];
+
+{
+  const claimed = B25_SET_ASIDE.filter((q) => W.isSavingsQuestion(q));
+  ok(`🔴 THE SAVINGS LANE REFUSES ALL ${B25_SET_ASIDE.length} SET ASIDE PHRASINGS${claimed.length ? `, STILL CLAIMED: ${claimed.map((q) => JSON.stringify(q)).join('; ')}` : ''}`,
+    claimed.length === 0);
+
+  const lost = B25_KEEP.filter((q) => !W.isSavingsQuestion(q));
+  ok(`🔴 AND IT STILL HEARS ALL ${B25_KEEP.length} OF ITS OWN${lost.length ? `, LOST: ${lost.map((q) => JSON.stringify(q)).join('; ')}` : ''}`,
+    lost.length === 0);
+
+  // ⚠️ WHAT THE NARROWING DOES NOT CLOSE, ASSERTED SO IT CANNOT BE READ AS MORE THAN IT IS.
+  // Refusing a lane is only half an answer: the phrase has to land somewhere better. EIGHT of the
+  // thirteen reach matchTotalsQuestion and get the set aside figure, which is the right answer. The
+  // other FIVE carry no money word at all ("am i saving enough this year") and fall through to the
+  // model, which is a softer answer to the right question rather than a precise answer to the wrong
+  // one. RE MEASURE this rather than deleting the line if it ever changes.
+  const toTotals = B25_SET_ASIDE.filter((q) => W.matchTotalsQuestion(q) !== null);
+  ok(`⚠️ ${toTotals.length} OF ${B25_SET_ASIDE.length} REACH THE SET ASIDE LANE, and the rest reach the model, not this lane`,
+    toTotals.length === 8);
+
+  // 🔴 AND THE MATCHER'S OWN COMMENT USED TO NAME TWO PHRASINGS IT CANNOT HEAR. B25's second half.
+  // The comment claimed "what am I saving" and "is this worth 12.99" as examples it catches. It
+  // catches neither and never has. The comment was fixed rather than the code, because the
+  // `worth <amount>` widening was measured at 3 gained against 3 purchase questions lost and
+  // rejected in writing. These two assertions are what stop the comment drifting back.
+  ok('🔴 "what am I saving" is NOT heard, which is what the comment now says',
+    W.isSavingsQuestion('what am i saving') === false);
+  ok('🔴 "is this worth 12.99" is NOT heard either, and the rejected widening is why',
+    W.isSavingsQuestion('is this worth 12.99') === false);
+  const PURCHASES = ['is this drill worth 129', 'is that tool worth 300 quid', 'is the ladder worth 89.99'];
+  const eaten = PURCHASES.filter((q) => W.isSavingsQuestion(q));
+  ok(`🔴 ...and the three purchase questions that widening would have cost are still not claimed${eaten.length ? `, EATEN: ${eaten.join('; ')}` : ''}`,
+    eaten.length === 0);
+}
+
 console.log('\n=== 13. B19: the identity lane, derived from all three routers ===\n');
 
 // ══════════════════════════════════════════════════════════════════════════════════════════

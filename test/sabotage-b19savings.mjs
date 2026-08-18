@@ -138,6 +138,23 @@ const TH_LANE = '  if (isSavingsQuestion(q)) return savingsAnswerForUser(userId)
 const ASK_LANE = '  if (!truth && isSavingsQuestion(question)) truth = await savingsAnswerForUser(userId);';
 
 const SABOTAGES = [
+  // ── B25, 18 AUGUST 2026. THE SET ASIDE QUESTION THIS LANE USED TO CLAIM. ────────────────
+  {
+    name: '🔴 B25: the set aside guard goes, so "am i saving enough for my tax bill" gets the savings ledger again',
+    apply: ({ dir }) => edit(dir, WAI,
+      "  // 🔴 B25: he is asking whether HE is putting enough by, which belongs to matchTotalsQuestion.\n  if (HE_IS_THE_SAVER.test(b)) return false;\n\n",
+      ""),
+  },
+  {
+    name: '🔴 B25: the guard loses its "for tax" arm, which is three of the thirteen straight back',
+    apply: ({ dir }) => edit(dir, WAI, "\\b(enough|more|for (my |the )?tax)\\b", "\\b(enough|more)\\b"),
+  },
+  {
+    name: '🔴 B25: the guard is made BLUNT, dropping the sufficiency word, which costs four real savings questions',
+    apply: ({ dir }) => edit(dir, WAI,
+      "\\bsav(e|es|ing)\\b[\\s\\S]{0,20}?\\b(enough|more|for (my |the )?tax)\\b",
+      "\\bsav(e|es|ing)\\b"),
+  },
   // ── A ROUTER LOSES THE LANE. The two web rows are the state of the world from Run 2 until today.
   {
     name: '🔴 THE THREAD loses the savings lane, which is exactly where it was until today',

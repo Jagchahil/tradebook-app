@@ -238,6 +238,32 @@ const SABOTAGES = [
       "const SUPPORT_COMPLAINT = /\\b(complain|complaint|",
       "const SUPPORT_COMPLAINT = /\\b(are you a bot|complain|complaint|"),
   },
+
+  // ── B29, ADDED 18 AUGUST 2026. THE OVERLAP THIS PACKET RECORDED IS THE OVERLAP THAT ──
+  // ── PACKET CLOSED, AND CLOSING IT IS AN ORDER RATHER THAN A MATCHER, SO THE ORDER    ──
+  // ── IS WHAT GETS SABOTAGED.                                                          ──
+  {
+    // 🔴 THE STATE BEFORE 18 AUGUST, RESTORED. "am i talking to a human" opened a support ticket
+    // on the founder's desk while "am i talking to a bot" got the identity answer: two phrasings
+    // of one question, two answers, on the one channel with paying customers. A guard that only
+    // counted the overlap would have PASSED this, because the count would go back to 2 and the
+    // number would still be written down. laneparity section 13 asserts it is ZERO.
+    name: '🔴 B29: the support lane is put back ABOVE the identity lane on WhatsApp, which is the split',
+    apply: ({ dir }) => edit(dir, WA,
+      '          } else if (isIdentity(text)) {\n            await handleIdentity(from);\n          } else if (isSupportRequest(text)) {\n            await handleSupportRequest(from, text);\n',
+      '          } else if (isSupportRequest(text)) {\n            await handleSupportRequest(from, text);\n          } else if (isIdentity(text)) {\n            await handleIdentity(from);\n'),
+  },
+  {
+    // 🔴 THE OTHER WAY OF UNDOING IT, AND IT IS THE ONE A TIDY WOULD REACH FOR. Narrowing
+    // SUPPORT_HUMAN instead of trusting the order was measured and rejected: it drops
+    // "am i talking to a human or a robot" and "am i talking to a real person here" from the desk
+    // as well, and neither is an identity phrasing, so both land on the model. laneparity asserts
+    // the support matcher is UNTOUCHED for exactly this reason.
+    name: '🔴 B29: SUPPORT_HUMAN is narrowed instead of the lanes being ordered, which opens the hole the reorder avoided',
+    apply: ({ dir }) => edit(dir, WAI,
+      'const SUPPORT_HUMAN =\n  /(speak|talk|chat|connect|put me through|through to)',
+      'const SUPPORT_HUMAN =\n  /(?<!\\bam i )(speak|talk|chat|connect|put me through|through to)'),
+  },
 ];
 
 const CONTROLS = [

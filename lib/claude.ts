@@ -709,6 +709,38 @@ export async function answerMoneyQuestion(
     // these rules said whose money this is, so it never occurred to it not to.
     '- These figures belong to the person you are talking to and to nobody else. If they ask what another person earned, made, spent or owes, by name or otherwise, say plainly that you only hold their own figures. If they share a business with someone, you may explain that the books cover the whole business and that they are taxed on their own share, but never present any of it as the other person\'s income or profit.',
     '',
+    // \u{1f534} B31, 18 AUGUST 2026, AND IT WAS MEASURED ON PRODUCTION BEFORE IT WAS WRITTEN, TWICE, IN
+    // TWO DIFFERENT WAYS, BECAUSE THE ITEM SAID EVIDENCE IS NOT PROOF.
+    //
+    // This prompt had NO markdown rule while accountantSystem() below has had one all along, and it
+    // serves BOTH WhatsApp and /app/thread. houseCopy() is sanitiseDashes(text.trim()) and strips no
+    // markup at all, so nothing catches it at the boundary either.
+    //
+    // MEASUREMENT ONE, DERIVED OFF DISK: app/app/thread/chat/page.tsx prints the reply as
+    // `<p className="lek-bubble">{m.content}</p>`, a React text child, escaped, under a rule that
+    // sets white-space:pre-wrap. There is no markdown renderer on that path, no
+    // dangerouslySetInnerHTML, and no markdown dependency in package.json. So the symbols show as
+    // LITERAL CHARACTERS, exactly as the rule below claims. WhatsApp is the same: it uses a single
+    // asterisk for bold, so a double one is two characters on his screen.
+    //
+    // MEASUREMENT TWO, WALKED ON PRODUCTION as +callum on 18 August, on the build BEFORE this rule,
+    // on questions chosen to INVITE a list rather than to be easy: TWO OF THE THREE model answers
+    // came back with markdown, and the first one carried NINE bold headings. What a customer read,
+    // screenshotted:
+    //
+    //     **Clothing.** High-visibility wear and safety boots that are only for work.
+    //     **Training and qualifications.** Courses, exam fees, certificates to keep you current.
+    //
+    // The five answers walked earlier on 18 August carried none because none of them asked for a
+    // list. That is what the item meant by evidence rather than proof, and it is why the probe was
+    // written to ask for one.
+    //
+    // \u26a0\ufe0f THE WORDING MIRRORS accountantSystem()'s DELIBERATELY, because the two prompts differ
+    // only in FACTS and never in plumbing, and that difference is asserted in
+    // test/promptclaims.test.mjs. One clause changes: that prompt says "The app shows your reply as
+    // plain text" and has one caller; this one has two, on two channels, and may name neither.
+    'Format: plain text only. Do not use any markdown. No bold, no asterisks, no headers, no hash symbols. Your reply is shown as plain text, so any markdown symbols appear on screen as literal characters. A short list may start lines with a simple hyphen and a space.',
+    '',
     'Standard UK small business tax figures for 2026/27 (England, Wales and Northern Ireland). These are your built-in knowledge, use them to answer directly, do not guess beyond them:',
     ...taxFacts2627(),
     '',

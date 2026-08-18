@@ -585,14 +585,45 @@ async function processMessage(message: IncomingMessage): Promise<void> {
           // ═══════════════════════════════════════════════════════════════════════════════
           } else if (isDataRightsRequest(text)) {
             await sendText(from, DATA_RIGHTS_ANSWER);
+          // 🔴 B29, 18 AUGUST 2026, AND IT IS A REORDER RATHER THAN A MATCHER CHANGE, WHICH IS THE
+          // WHOLE POINT. TWO PHRASINGS OF ONE QUESTION WERE GETTING TWO ANSWERS ON THIS CHANNEL.
+          //
+          //   "am i talking to a bot"    ->  the identity answer
+          //   "am i talking to a human"  ->  a SUPPORT TICKET on the founder's desk, and
+          //                                 "I've passed this straight to a real person"
+          //
+          // SUPPORT_HUMAN is `(speak|talk|chat|...)[^.?!]{0,25}(human|person|...)` and was built for
+          // a REQUEST ("can I speak to a human"). "am i talking to a human" is not a request, it is
+          // the QUESTION isIdentity exists to answer, and this lane sat below the support one.
+          // Measured at 2 of the 16 identity phrasings, and ZERO on both web routers, which is why
+          // this is a WhatsApp only edit.
+          //
+          // ⚠️ IT WAS A REAL DECISION AND NOT OBVIOUSLY A BUG, AND JAG MADE IT ON 18 AUGUST WITH THE
+          // MEASUREMENT IN FRONT OF HIM: a man typing that at 8pm may want a person, and the
+          // identity answer does not get him one. Two other options were built and measured and he
+          // chose this one. What decided it is that a QUESTION was opening a ticket nobody asked
+          // for, on the one lane in the product that reads no rows and costs nothing to answer.
+          //
+          // 🔴 AND THE REORDER IS SAFE BY CONSTRUCTION RATHER THAN BY A COUNT, WHICH IS WHY IT WAS
+          // PREFERRED TO NARROWING THE SUPPORT MATCHER. isIdentity is anchored END TO END
+          // (`/^(who are you|...)$/`), so it can only ever move a message that IS one of the
+          // sixteen. Measured: 0 of 17 genuine cries for a person move away from the desk, and
+          // "am i talking to a human or a robot" and "am i talking to a real person here" still
+          // reach it, because neither is an identity phrasing. THE ALTERNATIVE, a lookbehind on
+          // SUPPORT_HUMAN, was measured and REJECTED: it drops those two from the desk as well and
+          // they land on the model, which buys a fix and opens a hole. This file's own rule about
+          // blunt negatives says the same thing.
+          //
+          // test/laneparity.test.mjs section 13 holds the new number, which is ZERO, with the same
+          // re measure note the old 2 carried.
+          } else if (isIdentity(text)) {
+            await handleIdentity(from);
           } else if (isSupportRequest(text)) {
             await handleSupportRequest(from, text);
           } else if (isHelp(text)) {
             await handleHelp(from);
           } else if (isTaxTips(text)) {
             await handleTaxTips(from);
-          } else if (isIdentity(text)) {
-            await handleIdentity(from);
           } else if (matchProductTruth(text) !== null) {
             await handleProductTruth(from, text);
           } else if (isPricing(text)) {

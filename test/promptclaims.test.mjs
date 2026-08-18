@@ -213,6 +213,44 @@ console.log('\nAnd what was guarded out is replaced by something true, not by si
   // is TEXT ONLY. This is the entire measured difference between the two prompts.
   ok('🔴 answerAccountantQuestion: carries NO photograph promise, because its one caller is text only',
     !/photograph of a receipt in this conversation/i.test(ask));
+
+  // ══════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B31, 18 AUGUST 2026. BOTH PROMPTS FORBID MARKDOWN, AND ONE OF THEM DID NOT UNTIL TONIGHT.
+  //
+  // Found by the B27 sweep, measured twice before it was changed, because the item said the five
+  // clean answers walked that day were evidence and not proof.
+  //
+  //   DERIVED OFF DISK: app/app/thread/chat/page.tsx prints the reply as a React TEXT CHILD inside
+  //   a pre-wrap paragraph. No markdown renderer on the path, no dangerouslySetInnerHTML, no
+  //   markdown dependency in package.json. The symbols show as literal characters.
+  //
+  //   WALKED ON PRODUCTION as +callum, on the build BEFORE this rule, on questions written to
+  //   INVITE a list: TWO OF THREE model answers came back with markdown and the first carried NINE
+  //   bold headings. A customer read "**Clothing.** High-visibility wear and safety boots".
+  //
+  // ⚠️ houseCopy() IS sanitiseDashes(text.trim()) AND STRIPS NO MARKUP, so nothing catches this at
+  // the boundary either. A stripping pass was NOT added: the measurement says the prompt rule is
+  // where accountantSystem() already solved it, and two solutions to one problem is how they drift.
+  // ══════════════════════════════════════════════════════════════════════════════════
+  const NO_MARKDOWN = /do not use any markdown/i;
+  for (const [label, prompt] of [['answerMoneyQuestion', money], ['answerAccountantQuestion', ask]]) {
+    ok(`🔴 ${label}: is told plainly not to use markdown`, NO_MARKDOWN.test(prompt));
+    ok(`🔴 ${label}: ...and names the symbols, so "no markdown" cannot be read as a style note`,
+      /no bold, no asterisks, no headers, no hash symbols/i.test(prompt));
+    ok(`🔴 ${label}: ...and says WHY, which is that the symbols land on his screen as characters`,
+      /literal characters/i.test(prompt));
+    ok(`${label}: ...and still allows a hyphen bullet, which is the one list shape that survives`,
+      /simple hyphen and a space/i.test(prompt));
+  }
+  // 🔴 AND THE ONE WORD THAT DIFFERS IS THE CHANNEL, WHICH IS THIS SUITE'S WHOLE SUBJECT.
+  // accountantSystem() has ONE caller and may say "The app". answerMoneyQuestion has TWO, on two
+  // channels, and may name neither, so its version of the same sentence is impersonal. If somebody
+  // copies the other one across wholesale, the channel guard above catches "The app" and this
+  // catches the reason.
+  ok('🔴 answerMoneyQuestion: the markdown rule names NO app and NO channel, because it has two callers',
+    NO_MARKDOWN.test(money) && !/\bthe app shows your reply\b/i.test(money));
+  ok('🔴 answerAccountantQuestion: may say "The app", because its one caller IS the phone app',
+    /the app shows your reply/i.test(ask));
 }
 
 // ── The guard can bite. Three specimens that MUST match, so a broken regex cannot pass quietly. ─

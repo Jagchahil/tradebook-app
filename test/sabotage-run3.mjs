@@ -156,10 +156,16 @@ const SABOTAGES = [
       '  const named = false;'),
   },
   {
-    name: 'F5 the money verb pattern is dropped, leaving only the possessive one',
+    // 🔴 ANCHOR REPAIRED 18 AUGUST 2026 BY THE WAINTENTS PACKET. It quoted the WHOLE
+    // `for (const re of [NAMED_PERSON_VERB_RE, NAMED_PERSON_POSSESSIVE_RE]) {` line, and B23's
+    // shape 3 made that pair a triple, so this sabotage could no longer be applied. It now removes
+    // ONE element by name and leaves the brackets alone, because that array is DESIGNED to grow:
+    // it gains a pattern every time the gate learns a shape. Same rule as B23's own repair of the
+    // noun list's closing bracket, on the line above it.
+    name: 'F5 the money verb pattern is dropped, leaving only the others',
     apply: (d) => edit(d, 'lib/waintents.ts',
-      '  for (const re of [NAMED_PERSON_VERB_RE, NAMED_PERSON_POSSESSIVE_RE]) {',
-      '  for (const re of [NAMED_PERSON_POSSESSIVE_RE]) {'),
+      '[NAMED_PERSON_VERB_RE, ',
+      '['),
   },
   {
     name: 'F5 the stoplist swallows every name, so nothing is ever a person',

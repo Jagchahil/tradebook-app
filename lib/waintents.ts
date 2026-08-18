@@ -933,15 +933,68 @@ export function matchTotalsQuestion(body: string, now: Date = new Date()): Total
   // and 2148 and app/api/thread/route.ts at 259, which is why the fix belongs here and not in a
   // route. Same reason the Scotland rule moved into taxFacts2627() the same afternoon.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B34, 18 AUGUST 2026. TWO SPELLINGS OF ONE WORD WERE GETTING TWO DIFFERENT LANES, AND THE
+  // ITEM WAS WRONG ABOUT WHY ON THE FIRST OF ITS THREE.
+  //
+  // The item says the three set aside phrasings it measured "each have no money noun and no how
+  // much". Re derived at head, that is true of two of them and FALSE of the first:
+  // "whats the taxman going to want" carries the money noun "taxman" and fails on the
+  // INTERROGATIVE clause alone, because \bwhat\b does not match "whats". The word boundary fails
+  // on the s, which is B2-F3's own defect ("taxman" not matching \btax\b) one clause over.
+  //
+  // ⚠️ SO THE FIX IS NOT A WIDENING, IT IS A CONSISTENCY. "what is the taxman going to want"
+  // already reaches this lane today. Only the apostrophe free spelling a man actually types on a
+  // phone did not. MEASURED, and it costs nothing: 10 of laneparity's corpora and its 37 lane
+  // phrasing sweep are IDENTICAL before and after, and so are 31 shapes written for this edit.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
   const asksTax = /\b(taxman|tax man|tax|owe|set(?:ting|tin)? aside|put(?:ting|tin)? (?:by|aside|away))\b/.test(b)
-    && /\b(how much|what|my|should i)\b/.test(b)
+    && /\b(how much|whats?|my|should i)\b/.test(b)
     && !/\bcan i\b|\bclaim\b/.test(b);
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B34's OTHER TWO, AND THEY NEEDED A COMPANION RATHER THAN A WIDER CLAUSE. THE WIDER CLAUSE
+  // WAS BUILT, MEASURED AND REJECTED, TWICE, AND THE NUMBERS ARE WHY.
+  //
+  // "am i going to get stung in january" and "what will january cost me" carry no money noun at
+  // all, so each needs BOTH of asksTax's first two clauses relaxed. Both relaxations were built
+  // and run against every corpus:
+  //
+  //   "january" added to the MONEY NOUN list      hijacks EIGHT ordinary period questions.
+  //                                               "how much did i spend in january" becomes a set
+  //                                               aside answer, and so do make, earn, profit and
+  //                                               fuel since january. asksTax is tested FIRST, so
+  //                                               a month in that list outranks the kind he asked.
+  //   "am i" added to the INTERROGATIVE clause    hands FOUR questions that are not the set aside
+  //                                               question a set aside figure: "am i paying too
+  //                                               much tax", "am i on the right tax code", "am i
+  //                                               registered for tax", "am i due a tax refund".
+  //                                               That is B25's defect exactly: a precise answer to
+  //                                               a question he did not ask.
+  //   "cost" added to the money noun list         eats two isPricing phrasings, and buys nothing
+  //                                               the clause below does not buy for free.
+  //
+  // ⚠️ SO THE COMPANION IS NARROW ON PURPOSE AND EVERY ALTERNATIVE IN IT IS WALKED BY A PHRASING
+  // IN laneparity, or it is not in it. January is the Self Assessment payment date, which is why
+  // this file already knows the word: it is in NOT_A_PERSON, and lib/waintents.ts builds a January
+  // deadline. What is NOT allowed is January standing next to any cost word at all: measured, that
+  // takes "how much did the van cost me in january" and four more like it. January has to be the
+  // SUBJECT of the cost, which is the difference between asking what the month will do to him and
+  // asking what a thing cost him during it.
+  //
+  // MEASURED, both directions, on every corpus laneparity holds plus 31 shapes written for this
+  // edit: 3 of 3 closed, 0 of 61 self phrasings lost, 0 of 37 lanes eaten, 0 at risk shapes moved.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const asksJanuaryBill = /\b(?:will|is)\s+january\s+(?:going to\s+)?cost\b/.test(b)
+    || /\bget(?:ting)?\s+stung\b[^?]{0,24}\bjanuary\b/.test(b);
   if (/£\s*\d/.test(b)) return null; // an amount means it is probably an entry
   let kind: TotalsKind | null = null;
   if (asksTax) kind = 'tax';
   else if (asksProfit) kind = 'profit';
   else if (asksMade) kind = 'made';
   else if (asksSpent) kind = 'spent';
+  // 🔴 B34's COMPANION IS TRIED LAST, WHICH IS HALF OF ITS SAFETY. A sentence naming January that
+  // any other kind can claim keeps that kind. Only a sentence nothing else wanted reaches here.
+  else if (asksJanuaryBill) kind = 'tax';
   if (!kind) return null;
   const period = periodFrom(b, now);
   // For a tax estimate the only period that makes sense is the tax year.
@@ -1991,6 +2044,14 @@ const NOT_A_PERSON = new Set([
   // a man asking about his OWN income, and both started being refused the moment the property
   // nouns went into the possessive pattern below.
   'tenant', 'landlord',
+  // 🔴 B23 SHAPE 3, 18 AUGUST 2026, AND THIS ONE IS PRE EXISTING RATHER THAN NEW. Measured at
+  // head with no widening applied at all: "what is the garage's turnover", "what is the garage's
+  // rent" and "how much is the garage's vat" were ALL refused already, because a garage is a place
+  // a tradesman owns and this list had every one of its siblings ('shop', 'yard', 'site', 'van')
+  // and not it. The possessive run above only made it easier to notice. Same family, same fix, and
+  // it costs no third party shape: measured, all four of the corpus's named person phrasings are
+  // unchanged.
+  'garage', 'unit',
 ]);
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
@@ -2078,8 +2139,82 @@ const NOT_A_PERSON = new Set([
 const NAMED_PERSON_VERB_RE =
   /\bhow much (?:(?!of\b|from\b|to\b|in\b|on\b|for\b|with\b|off\b|out\b|at\b|by\b|as\b)[a-z0-9'\u2019-]+\s+){0,5}?(?:has|have|had|did|does|do|is|was)\s+(?:the\s+)?([a-z][a-z'\u2019-]{1,20})\s+(?:made|make|makes|earn|earned|earns|owe|owes|owed|spent|spend|spends|paid|pay|pays|taken|take|takes|turned|billed|invoiced|saved|save|saves)\b/i;
 
-const NAMED_PERSON_POSSESSIVE_RE =
-  /\b([a-z][a-z'\u2019-]{1,20})(?:'s|\u2019s)\s+(?:books|tax|figures|takings|profit|income|account|bill|turnover|vat|earnings|wages|money|share|national insurance|ni|class ?[24]|student loan|propert(?:y|ies)|rentals?|rent|savings?|saving)\b/i;
+// ══════════════════════════════════════════════════════════════════════════════════
+// 🔴 ONE LIST, THREE PATTERNS. B23 SHAPE 3, 18 AUGUST 2026.
+//
+// The nouns below were a literal inside the possessive pattern until tonight. Shape 3's pattern
+// needs the SAME nouns, and a second copy of them is the failure this file keeps deleting: the
+// list is DESIGNED to grow (B23's own rule is that the gate gains the nouns of every lane we
+// wire, and three lanes have been wired since it was written), so two copies would drift on the
+// next lane rather than eventually.
+//
+// ⚠️ THE TEXT OF THE LIST IS UNCHANGED, CHARACTER FOR CHARACTER, AND THAT IS DELIBERATE RATHER
+// THAN INCIDENTAL. test/sabotage-b23gateear.mjs anchors seven sabotages and one control on the
+// INTERIOR of this list, which is the repair B23 made after all three died on an append. Keeping
+// the text identical is what keeps every one of them alive across this move. ONE anchor did not
+// survive, because it quoted the list's OPENING bracket (`(?:'s|’s)\s+(?:books`), which is the
+// same edge bug B23 repaired at the closing bracket, wearing the other end. It is repaired in the
+// same commit and now quotes the apostrophe alternation alone.
+// ══════════════════════════════════════════════════════════════════════════════════
+const MONEY_NOUN = 'books|tax|figures|takings|profit|income|account|bill|turnover|vat|earnings|wages|money|share|national insurance|ni|class ?[24]|student loan|propert(?:y|ies)|rentals?|rent|savings?|saving';
+
+// ⚠️ AND ONE WORD MAY SIT BETWEEN THE NAME AND THE NOUN, WHICH IS THE SHAPE B23 FOUND WHILE
+// CHECKING ITS OWN WORK AND SIZED WITHOUT CLOSING. "what is murphy's ltd turnover" fell through
+// where "what is murphy's turnover" was refused, because the noun had to follow the apostrophe
+// immediately. MEASURED at {0,1} and {0,2}: both buy the same THREE third party shapes
+// ("murphy's ltd turnover", "jerome's total tax", "dave's ltd profit") and both cost the same
+// nothing on every corpus, so it is one word, which is the smallest run that hears everything
+// measured. The same bound rule B23 wrote for the object noun run.
+const NAMED_PERSON_POSSESSIVE_RE = new RegExp(
+  String.raw`\b([a-z][a-z'\u2019-]{1,20})(?:'s|\u2019s)\s+(?:[a-z]+\s+){0,1}?(?:${MONEY_NOUN})\b`, 'i');
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// 🔴 B23 SHAPE 3. THE TWO THAT CARRY NO "how much" AT ALL, AND ONE OF THEM WAS TYPED ON
+// PRODUCTION AFTER B23 SHIPPED AND CAME BACK WITH HIS OWN £303.24.
+//
+//   "does jerome pay class 4"            -> "National Insurance this tax year: £303.24 Class 4 ..."
+//   "what national insurance is priya on"
+//
+// Neither the possessive pattern nor the object noun run reaches them: both need either an
+// apostrophe or the words "how much". The item that sized this called it highest risk and lowest
+// value, and the risk half is right, which is why this is TWO narrow shapes rather than one wide
+// one.
+//
+// ⚠️ THE WIDE ONE WAS BUILT AND MEASURED FIRST, AND IT FAILED IN THE DIRECTION THAT MATTERS.
+// Making "how much" optional on NAMED_PERSON_VERB_RE closes shape 3a and REFUSES
+// "how much of my income does the taxman take", which is a man asking about his own tax bill and
+// is the exact phrasing the run's preposition guard exists for. It also refused "does the taxman
+// take much", "do subcontractors pay cis" and "did anybody pay". FOUR false positives for one
+// gain. The preposition guard only ever protected the run AFTER "how much", so removing the
+// prefix removes the guard with it.
+//
+// SO EACH SHAPE CARRIES ITS OWN SECOND SIGNAL, AND IN BOTH CASES IT IS THE MONEY NOUN:
+//
+//   3a  <aux> <name> <money verb> <MONEY NOUN>    "does jerome pay class 4"
+//   3b  <MONEY NOUN> is <name> <preposition>      "what national insurance is priya on"
+//
+// 🔴 AND 3b's NOUN MUST BE ADJACENT TO THE AUXILIARY, WHICH IS THE WHOLE OF ITS SAFETY. A
+// window of even a few characters between them matches "what is the vat rate the shop is charging
+// on" and captures "charging". Adjacency is the bound, it was measured, and it is the reason this
+// shape reads as narrow rather than as careless.
+//
+// MEASURED IN BOTH DIRECTIONS, in the same packet, on every corpus in laneparity section 9d plus
+// 28 shapes written for this widening:
+//
+//   the nine B23 measured             6 of 9  ->  8 of 9     the gain
+//   third party shapes already heard  6 of 6  ->  6 of 6     nothing traded away
+//   the savings lane's own            4 of 5  ->  4 of 5     unchanged
+//   ordinary self phrasings           0 of 61 ->  0 of 61    NOTHING taken from a customer
+//   every dispatched lane's phrasings 0 of 61 ->  0 of 61    no lane eaten
+//   bare s possessives                0 of 4  ->  0 of 4     that decision is untouched
+//   28 shapes written for this edit   0       ->  0          "does the taxman take much" and 27 more
+//
+// ⚠️ THE NINTH IS STILL OPEN AND IS STILL THE BARE S POSSESSIVE. "how are daves rentals doing"
+// is unchanged by this packet in either direction, and the apostrophe doctrine above is why.
+// ══════════════════════════════════════════════════════════════════════════════════
+const NAMED_PERSON_BARE_RE = new RegExp(
+  String.raw`\b(?:does|do|did|has|have|is|was)\s+(?:the\s+)?([a-z][a-z'\u2019-]{1,20})\s+(?:pay|pays|paid|owe|owes|owed|earn|earns|earned|make|makes|made|claim|claims|claimed)\s+(?:the\s+|any\s+)?(?:${MONEY_NOUN})\b`
+  + String.raw`|\b(?:${MONEY_NOUN})\s+(?:is|was)\s+(?:the\s+)?([a-z][a-z'\u2019-]{1,20})\s+(?:on|paying)\b`, 'i');
 
 // The customer's own name is not somebody else. Split on whitespace so "Marcus Whitfield" excuses
 // both "marcus" and "whitfield", and lower cased because nobody capitalises their partner on
@@ -2092,10 +2227,13 @@ export function selfNameTokens(fullName: string | null | undefined): string[] {
 }
 
 function namesAPerson(b: string, selfNames: string[]): boolean {
-  for (const re of [NAMED_PERSON_VERB_RE, NAMED_PERSON_POSSESSIVE_RE]) {
+  for (const re of [NAMED_PERSON_VERB_RE, NAMED_PERSON_POSSESSIVE_RE, NAMED_PERSON_BARE_RE]) {
     const m = b.match(re);
     if (!m) continue;
-    const word = (m[1] ?? '').toLowerCase();
+    // 🔴 THE SECOND GROUP IS SHAPE 3b's, AND IT IS READ HERE RATHER THAN IN A SECOND LOOP. 3a
+    // captures in group 1 like the two patterns above it; 3b's name sits AFTER the money noun, so
+    // it is group 2. A pattern whose capture the stoplist never sees is a pattern with no stoplist.
+    const word = (m[1] ?? m[2] ?? '').toLowerCase();
     if (!word || NOT_A_PERSON.has(word)) continue;
     // 🔴 B23. THE STOPLIST WAS SINGULAR ONLY AND NOBODY HAD NOTICED, because until the object noun
     // shape above existed nothing could capture a plural. "customer", "client", "shop", "year" and

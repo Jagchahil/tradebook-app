@@ -800,6 +800,86 @@ for (const asked of [
   ok(`does NOT hear "${asked}" as a tax question`, got === null || got.kind !== 'tax');
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// B34. THE THREE SET ASIDE PHRASINGS THAT FELL TO THE MODEL, AND WHY EACH ONE NEEDED WHAT IT DID.
+//
+// The item measured 3 of 18 set aside phrasings reaching the model rather than this lane. Re
+// derived at head before anything was changed, and THE ITEM WAS WRONG ABOUT WHY ON THE FIRST:
+// it says all three lack a money noun, and "whats the taxman going to want" HAS one. It fails on
+// the interrogative clause, because \bwhat\b does not match "whats". The word boundary fails on
+// the s, which is B2-F3's own defect one clause over: "taxman" not matching \btax\b.
+//
+// ⚠️ THE OTHER TWO CARRY NO MONEY NOUN AND NEEDED A COMPANION, AND THE WIDE FIX WAS BUILT,
+// MEASURED AND REJECTED TWICE. Adding "january" to the money noun list hijacks EIGHT ordinary
+// period questions ("how much did i spend in january" becomes a set aside answer). Adding "am i"
+// to the interrogative clause hands FOUR questions that are not the set aside question a set aside
+// figure. Both numbers are in lib/waintents.ts above the clause.
+//
+// 🔴 EVERY ALTERNATIVE IN THAT COMPANION IS WALKED BELOW, OR IT IS NOT IN THE COMPANION. An
+// unexercised alternative is a hole with a name, and a sabotage deletes it for free.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== B34: the three set aside phrasings that used to reach the model ===\n');
+
+// The three from the item, verbatim. These are the targets and they are the whole of the item.
+const B34_THREE = [
+  'whats the taxman going to want',
+  'am i going to get stung in january',
+  'what will january cost me',
+];
+for (const asked of B34_THREE) {
+  const got = W.matchTotalsQuestion(asked);
+  ok(`🔴 B34: hears "${asked}", which reached the model before 18 August`,
+    got !== null && got.kind === 'tax');
+}
+
+// 🔴 ONE PHRASING PER ALTERNATIVE, so nothing in the companion can be deleted in silence.
+// Each carries the match on ONE thing: none of them contains a money noun OR the words "how much",
+// so the alternative under test is the only reason it is heard.
+for (const [alt, asked] of [
+  ['the interrogative clause hears "whats"', 'whats the taxman going to want'],
+  ['will january cost', 'what will january cost me'],
+  ['is january going to cost', 'what is january going to cost me'],
+  ['get stung ... january', 'am i going to get stung in january'],
+  ['getting stung ... january', 'am i getting stung in january'],
+]) {
+  const got = W.matchTotalsQuestion(asked);
+  ok(`🔴 B34 alternative walked, ${alt}: "${asked}"`, got !== null && got.kind === 'tax');
+}
+
+// 🔴 AND THE DIRECTION THE WIDE FIX BROKE. Every one of these was measured against the two
+// rejected widenings and every one of them MOVED. They are here so that if somebody reopens either,
+// this section goes red first and the measurement is already done for them.
+//
+// The eight a month name in the money noun list would have taken:
+for (const [asked, want] of [
+  ['how much did i spend in january', 'spent'],
+  ['what did i spend in january', 'spent'],
+  ['how much did i make in january', 'made'],
+  ['what was my profit in january', 'profit'],
+  ['how much have i spent on fuel since january', 'spent'],
+]) {
+  const got = W.matchTotalsQuestion(asked);
+  ok(`🔴 B34: "${asked}" is still a ${want} question, not a set aside one`,
+    got !== null && got.kind === want);
+}
+// The four "am i" in the interrogative clause would have taken, plus the five cost shapes the
+// companion is bounded away from. Each is a question this lane does not answer, so a figure here
+// is a precise answer to a question he did not ask, which is B25's defect by name.
+for (const asked of [
+  'am i paying too much tax',
+  'am i on the right tax code',
+  'am i registered for tax',
+  'am i due a tax refund',
+  'how much did the van cost me in january',
+  'what did the materials cost in january',
+  'how much was the insurance bill in january',
+  'am i going to get stung on this job',
+  'what will the job cost me',
+]) {
+  const got = W.matchTotalsQuestion(asked);
+  ok(`🔴 B34: "${asked}" is still NOT a set aside question`, got === null || got.kind !== 'tax');
+}
+
 // ⚠️ ONE FUNCTION, TWO CHANNELS, WHICH IS WHY THE FIX IS IN lib AND NOT IN A ROUTE. If either
 // channel stops asking this function, it grows its own answer to the same question and the two
 // drift, which is the defect the Scotland rule had on the same afternoon.

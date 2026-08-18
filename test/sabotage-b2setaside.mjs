@@ -65,9 +65,45 @@ const SABOTAGES = [
     apply: ({ dir }) => edit(dir, 'lib/waintents.ts', 'put(?:ting|tin)? (?:by|aside|away)', 'put (?:by|aside|away)'),
   },
   {
+    // 🔴 ANCHOR REPAIRED 18 AUGUST 2026 BY THE WAINTENTS PACKET, WHICH BROKE IT. It quoted the
+    // WHOLE interrogative alternation, and B34 taught that alternation to hear "whats" as well as
+    // "what". Now it removes ONE alternative and leaves the brackets alone, which is the same edge
+    // rule the noun list keeps teaching one line up.
     name: '"should i" is dropped from the question test, so "what should i be putting by" dies',
+    apply: ({ dir }) => edit(dir, 'lib/waintents.ts', '|my|should i)', '|my)'),
+  },
+
+  // ── B34, ADDED 18 AUGUST. THE THREE PHRASINGS THAT FELL TO THE MODEL, AND THE TWO WIDE ──
+  // ── FIXES THAT WERE MEASURED AND REJECTED, SO NEITHER CAN BE REINSTATED IN SILENCE.    ──
+  {
+    name: '🔴 B34: the interrogative clause stops hearing "whats", which is the state the item measured',
+    apply: ({ dir }) => edit(dir, 'lib/waintents.ts', 'how much|whats?|my', 'how much|what|my'),
+  },
+  {
+    name: '🔴 B34: the January companion goes entirely, so two of the three fall to the model again',
+    apply: ({ dir }) => edit(dir, 'lib/waintents.ts', "  else if (asksJanuaryBill) kind = 'tax';\n", ''),
+  },
+  {
+    name: '🔴 B34: the companion loses "is", so "what is january going to cost me" dies',
+    apply: ({ dir }) => edit(dir, 'lib/waintents.ts', '(?:will|is)\\s+january', '(?:will)\\s+january'),
+  },
+  {
+    name: '🔴 B34: the companion loses the participle, so "am i getting stung in january" dies',
+    apply: ({ dir }) => edit(dir, 'lib/waintents.ts', 'get(?:ting)?\\s+stung', 'get\\s+stung'),
+  },
+  {
+    name: '🔴 GREEDY B34: the stung branch drops its January bound, so "am i going to get stung on this job" gets a tax figure',
     apply: ({ dir }) => edit(dir, 'lib/waintents.ts',
-      "/\\b(how much|what|my|should i)\\b/.test(b)", "/\\b(how much|what|my)\\b/.test(b)"),
+      "|| /\\bget(?:ting)?\\s+stung\\b[^?]{0,24}\\bjanuary\\b/.test(b);",
+      "|| /\\bget(?:ting)?\\s+stung\\b/.test(b);"),
+  },
+  {
+    name: '🔴 GREEDY B34: "january" is put into the money noun list, the rejected fix that hijacks eight period questions',
+    apply: ({ dir }) => edit(dir, 'lib/waintents.ts', '(taxman|tax man|tax|owe|set', '(taxman|tax man|tax|owe|january|set'),
+  },
+  {
+    name: '🔴 GREEDY B34: "am i" is put into the interrogative clause, the other rejected fix, which answers four questions he did not ask',
+    apply: ({ dir }) => edit(dir, 'lib/waintents.ts', '|my|should i)', '|my|should i|am i)'),
   },
   {
     name: '🔴 THE ANSWER WORDING CHANGES AND THE MATCHER IS NOT TAUGHT IT. The pairing must catch this.',
@@ -95,6 +131,20 @@ const SABOTAGES = [
 ];
 
 const CONTROLS = [
+  {
+    // ⚠️ SOMEBODY BEING MORE CAREFUL WITH B34's COMPANION, which must not be frozen. "hurt" is a
+    // word a man uses about January and nothing in any corpus walks it, so this is a widening with
+    // no measured effect rather than a behaviour change.
+    name: '⚠️ B34: the January companion also hears "hurt", which is somebody being MORE careful',
+    apply: ({ dir }) => edit(dir, 'lib/waintents.ts',
+      '(?:going to\\s+)?cost\\b', '(?:going to\\s+)?(?:cost|hurt)\\b'),
+  },
+  {
+    name: '⚠️ B34: the argument above the companion is reworded, which changes nothing anybody types',
+    apply: ({ dir }) => edit(dir, 'lib/waintents.ts',
+      "B34's OTHER TWO, AND THEY NEEDED A COMPANION RATHER THAN A WIDER CLAUSE.",
+      "B34's REMAINING TWO, AND THEY NEEDED A COMPANION RATHER THAN A WIDER CLAUSE."),
+  },
   {
     name: 'the comment explaining the finding is reworded',
     apply: ({ dir }) => edit(dir, 'lib/waintents.ts',

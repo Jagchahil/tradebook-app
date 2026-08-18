@@ -1415,6 +1415,22 @@ const B23_SELF = [
   // A business whose name looks like a person.
   "how much is dave's plumbing turning over",
   'how much has murphy and sons paid me',
+  // 🔴 THE WAINTENTS PACKET, 18 AUGUST 2026. A PLACE A TRADESMAN OWNS IS NOT A PERSON, AND THIS
+  // WAS PRE EXISTING RATHER THAN CAUSED BY THE POSSESSIVE RUN THAT FOUND IT. Measured at head with
+  // no widening applied: all three of these were already refused, because the stoplist held every
+  // sibling ('shop', 'yard', 'site', 'van') and not 'garage' or 'unit'. One phrasing per word
+  // added, so neither can leave the list in silence.
+  "what is the garage's turnover",
+  "how much is the garage's vat",
+  "what is the unit's rent",
+  // 🔴 AND THE POSSESSIVE RUN'S OWN RISK, which is the direction {0,1} puts at risk: a word between
+  // a NOT a person and its money noun. Every one of these is a man asking about his own money.
+  "how much is this month's total rent",
+  "what is the business's annual turnover",
+  "how much is this year's class 4",
+  "how much is the tenant's monthly rent",
+  "what is the company's monthly bill",
+  "whats the van's road tax",
 ];
 
 // Third party shapes with a bare s possessive and NO apostrophe. Measured separately and left
@@ -1512,13 +1528,18 @@ const B23_LONG_OBJECT = [
 {
   const heard = B23_MISSES.filter((p) => aboutElse(p));
   const open = B23_MISSES.filter((p) => !aboutElse(p));
+  // 🔴 RE MEASURED 18 AUGUST 2026 BY THE WAINTENTS PACKET, WHICH CLOSED SHAPE 3. It was 6, and the
+  // two that moved are "does jerome pay class 4" and "what national insurance is priya on", both
+  // of which carry no "how much" at all and now have a pattern of their own. The argument, both
+  // shapes and the rejected wide version are in lib/waintents.ts above NAMED_PERSON_BARE_RE.
   ok(`⚠️ THE GATE HEARS ${heard.length} OF ${B23_MISSES.length} THIRD PARTY MONEY SHAPES. RE MEASURE THIS, NEVER DELETE IT`,
-    heard.length === 6);
-  // 🔴 AND THE THREE IT STILL CANNOT HEAR, BY NAME, so a later reader cannot mistake a widening
-  // for a closure. Two carry no "how much" at all and one is a possessive with no apostrophe.
-  eq('⚠️ ...and the three left open are these three and no others',
+    heard.length === 8);
+  // 🔴 AND THE ONE IT STILL CANNOT HEAR, BY NAME, so a later reader cannot mistake a widening for
+  // a closure. It is the bare s possessive, and it is DECIDED rather than pending: the apostrophe
+  // is the signal that a person is being named, and the corpus below holds that decision at 0 of 4.
+  eq('⚠️ ...and the one left open is the bare s possessive and nothing else',
     open.slice().sort(),
-    ['does jerome pay class 4', 'how are daves rentals doing', 'what national insurance is priya on']);
+    ['how are daves rentals doing']);
   // Every one of the nine still reaches one of the three lanes, which is what makes it a defect
   // rather than a curiosity: a phrase the gate misses is answered from HIS rows.
   const claimed = B23_MISSES.filter((p) => W.isNiQuestion(p) || W.isStudentLoanQuestion(p) || W.isPropertyQuestion(p));
@@ -1535,10 +1556,146 @@ const B23_LONG_OBJECT = [
 
 // ── DIRECTION THREE: A MAN ASKING ABOUT HIS OWN MONEY IS NEVER REFUSED. ─────────────────────
 {
+  // ⚠️ RE MEASURED IN FULL BY THE WAINTENTS PACKET, 18 AUGUST 2026, WHICH IS THE CONDITION B23'S
+  // OWN NOTE ATTACHES TO EVERY WIDENING OF THIS GATE. Shape 3 added a third pattern and the
+  // possessive gained a one word run, and this number did not move: 0 of 61 before, 0 of 70 after,
+  // the nine new ones being the stoplist and run risks the packet itself created.
   const refused = B23_SELF.filter((p) => aboutElse(p));
   ok(`the self corpus is big enough to be worth something, ${B23_SELF.length} phrasings`, B23_SELF.length >= 50);
   ok(`🔴 ZERO OF ${B23_SELF.length} ORDINARY SELF PHRASINGS ARE REFUSED BY THE WIDENED EAR${refused.length ? `, REFUSED: ${refused.map((p) => JSON.stringify(p)).join('; ')}` : ''}`,
     refused.length === 0);
+}
+
+// ── SHAPE 3, CLOSED 18 AUGUST, AND EACH OF ITS TWO PATTERNS WALKED ON ITS OWN. ──────────────
+//
+// 🔴 "does jerome pay class 4" WAS TYPED ON PRODUCTION AFTER B23 SHIPPED AND RETURNED HIS OWN
+// £303.24. That figure is the before, it is in the B23 walk report and in this file's own header,
+// and it is what makes this a defect rather than a curiosity.
+//
+// The two shapes are separate patterns and each carries its match on ONE thing, so a sabotage that
+// deletes either goes red here by name rather than in a total.
+{
+  // 🔴 THE LAST THREE WERE ADDED BY THIS PACKET'S OWN SABOTAGE PASS, WHICH IS THE POINT OF HAVING
+  // ONE. A sabotage removing the optional article before the money noun ran MISSED, and it was not
+  // a no op: measured, it loses exactly these three. Nothing walked the article, so it was a hole
+  // with a name, in code written an hour earlier by somebody who knows that rule.
+  const SHAPE_3A = [
+    'does jerome pay class 4', 'does dave owe tax', 'did priya pay vat',
+    'does jerome pay the vat', 'does dave owe any tax', 'did priya pay the bill',
+  ];
+  const SHAPE_3B = ['what national insurance is priya on', 'what student loan is dave on'];
+  const deafA = SHAPE_3A.filter((p) => !aboutElse(p));
+  const deafB = SHAPE_3B.filter((p) => !aboutElse(p));
+  ok(`🔴 SHAPE 3a, <aux> <name> <money verb> <money noun>, hears all ${SHAPE_3A.length}${deafA.length ? `, NOT HEARD: ${deafA.map((p) => JSON.stringify(p)).join('; ')}` : ''}`,
+    deafA.length === 0);
+  ok(`🔴 SHAPE 3b, <money noun> is <name> <preposition>, hears all ${SHAPE_3B.length}${deafB.length ? `, NOT HEARD: ${deafB.map((p) => JSON.stringify(p)).join('; ')}` : ''}`,
+    deafB.length === 0);
+
+  // 🔴 AND THE WIDE VERSION, WHICH WAS BUILT FIRST AND REJECTED ON THESE FOUR. Making "how much"
+  // optional on the verb pattern closes 3a and refuses all of these, the first of which is a man
+  // asking about his OWN tax bill and is the exact phrase the run's preposition guard exists for.
+  const WIDE_COST = [
+    'how much of my income does the taxman take',
+    'does the taxman take much',
+    'do subcontractors pay cis',
+    'did anybody pay',
+  ];
+  const wrong = WIDE_COST.filter((p) => aboutElse(p));
+  ok(`🔴 ...and the ${WIDE_COST.length} the WIDE version of shape 3 would have refused are still answered${wrong.length ? `, REFUSED: ${wrong.map((p) => JSON.stringify(p)).join('; ')}` : ''}`,
+    wrong.length === 0);
+
+  // ⚠️ 3b's NOUN MUST BE ADJACENT TO THE AUXILIARY. A window of even a few characters matches this
+  // and captures "charging", which is not a person and is not what he asked about.
+  ok('🔴 3b is bounded by ADJACENCY: "what is the vat rate the shop is charging on" is not a person',
+    aboutElse('what is the vat rate the shop is charging on') === false);
+}
+
+// ── THE POSSESSIVE'S ONE WORD RUN, AND THE STOPLIST WORDS IT EXPOSED. ───────────────────────
+//
+// ⚠️ "what is murphy's ltd turnover" fell through where "what is murphy's turnover" was refused,
+// because the noun had to follow the apostrophe immediately. Sized by B23 without closing, closed
+// here. MEASURED at {0,1} and {0,2}: both buy the same three and cost the same nothing, so it is
+// one word, which is the bound rule B23 wrote for the object noun run applied again.
+{
+  const GAP = ["what is murphy's ltd turnover", "whats jerome's total tax", "what is dave's ltd profit"];
+  const deaf = GAP.filter((p) => !aboutElse(p));
+  ok(`🔴 THE POSSESSIVE HEARS ALL ${GAP.length} WITH ONE WORD BETWEEN THE NAME AND THE NOUN${deaf.length ? `, NOT HEARD: ${deaf.map((p) => JSON.stringify(p)).join('; ')}` : ''}`,
+    deaf.length === 0);
+}
+
+// ── EVERY ALTERNATIVE OF THIRD_PARTY_RE, WALKED. A HOLE FOUND BY CHECKING RATHER THAN BY A BUG. ─
+//
+// 🔴 FOUND 18 AUGUST 2026 BY THE WAINTENTS PACKET WHILE CHECKING ITS OWN WORK, AND IT IS THIS
+// REPO'S OWN RULE FAILING ON THE GATE'S OLDEST PATTERN. THIRD_PARTY_RE has SIX alternatives and
+// only ONE of them was walked by any phrasing in this suite: "the barber next door". A sabotage
+// could have deleted "my mate", "his", "her", "their" or "someone else's" and every suite in the
+// repo would have stayed green.
+//
+// ⚠️ AN UNEXERCISED ALTERNATIVE IS NOT A FEATURE, IT IS A HOLE WITH A NAME. B23 wrote that rule
+// about the possessive noun list and walked every noun in it. This is the same rule applied to the
+// pattern next door, five years late.
+{
+  const THIRD_PARTY_ALTS = [
+    ['trade noun plus a location', 'what does the barber next door owe you lot then'],
+    ['my mate', 'how much does my mate earn'],
+    ['his plus a money noun', 'whats his turnover like'],
+    ['her plus a money noun', 'hows her profit doing'],
+    ['their plus a money noun', 'whats their turnover'],
+    ["someone else's plus a money noun", "what is someone else's income"],
+  ];
+  const deaf = THIRD_PARTY_ALTS.filter(([, p]) => !aboutElse(p));
+  ok(`🔴 EVERY ALTERNATIVE OF THIRD_PARTY_RE IS WALKED, ${THIRD_PARTY_ALTS.length} of them${deaf.length ? `, NOT HEARD: ${deaf.map(([a, p]) => `${a}: ${JSON.stringify(p)}`).join('; ')}` : ''}`,
+    deaf.length === 0);
+}
+
+// ── THE GENERIC "their", MEASURED ON PRODUCTION, RECORDED RATHER THAN FIXED. ────────────────
+//
+// 🔴 FOUND BY WALKING lekhio.app AS +callum ON 18 AUGUST, ON HEAD, WITH NOTHING CHANGED. Typed
+// into /app/thread:
+//
+//   "what are the main ways a sole trader can legally reduce their tax bill"
+//     -> "I can only see your books, so I have no idea and could not tell you if I did."
+//
+// A general tax question, refused as though it were about another person. THIRD_PARTY_RE's "their"
+// alternative cannot tell a possessive about a named person from the SINGULAR THEY, which is how
+// ordinary British English refers to a generic sole trader. Measured: 6 of the 10 below.
+//
+// ⚠️ IT IS RECORDED HERE AND DELIBERATELY NOT FIXED, AND THE REASON IS THE GATE'S OWN DOCTRINE.
+// Dropping "their" was built and measured: it closes all six and costs THREE real third party
+// shapes ("whats their turnover", "how much is their profit", "what are their takings like"). That
+// trades a re ask for a possible disclosure, which is the wrong direction by the argument written
+// above NOT_A_PERSON. It needs a way to tell a generic subject from a named one, which is a design
+// decision and not a token deletion, so it is a backlog item with its number rather than a guess.
+//
+// ⚠️ THE NUMBER IS ASSERTED SO IT CANNOT MOVE IN THE DARK, exactly as the bare s 0 of 4 and the
+// 8 of 9 above are. IF THIS GOES RED SOMEBODY HAS TOUCHED IT: re measure and write the new number
+// in, and if it went DOWN, say what it cost on the three third party shapes named above.
+{
+  const GENERIC_THEIR = [
+    'what are the main ways a sole trader can legally reduce their tax bill',
+    'how does a sole trader work out their tax',
+    'when does a subcontractor get their cis back',
+    'can a sole trader claim their phone bill',
+    'how does someone register for their vat',
+    'what happens to a builder if they miss their tax return',
+    'does a plumber pay tax on their profit',
+    'how do most sparkies handle their books',
+    'what should a new sole trader do about their income tax',
+    'how does a landlord declare their rental income',
+  ];
+  const refused = GENERIC_THEIR.filter((p) => aboutElse(p));
+  ok(`⚠️ THE GATE REFUSES ${refused.length} OF ${GENERIC_THEIR.length} GENERIC "their" QUESTIONS, walked on production and RECORDED, not fixed`,
+    refused.length === 6);
+  // And the same questions in the first person, which is the control that says the refusal is
+  // about the pronoun and not about the question.
+  const SAME_AS_SELF = [
+    'what are the main ways i can legally reduce my tax bill',
+    'how do i work out my tax',
+    'can i claim my phone bill',
+  ];
+  const wrong = SAME_AS_SELF.filter((p) => aboutElse(p));
+  ok(`⚠️ ...and all ${SAME_AS_SELF.length} of the same questions in the first person are answered, so it is the pronoun${wrong.length ? `, REFUSED: ${wrong.join('; ')}` : ''}`,
+    wrong.length === 0);
 }
 
 // ── AND THE ONE THAT WAS MEASURED AND LEFT OPEN, ASSERTED SO THE DECISION CANNOT ROT. ───────
@@ -1616,8 +1773,11 @@ const B23_LONG_OBJECT = [
 {
   const exported = [];
   for (const m of read('lib/waintents.ts').matchAll(/^export\s+(?:async\s+)?function\s+((?:is|match|looksLike)[A-Za-z0-9_]*)/gm)) exported.push(m[1]);
+  // 🔴 RE MEASURED 18 AUGUST BY THE WAINTENTS PACKET. It was six and shape 3 made it eight, so the
+  // two new ones walk every gate above this one too. That is the point of deriving the list rather
+  // than typing it: a widening upstairs cannot ship without this sweep growing to cover it.
   const NEWLY_HEARD = B23_MISSES.filter((p) => aboutElse(p));
-  ok(`the six newly heard phrases were derived, not typed, ${NEWLY_HEARD.length} of them`, NEWLY_HEARD.length === 6);
+  ok(`the newly heard phrases were derived, not typed, ${NEWLY_HEARD.length} of them`, NEWLY_HEARD.length === 8);
 
   for (const [name, code] of ROUTERS) {
     const gateAt = code.indexOf(elseSites[name]);
@@ -2474,15 +2634,92 @@ const IDENTITY_PHRASES = [
     // isSupportRequest is WhatsApp only, so on the two web routers the number is ZERO and this
     // packet is what makes it zero: before today those phrasings reached the MODEL there.
     // ══════════════════════════════════════════════════════════════════════════════════
-    const KNOWN = name === 'whatsapp'
-      ? ['isSupportRequest claims "am i talking to a human"', 'isSupportRequest claims "am i talking to a person"']
-      : [];
+    // ══════════════════════════════════════════════════════════════════════════════════
+    // 🟢 B29, CLOSED 18 AUGUST 2026, AND THE NUMBER ABOVE THIS LINE USED TO BE TWO.
+    //
+    // The overlap recorded here was real: "am i talking to a bot" got the identity answer and
+    // "am i talking to a human" opened a SUPPORT TICKET on the founder's desk, on the one channel
+    // with paying customers. Two phrasings of one question, two answers. The packet that recorded
+    // it said it was a MATCHER question and not a wiring one. It was measured again on 18 August
+    // and it is a wiring one: isIdentity is anchored END TO END, so hoisting it above the support
+    // lane can only ever move a message that IS one of the sixteen phrasings below.
+    //
+    // MEASURED BEFORE IT MOVED, in both directions:
+    //   the two phrasings                       moved to the identity lane
+    //   17 genuine cries for a person            0 moved away from the desk
+    //   "am i talking to a human or a robot"     still reaches the desk, it is not one of the 16
+    //   "am i talking to a real person here"     still reaches the desk, same reason
+    //   every other lane's 61 phrasings          isIdentity claims 0 of them
+    //
+    // ⚠️ THE ALTERNATIVE WAS MEASURED AND REJECTED, AND IT IS WHY THIS IS A REORDER. A lookbehind
+    // narrowing SUPPORT_HUMAN to refuse an "am i ..." opener closes the two AND drops those last
+    // two from the desk, where neither is an identity phrasing, so both land on the model. A fix
+    // that opens a hole. This repo's rule about blunt negatives says take the rewording, and here
+    // the rewording is an ordering.
+    //
+    // ⚠️ JAG DECIDED IT, ON 18 AUGUST, WITH THE MEASUREMENT IN FRONT OF HIM, because it changes
+    // what a customer hears. It is a real decision and not obviously a bug: a man typing that at
+    // 8pm may want a person, and the identity answer does not get him one. What decided it is that
+    // a QUESTION was opening a ticket nobody asked for.
+    //
+    // 🔴 SO THE KNOWN OVERLAP IS NOW ZERO ON EVERY ROUTER, AND THIS LIST IS KEPT RATHER THAN
+    // DELETED, EMPTY, so that a later reorder that puts the support lane back on top goes red here
+    // with the argument beside it instead of silently restoring the split. RE MEASURE, NEVER DELETE.
+    // ══════════════════════════════════════════════════════════════════════════════════
+    const KNOWN = [];
     const unexpected = eaten.filter((e) => !KNOWN.includes(e));
     ok(`🔴 ${name}: NOTHING ABOVE THE IDENTITY LANE CLAIMS ONE OF ITS PHRASES${unexpected.length ? `, EATEN: ${unexpected.join('; ')}` : ''}`,
       unexpected.length === 0);
-    ok(`⚠️ ${name}: and the KNOWN overlap is exactly ${KNOWN.length}, the pre existing support ear`,
+    ok(`🟢 ${name}: and the KNOWN overlap is exactly ${KNOWN.length}, which is B29 closed`,
       eaten.length === KNOWN.length);
   }
+}
+
+// 🔴 B29: THE SUPPORT MATCHER IS UNCHANGED, WORD FOR WORD, AND THAT IS ASSERTED SO NOBODY READS
+// THE REORDER AS A NARROWING. isSupportRequest STILL hears both phrasings. What changed is that
+// nothing asks it about them any more, because the identity lane answers first. If somebody later
+// narrows SUPPORT_HUMAN as well, this goes red and they have to say why they did both.
+{
+  // ══════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND THE COUNT MOVES HERE, OUT OF THE ROUTING SWEEP, BECAUSE THE REORDER MADE IT VACUOUS
+  // THERE. FOUND BY B29's OWN SABOTAGE PASS, WITHIN THE HOUR, AND IT IS THE SHARPEST THING THIS
+  // PACKET LEARNED.
+  //
+  // sabotage-b19identity.mjs has a sabotage that widens SUPPORT_HUMAN to swallow "are you a bot",
+  // and its stated job is "which would move the KNOWN overlap". Before tonight the routing sweep
+  // caught it, because isSupportRequest sat ABOVE the identity lane and every widening of it
+  // showed up in that sweep's `eaten` list. The reorder took isSupportRequest OUT of the gates
+  // above, so the sweep stopped being able to see it and the sabotage ran MISSED.
+  //
+  // ⚠️ THE REORDER DID NOT MAKE THE RISK GO AWAY. A support matcher that swallows an ordinary
+  // question still drags a man onto a desk he did not ask for; it just stops doing it to THESE
+  // sixteen. So the assertion FOLLOWS THE WORK rather than being deleted with the exposure: it is
+  // a MATCHER count now, not an ordering one, and it is asserted at the same 2 it always was.
+  //
+  // RE MEASURE, NEVER DELETE. If this goes to 3 somebody widened the support ear. If it goes to 0
+  // somebody narrowed it, which is the change B29 measured and rejected, and the two assertions
+  // below say what that costs.
+  // ══════════════════════════════════════════════════════════════════════════════════
+  {
+    const claimed = IDENTITY_PHRASES.filter((q) => W.isSupportRequest(q));
+    ok(`🔴 B29: the support matcher claims exactly ${claimed.length} of the ${IDENTITY_PHRASES.length} identity phrasings, and they are the two that read as a request${claimed.length ? `: ${claimed.map((q) => JSON.stringify(q)).join('; ')}` : ''}`,
+      claimed.length === 2);
+    eq('🔴 B29: ...and they are those two by name, so a widening cannot swap one for another',
+      claimed.slice().sort(), ['am i talking to a human', 'am i talking to a person']);
+  }
+
+  const STILL = ['am i talking to a human', 'am i talking to a person'];
+  const lost = STILL.filter((p) => !W.isSupportRequest(p));
+  ok(`🔴 B29: SUPPORT_HUMAN is UNTOUCHED and still hears all ${STILL.length}, the fix is the ORDER${lost.length ? `, LOST: ${lost.join('; ')}` : ''}`,
+    lost.length === 0);
+  // 🔴 AND THE TWO A NARROWING WOULD HAVE COST, which are not identity phrasings and must keep
+  // reaching a person. These are the measurement that rejected the lookbehind.
+  const REACH = ['am i talking to a human or a robot', 'am i talking to a real person here'];
+  const deaf = REACH.filter((p) => !W.isSupportRequest(p));
+  ok(`🔴 B29: and the ${REACH.length} that are a real ask for a person still reach the desk${deaf.length ? `, DEAF: ${deaf.join('; ')}` : ''}`,
+    deaf.length === 0);
+  ok('🔴 B29: ...and neither of those is an identity phrasing, which is why the reorder cannot eat them',
+    REACH.every((p) => W.isIdentity(p) === false));
 }
 
 // ⚠️ WHAT THIS DOES NOT CLOSE, ASSERTED SO IT CANNOT BE READ AS MORE THAN IT IS. isIdentity is

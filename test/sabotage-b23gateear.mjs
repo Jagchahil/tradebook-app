@@ -162,8 +162,17 @@ const SABOTAGES = [
     apply: ({ dir }) => edit(dir, W, "[a-z0-9'\\u2019-]+\\s+){0,5}?", "[a-z'\\u2019-]+\\s+){0,5}?"),
   },
   {
+    // 🔴 REPAIRED 18 AUGUST 2026 BY THE WAINTENTS PACKET, AND IT IS THE EDGE RULE FROM THE OTHER
+    // END. This anchor used to read `(?:'s|\u2019s)\s+(?:books`, which quotes the noun list's
+    // OPENING bracket and its first noun. B23 already repaired three anchors that quoted the
+    // CLOSING bracket when the savings packet appended to it. This one died the moment the list
+    // moved into a MONEY_NOUN constant, for the identical reason wearing the other end.
+    //
+    // ⚠️ IT NOW QUOTES THE APOSTROPHE ALTERNATION ALONE, which is the thing under test and is the
+    // one part of that line the noun list cannot move. ANCHOR ON THE WORK, NEVER ON WHAT HAPPENS
+    // TO SIT NEXT TO IT.
     name: '🔴 GREEDY: the apostrophe is made optional, so every plural noun becomes a named person',
-    apply: ({ dir }) => edit(dir, W, "(?:'s|\\u2019s)\\s+(?:books", "(?:'s|\\u2019s|s)\\s+(?:books"),
+    apply: ({ dir }) => edit(dir, W, "(?:'s|\\u2019s)\\s+", "(?:'s|\\u2019s|s)\\s+"),
   },
 
   // ── THE STOPLIST, IN BOTH DIRECTIONS. ────────────────────────────────────────────────────
@@ -188,16 +197,52 @@ const SABOTAGES = [
     apply: ({ dir }) => edit(dir, W, '  if (named) return true;\n', ''),
   },
   {
-    name: '🔴 the possessive pattern is dropped from the pair the matcher walks',
-    apply: ({ dir }) => edit(dir, W,
-      '  for (const re of [NAMED_PERSON_VERB_RE, NAMED_PERSON_POSSESSIVE_RE]) {',
-      '  for (const re of [NAMED_PERSON_VERB_RE]) {'),
+    // 🔴 REPAIRED 18 AUGUST 2026. THIS ANCHOR QUOTED THE WHOLE ARRAY AND THE ARRAY GREW. Shape 3
+    // made the pair a triple and both of these died at once, which is the list edge rule again:
+    // the array is DESIGNED to grow, because it gains a pattern every time the gate learns a shape.
+    // Each now removes ONE element by name and leaves the brackets alone, so a fourth pattern
+    // cannot kill them.
+    name: '🔴 the possessive pattern is dropped from the patterns the matcher walks',
+    apply: ({ dir }) => edit(dir, W, ', NAMED_PERSON_POSSESSIVE_RE,', ','),
   },
   {
-    name: '🔴 the verb pattern is dropped from the pair the matcher walks',
-    apply: ({ dir }) => edit(dir, W,
-      '  for (const re of [NAMED_PERSON_VERB_RE, NAMED_PERSON_POSSESSIVE_RE]) {',
-      '  for (const re of [NAMED_PERSON_POSSESSIVE_RE]) {'),
+    name: '🔴 the verb pattern is dropped from the patterns the matcher walks',
+    apply: ({ dir }) => edit(dir, W, '[NAMED_PERSON_VERB_RE, ', '['),
+  },
+
+  // ── SHAPE 3, ADDED 18 AUGUST BY THE WAINTENTS PACKET. Two patterns, two shapes, and the ──
+  // ── production transcript behind one of them is "does jerome pay class 4" -> £303.24.    ──
+  {
+    name: '🔴 the whole shape 3 pattern is dropped, which is the state the £303.24 transcript was typed in',
+    apply: ({ dir }) => edit(dir, W, ', NAMED_PERSON_BARE_RE]', ']'),
+  },
+  {
+    // ⚠️ RE AIMED 18 AUGUST AFTER IT RAN MISSED, AND THE FIRST DRAFT IS WORTH RECORDING. It
+    // replaced `(?:is|was)` with `(?:is|wasnt)`, which leaves "is" in place, and 3b's own walked
+    // phrasing uses "is". A sabotage that removes the half nothing walks is not a sabotage. It now
+    // takes the TRAILING PREPOSITION, which is the signal 3b actually turns on.
+    name: '🔴 shape 3b loses its trailing preposition, so "what national insurance is priya on" answers from HIS rows again',
+    apply: ({ dir }) => edit(dir, W, '\\s+(?:on|paying)\\b', '\\s+(?:paying)\\b'),
+  },
+  {
+    name: '🔴 shape 3a\'s money verbs go, so "does jerome pay class 4" falls through',
+    apply: ({ dir }) => edit(dir, W, '(?:pay|pays|paid|owe|owes|owed|earn', '(?:owe|owes|owed|earn'),
+  },
+  {
+    name: '🔴 DEAF: shape 3a stops allowing an article before the noun, so half the shapes it hears go',
+    apply: ({ dir }) => edit(dir, W, '(?:the\\s+|any\\s+)?(?:${MONEY_NOUN})', '(?:${MONEY_NOUN})'),
+  },
+  {
+    name: '🔴 the second capture group is never read, so shape 3b captures a name the stoplist never sees',
+    apply: ({ dir }) => edit(dir, W, "(m[1] ?? m[2] ?? '')", "(m[1] ?? '')"),
+  },
+  {
+    name: '🔴 the possessive run goes, so "what is murphy\'s ltd turnover" falls through again',
+    apply: ({ dir }) => edit(dir, W, '(?:[a-z]+\\s+){0,1}?', ''),
+  },
+  {
+    name: '🔴 GREEDY: "garage" and "unit" leave the stoplist, so a man asking about his own yard is refused',
+    apply: ({ dir }) => edit(dir, W, "  'garage', 'unit',\n", ''),
   },
 ];
 
@@ -227,6 +272,16 @@ const CONTROLS = [
   {
     name: '⚠️ THE RUN IS WIDENED TO EIGHT WORDS, which is somebody being MORE careful and must not be frozen',
     apply: ({ dir }) => edit(dir, W, '){0,5}?(?:has|have', '){0,8}?(?:has|have'),
+  },
+  {
+    // ⚠️ DRAFTED AS A SABOTAGE, RAN MISSED, AND MOVED HERE ON THE MEASUREMENT RATHER THAN ON AN
+    // ARGUMENT, which is the rule the B19 deadline pass and B23's own greedy run both wrote down.
+    // Opening the POSSESSIVE run from one word to five changes nothing on any corpus in section 9d
+    // and gains exactly two shapes, BOTH of them third party ("what did dave's mate charge for the
+    // rent" and one longer one). So it is somebody hearing MORE about other people's money, which
+    // is the direction this gate exists to go in, and freezing one word would freeze that.
+    name: '⚠️ THE POSSESSIVE RUN IS WIDENED TO FIVE WORDS, which is somebody being MORE careful and must not be frozen',
+    apply: ({ dir }) => edit(dir, W, '(?:[a-z]+\\s+){0,1}?', '(?:[a-z]+\\s+){0,5}?'),
   },
   {
     // ⚠️ THIS WAS DRAFTED AS A SABOTAGE, RAN MISSED, AND WAS MOVED HERE ON THE EVIDENCE. The B19

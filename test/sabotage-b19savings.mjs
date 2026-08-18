@@ -293,8 +293,18 @@ const SABOTAGES = [
     apply: ({ dir }) => edit(dir, WAI, 'turned|billed|invoiced|saved|save|saves)', 'turned|billed|invoiced)'),
   },
   {
+    // 🔴 ANCHOR REPAIRED 18 AUGUST 2026 BY THE WAINTENTS PACKET, AND IT IS THE SAME TRAP FIRING A
+    // SECOND TIME. It read `|rentals?|rent|savings?|saving)`, which quotes this list's CLOSING
+    // BRACKET. B23 repaired three anchors that did exactly that when THIS packet's own savings
+    // nouns were appended after them; this one was written on the same day and quoted the new
+    // edge instead of the interior, so it died the moment shape 3 lifted the list into a constant
+    // and the `)` moved to a `';`.
+    //
+    // ⚠️ IT NOW QUOTES THE INTERIOR, `|rent|savings?|`, which no append and no move can touch. The
+    // rule this repo keeps paying for: ANCHOR INSIDE A LIST, NEVER AT ITS EDGE, and an edge is
+    // still an edge when it is the one you just added.
     name: '🔴 the possessive list loses "savings", so "what is jerome\'s saving" reaches his own figure',
-    apply: ({ dir }) => edit(dir, WAI, "|rentals?|rent|savings?|saving)", '|rentals?|rent)'),
+    apply: ({ dir }) => edit(dir, WAI, '|rent|savings?|saving', '|rent'),
   },
   {
     name: '🔴 the unlinked number sentence is copied to the web, where that state cannot exist',

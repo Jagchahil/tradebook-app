@@ -286,5 +286,38 @@ const dropped = await F.readActivityFeed('alice', 40, seal);
 ok('a row with no usable amount is dropped rather than rendered as £NaN',
   Array.isArray(dropped) && dropped.length === 0);
 
+// ════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE WEB FEED SAYS LEKHIO, WHATEVER ROLE THE ROW CARRIES. B28's web half, 18 August 2026.
+//
+// The title used to branch on `m.role === 'puchio'` and print "Puchio answered." to a customer who
+// has only ever been introduced to Lekhio, on a screen that had just introduced itself as Lekhio.
+//
+// ⚠️ AND IT WAS THE DEFAULT CASE, NOT A RARE ONE. `puchio` is not a constant in the code, it is a
+// ROLE VALUE OUT OF THE DATABASE: doc 95's chat memory wrote it on every stored turn before the
+// role was widened, and supabase/APPLY_2026-07-31_thread.sql still allows it. So every historic
+// answer in a man's own feed carried the other name.
+//
+// ⚠️ THIS SAYS NOTHING ABOUT WHAT THE PHONE IS CALLED. That is still B28 and it is still open.
+// The role column, its check constraint and every migration are deliberately untouched, which is
+// why this is asserted on the ANSWER SHOWN and not on the data.
+// ════════════════════════════════════════════════════════════════════════════════════════
+{
+  const bothRoles = [
+    { conversation_id: CONV, role: 'user', content: 'Can I claim the van?', created_at: '2026-08-05T09:00:00Z' },
+    { conversation_id: CONV, role: 'puchio', content: 'Yes, if it is used for work.', created_at: '2026-08-05T08:30:00Z' },
+    { conversation_id: CONV, role: 'lekhio', content: 'Yes, if it is used for work.', created_at: '2026-08-05T08:00:00Z' },
+  ];
+  reset([{ json: [] }, { json: bothRoles }, { json: [] }]);
+  const rolesFeed = await F.readActivityFeed('alice', 40, seal);
+  const titles = rolesFeed.map((i) => i.title);
+  ok('all three turns came back, so this is not vacuous', titles.length === 3);
+  ok('his own question is still his', titles[0] === 'You asked.');
+  ok('🔴 a stored puchio turn is shown as Lekhio on the web', titles[1] === 'Lekhio answered.');
+  ok('...and so is a lekhio one, which is the point: one name on this surface',
+    titles[2] === 'Lekhio answered.');
+  ok('🔴 the other name reaches no web customer through this feed',
+    !titles.some((t) => /puchio/i.test(t)));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

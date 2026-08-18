@@ -54,6 +54,11 @@ const sampleAnswers = {
   v: 1,
   t0: 1_754_000_000_000,
   step: 4,
+  // 🔴 B33, 18 August 2026. A man on step 4 has been past step 1, and step 1 is where he confirms
+  // the region, so a fixture on step 4 WITHOUT this is a state the product cannot produce. It is
+  // here because the fixture has to be a real customer, not because the clamp needs feeding: the
+  // clamp is exercised on its own, deliberately, in the block that follows this one.
+  region: true,
   phone: '+447700900123',
   email: 'sam@example.com',
   tradeType: 'partnership',
@@ -92,6 +97,7 @@ ok('🔴 THE SIX ANSWERS SURVIVE THE RELOAD, all of them, not a subset',
   && restored.trade === sampleAnswers.trade
   && restored.postcode === sampleAnswers.postcode
   && restored.address === sampleAnswers.address
+  && restored.region === sampleAnswers.region
   && restored.vat === sampleAnswers.vat
   && JSON.stringify(restored.streams) === JSON.stringify(sampleAnswers.streams));
 
@@ -100,6 +106,44 @@ ok('the original start time survives too, so the bot trap in /api/onboard reads 
 
 ok('restoring twice in a row (two refreshes back to back) gives the identical answers both times',
   JSON.stringify(readDraft()) === JSON.stringify(restored));
+
+// ════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B33. A DRAFT THAT NEVER CONFIRMED THE REGION COMES BACK TO THE SCREEN THAT ASKS.
+//
+// This is the only hole a client side gate really has. The tick is asked on step 1; a tab restored
+// onto step 4 would resume PAST the only screen that asks it, and the man would reach the end of
+// his signup never having been asked. A draft written before the gate shipped is exactly that
+// shape, and so is a hand edited sessionStorage entry. Neither is exotic and neither may work.
+//
+// ⚠️ EXERCISED, NOT READ. Every other guard on this behaviour reads the source and could be
+// satisfied by a line that runs on nothing. This one writes a real draft and reads it back.
+// ════════════════════════════════════════════════════════════════════════════════════════
+{
+  clearDraft();
+  const preGate = { ...sampleAnswers, step: 4 };
+  delete preGate.region;
+  writeDraft(preGate);
+  const back = readDraft();
+  ok('🔴 a draft from before the gate restores to step 1, not to the step it claims',
+    back !== null && back.step === 1);
+  ok('...and it restores the confirmation as false, never as missing',
+    back !== null && back.region === false);
+  ok('🔴 and not one of his other answers is lost on the way back',
+    back !== null && back.email === preGate.email && back.name === preGate.name
+    && back.tradeType === preGate.tradeType && back.trade === preGate.trade
+    && back.streams.join(',') === preGate.streams.join(','));
+
+  clearDraft();
+  const hand = { ...sampleAnswers, step: 5, region: 'yes' };
+  writeDraft(hand);
+  const forged = readDraft();
+  ok('🔴 a hand edited store cannot tick the box with a truthy string',
+    forged !== null && forged.region === false && forged.step === 1);
+
+  // Put the tab back the way the rest of this suite expects to find it.
+  clearDraft();
+  writeDraft(sampleAnswers);
+}
 
 console.log('\n=== 2. EXECUTABLE: cleared the moment the flow completes ===\n');
 

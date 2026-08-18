@@ -60,6 +60,20 @@ export interface StartDraft {
   v: 1;
   t0: number;
   step: number;
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B33. THE REGION CONFIRMATION, AND IT IS IN THE DRAFT FOR ONE REASON ONLY: SO A RESTORED
+  // DRAFT CANNOT WALK PAST THE GATE.
+  //
+  // The tick is asked on step 1. Without it here, a tab restored onto step 4 would resume PAST the
+  // only screen that asks, and the man would reach the end of the signup never having been asked.
+  // With it here, readDraft below sends any draft that has not got it back to step 1, where his
+  // answers are all still waiting for him and nothing is retyped.
+  //
+  // ⚠️ IT IS NOT AN ANSWER WE KEEP. Nothing is stored about it beyond this tab: it is not posted
+  // as a fact, it is not written to public.users, and the draft is cleared the moment the signup
+  // completes. What survives is that /api/onboard refused to mint an account without it.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  region: boolean;
   phone: string;
   email: string;
   tradeType: TradeType;
@@ -87,7 +101,16 @@ export function readDraft(): StartDraft | null {
     return {
       v: 1,
       t0: typeof d.t0 === 'number' && d.t0 > 0 ? d.t0 : Date.now(),
-      step: typeof d.step === 'number' && d.step >= 1 && d.step <= TOTAL ? d.step : 1,
+      // 🔴 B33. A DRAFT THAT HAS NOT CONFIRMED THE REGION RESTORES TO STEP 1, WHATEVER IT CLAIMS.
+      //
+      // Anything else is a hole in the gate rather than a courtesy: a tab drafted before this
+      // shipped, or one hand edited in the console, would otherwise resume past the only screen
+      // that asks. Step 1 is where the tick lives, every other answer he gave is restored beside
+      // it, and the cost of being wrong about him is a few taps rather than an unasked question.
+      step: d.region === true && typeof d.step === 'number' && d.step >= 1 && d.step <= TOTAL ? d.step : 1,
+      // Never restored as true from anything but a real true. A hand edited store, a half written
+      // value or an older draft with no field at all all mean "he has not said so".
+      region: d.region === true,
       phone: str(d.phone),
       email: str(d.email),
       tradeType: TRADE_TYPES.includes(d.tradeType as TradeType) ? (d.tradeType as TradeType) : null,

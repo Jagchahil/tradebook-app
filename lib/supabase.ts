@@ -1304,8 +1304,20 @@ export function normalizeUkPhone(input: string): string {
 }
 
 export interface WaitlistSignup {
-  phone: string;
+  // ⚠️ OPTIONAL SINCE B33, 18 AUGUST 2026, AND THE ROUTE STILL REQUIRES ONE OF THE TWO.
+  //
+  // /early-access is a phone first form and always sends a number. The region gate at signup asks
+  // for an address and nothing else, because a man we have just turned away has been asked for
+  // enough already. So the TABLE has always allowed either (both columns are nullable) and it is
+  // only this type and app/api/waitlist that insisted, which meant the honest smaller form could
+  // not use the list it belongs on.
+  phone?: string | null;
   email?: string | null;
+  // 🔴 WHICH GATE TURNED HIM AWAY, so the list is segmentable and a region that opens can be told
+  // without telling everybody. lib/region.ts derives it from REGION, which means a row keeps the
+  // tag of the gate that actually stopped him rather than being rewritten by a later change of
+  // mind. Absent on an /early-access row, which is correct: nothing turned that man away.
+  region?: string | null;
 }
 
 // What the insert actually did, because the two outcomes are different sentences to the man and
@@ -1316,14 +1328,47 @@ export type WaitlistOutcome = 'inserted' | 'already_listed';
 
 export async function insertWaitlistSignup(signup: WaitlistSignup): Promise<WaitlistOutcome> {
   const { url } = config();
-  const record: Record<string, string> = { phone: normalizeUkPhone(signup.phone) };
+  const record: Record<string, string> = {};
+  // A phone is no longer assumed. normalizeUkPhone('') returns '', which every reader already
+  // treats as absent, but sending the empty string where nothing was given writes a column we were
+  // not asked to write, so it is simply left off.
+  if (signup.phone) record.phone = normalizeUkPhone(signup.phone);
   if (signup.email) record.email = signup.email;
+  if (signup.region) record.region = signup.region;
 
-  const res = await fetch(`${url}/rest/v1/waitlist`, {
+  const post = (body: Record<string, string>) => fetch(`${url}/rest/v1/waitlist`, {
     method: 'POST',
     headers: headers({ Prefer: 'return=minimal' }),
-    body: JSON.stringify(record),
+    body: JSON.stringify(body),
   });
+
+  let res = await post(record);
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE COLUMN MAY NOT BE THERE YET, AND LOSING THE ADDRESS OVER THAT IS THE WORST OUTCOME
+  // AVAILABLE. B33, 18 August 2026.
+  //
+  // supabase/APPLY_2026-08-18_waitlist_region.sql adds waitlist.region and Jag runs it by hand,
+  // as every migration in this product is run. A deploy that lands before he runs it would make
+  // PostgREST answer 400 PGRST204 for an unknown column, and every man the region gate turned
+  // away would have his address dropped on the floor by the one screen whose entire job is to
+  // keep it. That is not a risk worth taking for a bookkeeping column.
+  //
+  // So the region is dropped and the row is saved without it, exactly once, and only when a region
+  // was being sent. Nothing else is forgiven: a 500, a refusal or a dropped connection is still a
+  // real failure and the caller still tells him so. It is the same trade app/api/onboarding makes
+  // in its own words: only a lost ANSWER is worth blocking a man for, and a segmentation tag is
+  // not one. The log says which state we are in, without ever naming him.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (res.status === 400 && record.region) {
+    const withoutRegion: Record<string, string> = {};
+    for (const [k, v] of Object.entries(record)) if (k !== 'region') withoutRegion[k] = v;
+    res = await post(withoutRegion);
+    if (res.ok) {
+      console.warn('[waitlist] region column missing: run supabase/APPLY_2026-08-18_waitlist_region.sql');
+    }
+  }
+
   if (res.ok) return 'inserted';
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 A DOUBLE SUBMIT IS NOT A FAILURE, AND IT MUST NOT BE ON_CONFLICT EITHER.
@@ -11617,7 +11662,21 @@ export async function readActivityFeed(userId: string, limit: number, seal: Feed
     items.push({
       kind: 'chat',
       when,
-      title: m.role === 'user' ? 'You asked.' : m.role === 'puchio' ? 'Puchio answered.' : 'Lekhio answered.',
+      // ═══════════════════════════════════════════════════════════════════════════════════
+      // 🔴 THE WEB FEED SAYS LEKHIO, WHATEVER ROLE THE ROW CARRIES. B28's web half, 18 Aug 2026.
+      //
+      // This used to branch on `m.role === 'puchio'` and print "Puchio answered." It is NOT a
+      // constant, it is a ROLE VALUE OUT OF THE DATABASE (doc 95's chat memory), so the name
+      // reached a WEB customer who has only ever been introduced to Lekhio, on a screen that had
+      // just introduced itself as Lekhio. Every stored turn from before the role was widened
+      // carries it, so this was not a rare case, it was the default one.
+      //
+      // ⚠️ THIS DOES NOT DECIDE WHAT THE PHONE IS CALLED, AND IT IS NOT MEANT TO. The phone's
+      // accountant box is still Puchio in five places in the mobile repo, that is still B28, and
+      // nothing here touches it. This is the one line that put the other name in front of a web
+      // customer, and the role column, the schema check and every migration are untouched.
+      // ═══════════════════════════════════════════════════════════════════════════════════
+      title: m.role === 'user' ? 'You asked.' : 'Lekhio answered.',
       detail: line,
       ref: sealed ? `/app/thread/chat?c=${encodeURIComponent(sealed)}` : '',
     });

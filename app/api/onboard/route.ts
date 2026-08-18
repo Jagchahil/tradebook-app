@@ -144,6 +144,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 B33. THE REGION GATE, ON THE SERVER, WHERE IT IS A GATE RATHER THAN A TICK.
+    //
+    // app/start draws the tick and refuses to advance without it, and that is the whole of what a
+    // customer ever sees. It is also drawn by JavaScript on his machine, so it is a courtesy and
+    // not a control. This is the control: no confirmation, no account.
+    //
+    // ⚠️ IT IS SAFE TO MAKE THIS REQUIRED, DERIVED RATHER THAN ASSUMED. This route has exactly ONE
+    // caller in the whole estate, `submitSignup` in app/start/page.tsx, checked by grep across
+    // both repos on 18 August 2026. The phone app does not post here and never has.
+    //
+    // ⚠️ AND IT IS NOT A CLAIM THAT WE KNOW WHERE HE LIVES. lib/scotland.ts's rule is that we do
+    // not detect and must never say we do. We do not. He told us, in his own words, once.
+    //
+    // ⚠️ THE MESSAGE IS FOR A DEVELOPER, NOT FOR A CUSTOMER. A customer cannot reach this: the
+    // button that posts is disabled until the box is ticked. Anything that DOES reach it has
+    // bypassed the screen, and the honest answer to that is the plain fact.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    if (b.regionConfirmed !== true) {
+      return NextResponse.json({ error: 'Confirm where you live before setting up.' }, { status: 400 });
+    }
+
     // 🔴 THE MOBILE IS OPTIONAL. The account is created from the proved EMAIL alone, and a number
     // typed here lands on signups.phone, which nothing that signs a man in or runs his books reads
     // (WhatsApp binds a fresh number from the handset). This door used to reject a signup with no

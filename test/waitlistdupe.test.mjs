@@ -193,8 +193,14 @@ console.log('\nThe fix is not the one that only looks right.\n');
   const routeCode = rawRouteSrc.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
   ok('the route still defers the welcome email with after(), so a signup never waits on email',
     /after\(async \(\) => \{/.test(routeCode));
+  // ⚠️ REPOINTED 18 AUGUST 2026 BY B33, AND THE PROPERTY IS UNCHANGED. The condition gained `!region`
+  //    because the region gate's waitlist rows must get NO welcome email at all: that email says
+  //    "one of the first we let in" and "your first 7 days are free", and neither may be said to a
+  //    man we have just turned away. `outcome === 'inserted'` is what this suite is about and it is
+  //    still the thing gating the send, so the assertion follows the work rather than freezing the
+  //    line it used to sit on.
   ok("🔴 and the send is gated on a real insert, which is the only thing stopping the second email",
-    /if \(email && outcome === 'inserted'\)/.test(routeCode));
+    /if \(email &&[^)]*outcome === 'inserted'\)/.test(routeCode));
   ok('the duplicate is no longer answered with a 500',
     !/return NextResponse\.json\(\{ error: 'Could not save[^]*?\n\s*\}\n\s*\/\/ A warm/.test(routeCode));
 }

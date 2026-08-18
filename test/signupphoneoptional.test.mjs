@@ -37,8 +37,14 @@ const onboardCode = codeOnly(onboard);
 console.log('\nThe front door asks for the email and offers the mobile.\n');
 
 // 1. THE GATE. Email is required; a phone is required only to be VALID if one is typed at all.
-ok('🔴 step one continues on the email alone, the phone optional and only validated if typed',
-  /if \(step === 1\) return emailValid && \(phone\.trim\(\)\.length === 0 \|\| phoneReady\);/.test(startCode));
+// ⚠️ REPOINTED 18 AUGUST 2026 BY B33, NOT WEAKENED, AND WHICH IT IS MATTERS. This pinned the
+//    WHOLE of step 1's gate, `if (step === 1) return emailValid && (...)`, so it failed the moment
+//    the region confirmation joined the expression, even though the property it is about, THE
+//    PHONE, had not moved by a character. The assertion now pins the phone clause and the fact
+//    that the email is in the same expression, which is the thing this suite is actually for. The
+//    region half has its own suite and is deliberately not restated here.
+ok('🔴 step one continues on the email, the phone optional and only validated if typed',
+  /if \(step === 1\) return [^;]*emailValid && \(phone\.trim\(\)\.length === 0 \|\| phoneReady\);/.test(startCode));
 ok('🔴 the old mandatory gate is gone: phone is no longer required to continue',
   !/if \(step === 1\) return phoneReady && emailValid;/.test(startCode));
 

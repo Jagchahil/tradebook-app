@@ -12,6 +12,13 @@ import { GREEN, GREEN_TINT, INK, LINE, MUTED, ON_GREEN_TINT, ON_RIVER, ON_SAFFRO
 import { findSic } from '../../lib/siccodes';
 import { HOW_LONG, registeredShape } from '../../lib/onboarding';
 import { TOTAL, type StartDraft, readDraft, writeDraft, clearDraft } from './draft';
+// 🔴 B33. ONE CONSTANT, AND EVERY WORD OF THE GATE DERIVED FROM IT. Nothing on this screen types
+// the region name out: change REGION in lib/region.ts and the tick, the link, the blocked screen
+// and the tag stored beside a waitlist address all change together.
+import {
+  REGION_TAG, regionConfirmLabel, regionConfirmWhy, regionElsewhereLink, regionBlockedHeading,
+  regionBlockedBody, regionWaitlistAsk, regionWaitlistButton, regionWaitlistDone, regionBackLine,
+} from '../../lib/region';
 
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
@@ -183,6 +190,24 @@ export default function StartPage() {
   const [resendBusy, setResendBusy] = useState(false);
   // Honeypot, must stay empty for a real person. NEVER drawn from the draft: a bot trap that could
   // be pre-filled by whatever the tab remembered would stop being a trap.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B33. THE REGION GATE. He confirms where he lives before he is asked anything else.
+  //
+  // `region` is the tick. `blocked` is the screen a man who cannot tick it asks for by name, and
+  // it is reached by ONE plain link under the tick rather than by a dead Continue button: a
+  // required tick with no way to say "not me" stops him without telling him why, which is the
+  // screen doc 103's honesty test exists to forbid.
+  //
+  // The rest is the waitlist capture on that screen and nothing more. No timeline, no country, no
+  // second question.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const [region, setRegion] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [regionEmail, setRegionEmail] = useState('');
+  const [regionBusy, setRegionBusy] = useState(false);
+  const [regionErr, setRegionErr] = useState('');
+  const [regionListed, setRegionListed] = useState(false);
+
   const [hp, setHp] = useState('');
   // The real start of THIS signup attempt, not of this page load. A draft restore carries the
   // original value back in, so a man who is interrupted and returns nine minutes later still
@@ -225,6 +250,10 @@ export default function StartPage() {
     setAddress(found.address);
     setVat(found.vat);
     setStreams(found.streams);
+    // 🔴 B33. readDraft already refuses to restore a step past 1 without this, so a draft that
+    // never confirmed the region comes back to the screen that asks. Carried anyway rather than
+    // reset, so a man who ticked it and refreshed is not asked the same question twice.
+    setRegion(found.region);
     if (found.step > 1) setRestoredNotice(true);
   }
 
@@ -256,10 +285,10 @@ export default function StartPage() {
   useEffect(() => {
     if (!hydrated || done) return;
     writeDraft({
-      v: 1, t0, step, phone, email, tradeType, share, name, personName, trade, customTrade,
+      v: 1, t0, step, region, phone, email, tradeType, share, name, personName, trade, customTrade,
       postcode, address, vat, streams,
     });
-  }, [hydrated, done, t0, step, phone, email, tradeType, share, name, personName, trade,
+  }, [hydrated, done, t0, step, region, phone, email, tradeType, share, name, personName, trade,
     customTrade, postcode, address, vat, streams]);
 
   // The low key way out, for a shared machine or simply a wrong guess. Wipes the draft and every
@@ -281,6 +310,13 @@ export default function StartPage() {
     setAddress('');
     setVat(false);
     setStreams([]);
+    // 🔴 B33. Start over means start over. Leaving the tick set would let a shared machine hand the
+    // next person somebody else's answer to the one question this product refuses to guess.
+    setRegion(false);
+    setBlocked(false);
+    setRegionEmail('');
+    setRegionErr('');
+    setRegionListed(false);
     setT0(Date.now());
   }
 
@@ -314,7 +350,11 @@ export default function StartPage() {
     // you are ready", which cannot both be true on the front door of a product whose whole pitch is
     // that it does not say one thing and do another. So the gate asks for the email, and for the
     // phone only that IF one is typed it is a real one, which catches a typo without demanding it.
-    if (step === 1) return emailValid && (phone.trim().length === 0 || phoneReady);
+    // 🔴 B33. AND HE CONFIRMS WHERE HE LIVES BEFORE ANYTHING ELSE IS ASKED. It is the first
+    // screen and it is the cheapest possible question, because the alternative is fifteen minutes
+    // of interview ending in a number worked out at rates that are not his. The man who cannot
+    // tick it does not sit here looking at a dead button: the link beside the tick is his.
+    if (step === 1) return region && emailValid && (phone.trim().length === 0 || phoneReady);
     if (step === 2) return tradeType !== null && name.trim().length > 1 && (!needsPersonName || personName.trim().length > 1) && (tradeType !== 'partnership' || shareValid);
     if (step === 3) return trade !== '' && (trade !== 'Something else' || customTrade.trim().length > 1);
     if (step === 4) return true; // streams optional, none is a fine answer
@@ -325,7 +365,7 @@ export default function StartPage() {
     // memo does not recompute when he types his percentage, so a partner fills the box in and
     // Continue stays dead until some other answer on the screen happens to change. He would read
     // that as the page being broken, on the one step nobody else has to do.
-  }, [step, phone, phoneReady, emailValid, tradeType, name, personName, needsPersonName, shareValid, trade, customTrade, vat]);
+  }, [step, region, phone, phoneReady, emailValid, tradeType, name, personName, needsPersonName, shareValid, trade, customTrade, vat]);
 
   // What they actually typed or picked, for the SIC matcher. Only a limited company needs a SIC
   // code at all (Companies House asks for it; a sole trader never does, see lib/siccodes), so this
@@ -350,6 +390,13 @@ export default function StartPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          // 🔴 B33. THE CONFIRMATION TRAVELS WITH THE SIGNUP AND THE DOOR REFUSES WITHOUT IT.
+          //
+          // A tick enforced only in this file is a tick, not a gate: the button is drawn by
+          // JavaScript on his machine and the route is the only thing we control. It costs one
+          // field and one `if`, and app/api/onboard has exactly ONE caller in the whole estate,
+          // which is this function, so nothing else can be broken by asking for it.
+          regionConfirmed: region,
           phone,
           email: email.trim(),
           tradeType,
@@ -440,6 +487,31 @@ export default function StartPage() {
       setCodeErr('We could not check that just now. Try again in a minute.');
     }
     setCodeBusy(false);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B33. THE ONLY THING THE BLOCKED SCREEN DOES. It takes an address, tags it with the region
+  // that turned him away, and says so. No account is made, no trial is granted, nothing is
+  // promised, and no email is sent: the waitlist welcome tells a man he will be "one of the first
+  // we let in" and that his "first 7 days are free", and neither may be said to somebody we have
+  // just turned away. app/api/waitlist suppresses it on this path for that reason.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  async function joinRegionList(): Promise<void> {
+    if (regionBusy) return;
+    setRegionBusy(true);
+    setRegionErr('');
+    try {
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: regionEmail.trim(), region: REGION_TAG }),
+      });
+      if (res.ok) setRegionListed(true);
+      else setRegionErr('We could not save that just now. Try again in a minute.');
+    } catch {
+      setRegionErr('We could not save that just now. Try again in a minute.');
+    }
+    setRegionBusy(false);
   }
 
   async function next() {
@@ -626,6 +698,67 @@ export default function StartPage() {
               </div>
 
             </div>
+          ) : blocked ? (
+            /* ═══════════════════════════════════════════════════════════════════════════════
+               🔴 B33. THE BLOCKED SCREEN. IT COLLECTS AN EMAIL AND PROMISES NOTHING ELSE.
+               No timeline, no named country, no claim about what will be supported. The wording
+               and the argument for every sentence of it are in lib/region.ts. He is not signed
+               up, no account exists, and nothing has been sent to him.
+               ═══════════════════════════════════════════════════════════════════════════════ */
+            <div className="step-anim">
+              <h1 style={{ fontSize: 27, fontWeight: 800, letterSpacing: '-0.8px', margin: '0 0 12px', lineHeight: 1.15 }}>{regionBlockedHeading()}</h1>
+              <p style={{ fontSize: 16, color: MUTED, lineHeight: 1.6, margin: '0 0 24px' }}>{regionBlockedBody()}</p>
+
+              {regionListed ? (
+                <div style={{ backgroundColor: GREEN_TINT, border: `1px solid ${edge(GREEN, 25)}`, borderRadius: 12, padding: '16px 18px' }}>
+                  <p style={{ fontSize: 15.5, fontWeight: 600, color: ON_GREEN_TINT, lineHeight: 1.55, margin: 0 }}>{regionWaitlistDone()}</p>
+                </div>
+              ) : (
+                <div style={{ backgroundColor: SURFACE, borderRadius: 12, padding: '16px 18px' }}>
+                  <p style={{ fontSize: 14.5, color: INK, lineHeight: 1.55, margin: '0 0 14px' }}>{regionWaitlistAsk()}</p>
+                  <label htmlFor="region-email" style={fieldLabel}>Email</label>
+                  <input
+                    id="region-email"
+                    className="field"
+                    inputMode="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={regionEmail}
+                    onChange={(e) => setRegionEmail(e.target.value)}
+                    style={fieldStyle}
+                  />
+                  {regionErr ? (
+                    <p role="alert" style={{ fontSize: 13.5, color: RED, marginTop: 10, marginBottom: 0 }}>{regionErr}</p>
+                  ) : null}
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() => void joinRegionList()}
+                    disabled={regionBusy || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regionEmail.trim())}
+                    style={{
+                      marginTop: 14, width: '100%', border: 'none', fontSize: 16, fontWeight: 700,
+                      padding: '15px 24px', borderRadius: 12,
+                      cursor: regionBusy ? 'default' : 'pointer',
+                      backgroundColor: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regionEmail.trim()) ? RIVER : SURFACE,
+                      color: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regionEmail.trim()) ? ON_RIVER : MUTED,
+                    }}
+                  >
+                    {regionBusy ? 'Saving' : regionWaitlistButton()}
+                  </button>
+                </div>
+              )}
+
+              {/* 🔴 THE WAY BACK. A man who simply had not read the box yet arrives here too, and
+                  telling him he is in the wrong place with no way to say otherwise would be the
+                  worst screen on the site. */}
+              <button
+                type="button"
+                onClick={() => setBlocked(false)}
+                style={{ marginTop: 22, background: 'none', border: 'none', padding: 0, color: RIVER, fontSize: 14.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+              >
+                {regionBackLine()}
+              </button>
+            </div>
           ) : (
             <div key={step} className="step-anim">
               {step === 1 && (
@@ -639,6 +772,35 @@ export default function StartPage() {
                   </div>
                   <p style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>Add your mobile now if you would like to link WhatsApp later, so you can send receipts by text. You can also add it any time from your account. Your email is all we need to start.</p>
                   <p style={{ fontSize: 12.5, color: MUTED, marginTop: 12 }}>We never share your details. We only ever message you in reply to you.</p>
+
+                  {/* 🔴 B33. THE REGION GATE. Asked on the first screen, before a single fact about
+                      his business is collected, because the alternative is fifteen minutes of
+                      interview ending in a number worked out at rates that are not his. Every word
+                      comes from lib/region.ts, so a one word change there swaps the whole gate. */}
+                  <div style={{ marginTop: 20, backgroundColor: SURFACE, borderRadius: 12, padding: '14px 16px' }}>
+                    <label htmlFor="signup-region" style={{ display: 'flex', alignItems: 'flex-start', gap: 11, cursor: 'pointer' }}>
+                      <input
+                        id="signup-region"
+                        type="checkbox"
+                        checked={region}
+                        onChange={(e) => setRegion(e.target.checked)}
+                        style={{ width: 20, height: 20, marginTop: 1, flexShrink: 0, accentColor: RIVER }}
+                      />
+                      <span>
+                        <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: INK, lineHeight: 1.4 }}>{regionConfirmLabel()}</span>
+                        <span style={{ display: 'block', fontSize: 12.5, color: MUTED, marginTop: 3, lineHeight: 1.5 }}>{regionConfirmWhy()}</span>
+                      </span>
+                    </label>
+                    {/* THE WAY OUT. Without it the man who cannot tick the box gets a dead Continue
+                        and no explanation, which is a worse screen than the one this replaces. */}
+                    <button
+                      type="button"
+                      onClick={() => { setBlocked(true); if (!regionEmail && emailValid) setRegionEmail(email.trim()); }}
+                      style={{ marginTop: 12, background: 'none', border: 'none', padding: 0, color: RIVER, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+                    >
+                      {regionElsewhereLink()}
+                    </button>
+                  </div>
                 </Step>
               )}
 
@@ -908,8 +1070,10 @@ export default function StartPage() {
         </div>
       </div>
 
-      {/* Footer nav */}
-      {!done && !billingResult && (
+      {/* Footer nav. 🔴 B33: hidden on the blocked screen, because there is nothing to continue
+          TO. Leaving a live Continue under a screen that has just said no is the shape doc 103
+          calls a button whose only function is to disappoint. */}
+      {!done && !billingResult && !blocked && (
         <div style={{ borderTop: `1px solid ${LINE}`, backgroundColor: PANEL }}>
           <div style={{ maxWidth: 560, margin: '0 auto', padding: '16px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
             {step > 1 ? (

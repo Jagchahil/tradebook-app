@@ -80,7 +80,13 @@ const SABOTAGES = [
       const hit = lines.findIndex((l) => l.includes(RULE_HEAD) && !l.trimStart().startsWith('//'));
       if (hit === -1) throw new Error('rule line not found');
       const [rule] = lines.splice(hit, 1);
-      const anchor = lines.findIndex((l) => l.includes('You are Lekhio, the in-app accountant'));
+      // 🔴 REPOINTED 18 AUGUST 2026 BY B27. This anchored on 'You are Lekhio, the in-app
+      // accountant', and B27 took that role word out, so the anchor died and this sabotage would
+      // have scored as MISSED with nothing wrong. It now quotes the DESCRIPTIVE TAIL of the same
+      // line, which names who the reader is rather than what Lekhio calls itself. That half is a
+      // settled decision; the role word was not, and pointing a guard at a thing somebody is
+      // hoping to change is how the last three dead anchors happened.
+      const anchor = lines.findIndex((l) => l.includes('for a UK self employed person (sole traders, subcontractors, freelancers, and small trades)'));
       if (anchor === -1) throw new Error('accountantSystem anchor not found');
       lines.splice(anchor + 1, 0, rule);
       writeFileSync(p, lines.join('\n'));

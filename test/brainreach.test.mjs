@@ -110,10 +110,24 @@ ok('at the trade prompt, a question steps out rather than being filed as the tra
 // --- THE WHATSAPP ACCOUNTANT COVERS COMPANIES TOO, AND HOLDS THE HOUSE STYLE --------------------
 // 21 Jul flood: "how are my dividends taxed?" got "that's outside my wheelhouse, see a company
 // accountant" on WhatsApp, though the app answers it fully; and the answers used em dashes the app
-// bans. The money answer is now framed as a small business accountant, carries the company figures,
+// bans. The money answer is now framed for a small business owner, carries the company figures,
 // and is told to hold the no-dash house style.
+//
+// 🔴 REPOINTED 18 AUGUST 2026 BY B27, AND IT IS THE TRAP THIS REPO HAS PAID FOR BEFORE. This
+// assertion used to pin the literal sentence "You are Lekhio, the accountant for a UK small
+// business owner". That sentence told a live model it was the customer's accountant, on the web as
+// well as WhatsApp, and B27 deleted it. **So the only thing left defending the overclaim would have
+// been the test written to guard the product.** Same shape as llmstxt.test.mjs:108 pinning a bank
+// feed sentence that had become false.
+//
+// It is repointed rather than deleted, because what it CARES about is still true and still worth
+// guarding: the 21 July defect was the WhatsApp answer being framed for sole traders only, so a
+// dividend question got fobbed off. The clause below IS that framing, it carries no role claim, and
+// it appears nowhere in a comment in lib/claude.ts, which matters because this suite does not strip
+// them. The role words themselves are now guarded by test/promptclaims.test.mjs, on the assembled
+// prompt rather than on the source.
 ok('the WhatsApp money answer is framed for small business owners, not sole traders only',
-  claude.includes('You are Lekhio, the accountant for a UK small business owner'));
+  claude.includes('Most are sole traders or subcontractors; some run a limited company'));
 ok('a limited company question is explicitly IN scope for the WhatsApp answer',
   claude.includes('A limited company question is NOT out of scope'));
 ok('the company figures (Corporation Tax, dividends) are spread into the WhatsApp money answer',

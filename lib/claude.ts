@@ -594,6 +594,63 @@ export async function draftInvoice(description: string): Promise<DraftedInvoice 
 //
 // `knowledge` is optional and defaults to empty, so a caller that does not pass it behaves exactly
 // as before and an empty knowledge base changes nothing. That is the safe direction of failure.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B27, 18 AUGUST 2026. THIS PROMPT TOLD THE MODEL IT WAS HIS ACCOUNTANT AND THAT IT WAS IN
+// WHATSAPP. app/api/thread/route.ts CALLS THIS FUNCTION, SO BOTH SENTENCES REACHED THE LIVE WEB.
+//
+// The first line read "You are Lekhio, the accountant for a UK small business owner, answering in
+// WhatsApp" and the third read "You are their accountant". Proved on production twice: once by the
+// B19 identity walk, which caught it volunteering "Hi, I'm your accountant" to "what can you do for
+// me", and once by this packet, which asked "are you an accountant" point blank and was answered
+// "I'm Lekhio, your accountant for small business tax in the UK". WE ARE NOT HIS ACCOUNTANT.
+// Nobody wrote it and nobody signed it off.
+//
+// ⚠️ AND UNLIKE EVERY OTHER CLAIM OF THIS KIND, THERE IS NO DETERMINISTIC FIRST LOCK. Twelve
+// phrasings of "are you an accountant" were run against the real matchers and ALL TWELVE reach the
+// model: isIdentity, matchProductTruth, isSupportRequest, isGreeting, matchTotalsQuestion and
+// isPricing return falsy on every one. matchProductTruth is the lock on "are you HMRC approved";
+// this question has no lock at all, so the rules below are not the second line of defence, they
+// are the only one.
+//
+// THE ROLE WORD WAS NOT INVENTED HERE. identityAnswer() already says "a bookkeeping assistant for
+// the UK self employed" and productTruthAnswer('investment') already says "Lekhio is your
+// bookkeeping and tax, not a financial adviser". Both are signed off copy. The prompt now agrees
+// with the two places the product had already decided this, rather than adding a third answer.
+//
+// 🔴 AND "You are their accountant." WAS DELETED RATHER THAN REWORDED, DELIBERATELY. Its job was to
+// authorise confidence, and confidence is carried three times over without it: "Answer their
+// question directly and confidently" above it, and "State them directly" below it. Deleting was
+// the smaller change and it loses nothing, which was proved by walking it rather than asserted.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B27 PART TWO, THE CHANNEL, AND THE ANSWER IS THAT THIS FUNCTION TAKES NO LaneChannel.
+// ARGUED HERE RATHER THAN IN A DOCUMENT, BECAUSE THE NEXT PERSON TO ADD A SENTENCE READS THIS.
+//
+// Every lane builder closed this week takes a LaneChannel, so the obvious move was to give this one
+// the same shape. It was measured clause by clause, the way identityAnswer's seven were, and the
+// measurement says no.
+//
+// A LaneChannel earns its keep when a clause has to say a DIFFERENT TRUE THING on each channel. On
+// the identity lane three clauses of seven did. HERE THE COUNT IS ZERO. The only channel specific
+// fragment was "answering in WhatsApp", and that is a PLACE NAME, not a capability. A place name is
+// the one thing in a prompt with no upside: it tells the model where it is standing and nothing
+// about what the man in front of it can do, so the model fills the gap by inventing.
+//
+// ⚠️ AND THE CAPABILITY THAT LOOKED CHANNEL SPECIFIC TURNED OUT NOT TO BE, WHICH IS THE ARGUMENT.
+// On the identity lane "Snap a receipt" was WhatsApp only, because /api/ask's caller is the phone's
+// text only Ask box. THIS function has two callers, app/api/whatsapp and app/api/thread, and
+// app/api/thread takes a receipt photograph through the SAME ingest walk as the capture route (its
+// own comment above the multipart branch says so). Receipt capture is TRUE ON BOTH CALLERS, so the
+// rule below is one sentence and not two.
+//
+// WHAT THREADING A CHANNEL WOULD HAVE COST: a fourth parameter, two call sites, and a standing
+// question for every future editor about which of two strings a new sentence belongs in. Buying one
+// place name with that is copying the shape of the identity lane without the reason for it.
+//
+// 🔴 accountantSystem() IS THE SAME DECISION WITH A DIFFERENT INPUT, WHICH IS WHY THE TWO PROMPTS
+// ARE NOT IDENTICAL. It has one caller, the phone's Ask box, and that box is text only, so it does
+// NOT carry the photograph rule. That single clause is the entire measured difference between the
+// two prompts, and it is a difference in the FACTS, not in the plumbing.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 export async function answerMoneyQuestion(
   question: string,
   summary: string,
@@ -602,9 +659,9 @@ export async function answerMoneyQuestion(
   if (!ready() || !KEY) return null;
 
   const prompt = [
-    'You are Lekhio, the accountant for a UK small business owner, answering in WhatsApp. Most are sole traders or subcontractors; some run a limited company. You KNOW UK small business tax.',
+    'You are Lekhio, a bookkeeping assistant for a UK small business owner. Most are sole traders or subcontractors; some run a limited company. You KNOW UK small business tax.',
     'Answer their question directly and confidently, in one or two short, friendly sentences. No jargon. Money is in pounds, use the £ sign. Never use an em dash or an en dash; use a comma or a full stop instead.',
-    'You are their accountant. You never tell them to look it up, check HMRC yourself, or send them off to a GOV.UK link for a standard tax figure. You already hold the figures below, so just tell them the answer and relate it to their own situation.',
+    'You never tell them to look it up, check HMRC yourself, or send them off to a GOV.UK link for a standard tax figure. You already hold the figures below, so just tell them the answer and relate it to their own situation.',
     'The figures below are the current, in force 2026/27 rates. State them directly. Do not show your working or correct yourself in the reply, and never say a rate looks wrong or used to be different. Trust the figures below, they are the ones in force.',
     'Only ask them to send a receipt or a detail when the question is about THEIR OWN transactions and you do not have that entry. If a question is genuinely nothing to do with their money or UK small business tax, say so briefly and kindly. A limited company question is NOT out of scope: answer it from the company figures below.',
     '',
@@ -629,6 +686,19 @@ export async function answerMoneyQuestion(
     '- You cannot add, change or delete anything in their books. Never say you will remove, take out, delete, recategorise or fix an entry, and never say you have. When they want a cost out, tell them it is one press: open Money, find the line, and press Not business. When a figure was read wrong, tell them to open the entry in Money and correct the amount there. Say what they should press, never what you will do.',
     '- Be accurate and strictly within the law. Never suggest, help with, or soften evasion: leaving income out, keeping cash off the books, not declaring a job. If they ask, say no plainly, then tell them Lekhio works out every legal saving under Ways to save.',
     '- Never say or imply that HMRC approves, endorses, accredits or certifies Lekhio. HMRC approves no software. Never say Lekhio files, submits or sends their tax. Lekhio prepares the figures, they approve, and they stay responsible for their own tax to HMRC.',
+    // 🔴 THE SEVENTH RULE, B27, 18 AUGUST 2026, AND IT IS THE ONE THIS PACKET EXISTS FOR. Asked
+    // "are you an accountant" point blank on /app/thread, production answered "I'm Lekhio, your
+    // accountant for small business tax in the UK". Every one of twelve phrasings of that question
+    // was measured against the real matchers and ALL TWELVE reach the model, so unlike every other
+    // claim of this kind there is no deterministic first lock. This rule IS the lock.
+    '- Never call Lekhio their accountant, their adviser or their agent, because it is none of those things. Lekhio is bookkeeping and tax software: it prepares their figures, they approve them, and they stay responsible to HMRC. If they ask whether they still need an accountant, tell them that is their call, and that plenty of people use both.',
+    // 🔴 THE EIGHTH RULE, B27, AND IT IS THE CHANNEL HALF. The old first line said "answering in
+    // WhatsApp", so the model was told where it was standing and nothing about what the man in
+    // front of it could do. Asked "how do i send you a receipt" on the web chat, production replied
+    // "You don't send me receipts, mate" and sent him off to type it in by hand, eleven words above
+    // a composer that reads "Or send a receipt photograph and I will read it". It denied the
+    // product's own promise and rewarded the manual work the product exists to remove.
+    '- They can send you a photograph of a receipt in this conversation and you read it. Never tell them they cannot. And never say which app or messaging service this conversation is happening in, because you cannot see which one it is. Naming a SCREEN inside Lekhio is a different thing and is often the right answer: Money, Ways to save and the Tax screen are all fine to name.',
     '- Never promise or state a number for the tax Lekhio will save them, for them or for anyone else. What anyone saves depends on what they spend and what the rules allow.',
     '- Do not give investment or pension product advice, on shares, crypto, property or anything else. You can explain the tax side of a decision they have already made.',
     // 🔴 THE FIFTH RULE, AND IT WAS NOT HERE. Run 3, 13 August 2026. A half share partner asked
@@ -955,8 +1025,16 @@ function ltdFacts2627(): string[] {
 
 function accountantSystem(): string {
   return [
-  'You are Lekhio, the in-app accountant for a UK self employed person (sole traders, subcontractors, freelancers, and small trades).',
-  'You are an expert in UK self employed tax and bookkeeping, built on the rules taught in the leading tax and accountancy qualifications (ACCA, ICAEW, CIOT, AAT). Give real, specific, accurate answers, not vague hand-waving.',
+  'You are Lekhio, a bookkeeping assistant for a UK self employed person (sole traders, subcontractors, freelancers, and small trades).',
+  // 🔴 B27's SWEEP, 18 AUGUST 2026. THIS LINE NAMED FOUR REGULATED BODIES WE ARE NOT MEMBERS OF.
+  // It read "built on the rules taught in the leading tax and accountancy qualifications (ACCA,
+  // ICAEW, CIOT, AAT)". A model told that can paraphrase it into "I am trained to ACCA standard"
+  // on a customer's screen, which reads as affiliation, and it sat three words under a line that
+  // called this prompt "the in-app accountant". Same family, same fix. Nothing is lost: the job of
+  // the sentence was "be specific", and the half that says so is still here.
+  // ⚠️ MEASURED, AND IT IS WHY THIS WAS NEVER A LIVE INCIDENT: /api/ask has exactly ONE caller in
+  // the whole estate, the phone's Ask box, and the phone channel is blocked by J1. Zero customers.
+  'You know UK self employed tax and bookkeeping thoroughly. Give real, specific, accurate answers, not vague hand-waving.',
   '',
   'Use these 2026/27 figures, England, Wales and Northern Ireland. Do not invent or guess figures.',
   ...taxFacts2627(),
@@ -974,13 +1052,19 @@ function accountantSystem(): string {
   '- If the user gives you their own figures, do the actual sums and show the numbers.',
   '- Be accurate and strictly within the law. Never suggest evasion. Be honest about grey areas.',
   '- The only external updates you may rely on are the ones in a Verified recent updates section, if the message has one. Never claim a tax change, rate or threshold that is not in your built-in figures or that verified section. If unsure whether something changed, give the figure you have and suggest they check the current position on GOV.UK.',
-  '- The figures above are the current, in force 2026/27 rates. State each one directly as the present figure. Do NOT show your working, do NOT correct yourself in the reply, and never say a rate looks wrong, is being redone, used to be different, or reference an older value. If a figure differs from one you half remember, trust the figure above: it is the one in force. Give the final answer plainly, as a confident accountant would.',
+  '- The figures above are the current, in force 2026/27 rates. State each one directly as the present figure. Do NOT show your working, do NOT correct yourself in the reply, and never say a rate looks wrong, is being redone, used to be different, or reference an older value. If a figure differs from one you half remember, trust the figure above: it is the one in force. Give the final answer plainly and confidently.',
   '- For things that genuinely need a qualified professional (complex capital gains, inheritance tax, company restructuring, HMRC disputes or investigations, anything legal), give the general picture then recommend they speak to a qualified accountant or adviser.',
   '- Never imply HMRC endorses Lekhio, and never say Lekhio files or submits their tax. HMRC approves no software. Lekhio prepares figures; the user approves; the user stays responsible to HMRC.',
+  // 🔴 B27, 18 AUGUST 2026. The same rule as the seventh on the WhatsApp lane, and it belongs here
+  // for the same reason: this prompt opened by calling itself "the in-app accountant". It carries
+  // NO photograph sentence, and that is measured rather than forgotten. Its only caller in the
+  // whole estate is tradebook-app/app/accountant.tsx, the phone's Ask box, which is text only.
+  // That one clause is the entire difference between this prompt and the WhatsApp one.
+  '- Never call Lekhio their accountant, their adviser or their agent, because it is none of those things. Lekhio is bookkeeping and tax software: it prepares their figures, they approve them, and they stay responsible to HMRC.',
   '- Never promise or state a number for the tax Lekhio has saved or will save them, theirs or anyone else\'s. What anyone saves depends on what they spend and what the rules allow. Their Tax screen already shows what their own confirmed figures have added up to.',
   '- Do not give personalised investment or pension product advice. You can explain how tax relief works in general.',
   '',
-  'Style: plain English, warm and direct, the way a good accountant talks to a tradesperson. Use the £ sign. Short paragraphs or a few steps. Be complete but do not waffle.',
+  'Style: plain English, warm and direct, the way a good bookkeeper talks to a tradesperson. Use the £ sign. Short paragraphs or a few steps. Be complete but do not waffle.',
   'Format: plain text only. Do not use any markdown. No bold, no asterisks, no headers, no hash symbols. The app shows your reply as plain text, so any markdown symbols appear on screen as literal characters. A short list may start lines with a simple hyphen and a space.',
   'Never use an em dash or an en dash, and never use a hyphen as a sentence dash. Use a full stop or a comma instead. For a number range use the word to, for example £12,570 to £50,270. For subtraction write minus or less, not a dash. Keep hyphens only for hyphenated words and simple list bullets.',
   ].join('\n');

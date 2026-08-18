@@ -28,8 +28,25 @@ function safe(n: number): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-// WHOLE POUNDS. What almost every conversational surface uses: the ledger, the weekly summary, the
-// agent's signals, the WhatsApp replies. Nobody wants "£1,204.00" in a sentence.
+// WHOLE POUNDS. The ledger panel, the weekly summary, most of the agent's signals, and every
+// statutory figure: a threshold, an allowance, a band. Nobody wants "£1,204.00" in a sentence, and
+// the law does not write £1,000 as £1,000.00.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS COMMENT USED TO NAME "THE WHATSAPP REPLIES" AS A gbp0 SURFACE. B26, 18 August 2026.
+//
+// They never were. lib/waintents.ts carries its own formatGbp, which is gbpAbs2 by another name,
+// and B18 (VAT) and B19 (savings, and the three lanes) each deliberately standardised a lane on
+// two places. So the chat has printed pence since long before this line was written, and the line
+// was a description of an intention rather than of the code.
+//
+// ⚠️ THE RULE, DECIDED BY JAG AND APPLIED BY B26: THE COSTUME BELONGS TO THE FIGURE, NOT THE DOOR.
+// One figure, one costume, wherever it is printed. The Self Assessment bill is the figure this was
+// found on: the chat said "£10,492.00" and the Tax page hero said "£10,492" under a sentence
+// promising they were the same figure. Both heroes and the 08:00 alert now say £10,492.00 too.
+//
+// Nobody is misled by pence. People are misled by one product quoting one number two ways.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 export function gbp0(n: number): string {
   const v = safe(n);
   // Math.round(-0.4) is -0, and String(-0) is "0", but toLocaleString on some inputs is not so

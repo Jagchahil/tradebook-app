@@ -170,9 +170,12 @@ console.log('A. The agent must not do its own tax for a landlord');
   // EVERY money figure in the customer facing text must be the passed bill or something derived
   // from it. The January total (bill plus one payment on account) is legitimate; a THIRD figure
   // would mean something in there is still computing locally.
-  const figures = [...new Set((s?.waText.match(/£[\d,]*\d/g) ?? []))].sort();
+  // ⚠️ THE PATTERN TAKES THE PENCE NOW, AND THAT IS B26 (18 August 2026). It stopped at the
+  //    decimal point, so the moment this text moved to two places it would have read "£1,756.50"
+  //    as "£1,756" and gone on passing while the pence drifted underneath it.
+  const figures = [...new Set((s?.waText.match(/£[\d,]*\d(?:\.\d{2})?/g) ?? []))].sort();
   eq('the text carries exactly two figures, both derived from the passed bill',
-    figures.join(' '), '£1,171 £1,757');
+    figures.join(' '), '£1,171.00 £1,756.50');
 
   // 🔴 AND THE BODY GETS THE SAME TREATMENT, WHICH IT DID NOT UNTIL 18 AUGUST 2026. A HOLE FOUND
   //    BY THE FULL LOOP. The body quotes the bill TWICE ("heading for about X ... X for the
@@ -185,7 +188,7 @@ console.log('A. The agent must not do its own tax for a landlord');
   //    so a change to the months moves both sides together and this can never rot into a guard
   //    defending a stale number. The vacuity check first, because a guard asserting that an
   //    undefined string is absent passes everything.
-  const blendText = poa(A.computeSignals(input()))?.body.match(/£[\d,]*\d/)?.[0];
+  const blendText = poa(A.computeSignals(input()))?.body.match(/£[\d,]*\d(?:\.\d{2})?/)?.[0];
   ok('the blend is derivable and is a different figure, so the two below are not vacuous',
     !!blendText && blendText !== '£1,171');
   ok('🔴 the blend never reaches a landlord body, at any occurrence',
@@ -262,10 +265,11 @@ console.log('A. The agent must not do its own tax for a landlord');
   // BILL". HMRC halves the TAX, and for the florist the two are the same number because she has no
   // student loan and no CIS, which is why nothing she reads moves by a penny. Math.round became
   // round2 inside lib/taxengine.ts paymentsOnAccount(), so the stored figure keeps its half penny
-  // and the printed one is unchanged: gbp0 rounds 585.5 to £586 exactly as before.
+  // and the printed one carries it: B26 moved this text to two places on 18 August 2026, so the
+  // half penny that round2 kept is now the half penny a customer reads.
   eq('payment on account is half the passed TAX, which for her IS the bill', s?.numbers.poa, 585.5);
   ok('January total in the text is bill plus one payment on account',
-    !!s && s.waText.includes('£1,757')); // 1171 + 585.5
+    !!s && s.waText.includes('£1,756.50')); // 1171 + 585.5
 }
 
 // ════════════════════════════════════════════════════════════════════════════════════════
@@ -627,19 +631,65 @@ eq('18 August 2026 is day 134', dayOf(Date.UTC(2026, 7, 18)), 134);
     Math.abs((s?.numbers.poa ?? 0) - bill / 2) > 1);
 }
 
-// 29. THE FORMAT GAP THAT IS LEFT, ASSERTED AS IT STANDS RATHER THAN AS WE WISH IT WERE. The chat
-//     says pence and the Tax page hero says whole pounds, on the same number, under a sentence
-//     promising they are the same figure. Recorded here so that when the page hero moves to two
-//     places this suite is what tells whoever does it that the chat already agreed.
+// 29. 🔴 AND THE FORMAT GAP IS CLOSED. B26, 18 August 2026, decided by Jag.
+//
+//     This block used to assert the gap as it stood: the chat said pence, the Tax page hero said
+//     whole pounds, on the same number, under a sentence promising they were the same figure. The
+//     rule that closed it is that THE COSTUME BELONGS TO THE FIGURE AND NOT TO THE DOOR. One
+//     figure, written one way, wherever it is printed. Nobody is misled by pence. People are
+//     misled by one product quoting one number two ways.
+//
+// ⚠️ THE SOURCE SCANS ARE THE LOCK AND THE RUNTIME EQUALITY ALONE WOULD NOT BE. gbp2 and formatGbp
+//    agree on this figure only because billFromPosition() returns Math.round output, so a door that
+//    quietly went back to whole pounds would still match a hard coded '£10,492.00' somewhere else
+//    in this file. What has to hold is that no door REACHES for the whole pound formatter for this
+//    number, so all five are read off disk by name: two heroes, two chat lanes and the 08:00 alert.
+//
+// ⚠️ AND THE TWO FORMATS ARE PROVED DIFFERENT ON THIS FIGURE FIRST. An equality assertion between
+//    two formatters that happened to agree everywhere would pass by coincidence and guard nothing.
 {
   const t = O.taxPosition(CALLUM(134));
   const bill = O.billFromPosition(t);
-  eq('the chat writes it with pence', W.formatGbp(bill), '£10,492.00');
+  const M = await import(pathToFileURL(path.join(stage, 'money.ts')).href);
+
+  ok('the two formats really are different on this figure, so nothing below is vacuous',
+    M.gbp0(bill) === '£10,492' && M.gbp2(bill) === '£10,492.00');
+  eq('the chat writes it to the penny', W.formatGbp(bill), '£10,492.00');
+  eq('and the pages write the identical string, which is the whole of B26', M.gbp2(bill), W.formatGbp(bill));
+
   const money = readFileSync(path.join(lib, 'money.ts'), 'utf8');
   ok('lib/money.ts still owns both formats', /export function gbp0/.test(money) && /export function gbp2/.test(money));
+
   const taxPage = readFileSync(path.join(root, 'app/app/tax/page.tsx'), 'utf8');
-  ok('and the Tax page hero still prints whole pounds, which is the difference',
-    /lek-hero">\{gbp0\(billFromPosition\(tax\)\)\}/.test(taxPage));
+  const overview = readFileSync(path.join(root, 'app/app/page.tsx'), 'utf8');
+  const thread = readFileSync(path.join(root, 'app/api/thread/route.ts'), 'utf8');
+  const intents = readFileSync(path.join(lib, 'waintents.ts'), 'utf8');
+  const agentSrc = readFileSync(path.join(lib, 'agent.ts'), 'utf8');
+
+  ok('DOOR 1, the Tax page hero, prints the bill to the penny',
+    /lek-hero">\{gbp2\(billFromPosition\(tax\)\)\}/.test(taxPage));
+  ok('DOOR 2, the Overview hero, the same figure on the other screen',
+    /lek-hero">\{gbp2\(billFromPosition\(tax\)\)\}/.test(overview));
+  ok('🔴 and NEITHER hero reaches for whole pounds on it any more, which is what the gap was',
+    !/lek-hero">\{gbp0\(billFromPosition\(tax\)\)\}/.test(taxPage)
+    && !/lek-hero">\{gbp0\(billFromPosition\(tax\)\)\}/.test(overview));
+  ok('DOOR 3, the web chat, still writes it to the penny', /formatGbp\(leadFigure\)/.test(thread));
+  ok('DOOR 4, WhatsApp, still writes it to the penny',
+    /Put by \$\{formatGbp\(setAside\)\} for tax/.test(intents));
+  ok('DOOR 5, the 08:00 payments on account alert, writes it to the penny too',
+    /heading for about \$\{gbp2\(estBill\)\}/.test(agentSrc)
+    && !/heading for about \$\{gbp\(estBill\)\}/.test(agentSrc));
+
+  // ⚠️ THE STATUTORY THRESHOLD IS NOT HIS FIGURE AND KEEPS ITS WHOLE POUNDS. The law writes
+  //    £1,000, not £1,000.00, and a threshold is not a number that moves with his books.
+  // ⚠️ THE RULE, NOT THE SPELLING. lib/agent.ts defines gbp() AS gbp0(), so pinning one of the two
+  //    names would go red on an inlining that changed nothing, and test/sabotage-b30agentpoa.mjs
+  //    keeps a control that does exactly that. What must hold is that the threshold is printed and
+  //    is NOT printed to the penny.
+  ok('and the payments on account threshold is still written as the law writes it',
+    /\$\{gbp0?\(FACTS\.poaThreshold\)\}/.test(agentSrc)
+    && !/gbp2\(FACTS\.poaThreshold\)/.test(agentSrc)
+    && /\{gbp0\(FACTS\.poaThreshold\)\}/.test(taxPage));
 }
 
 console.log('');

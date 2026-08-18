@@ -25,7 +25,7 @@ import { bankFeedOffered } from '../../lib/bankfeed';
 import { normaliseVendor } from '../../lib/memory';
 import { categoriseBankLine } from '../../lib/categories';
 import { selectAnnouncements } from '../../lib/announcements';
-import { gbp0, gbpAbs0 } from '../../lib/money';
+import { gbp0, gbp2, gbpAbs0 } from '../../lib/money';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, RADIUS, SPACE, TYPE } from '../../lib/tokens';
 import {
   GREEN, INK, LINE, MUTED, ON_GREEN_TINT, ON_RIVER, ON_SAFFRON_TINT, PANEL, PAPER, RIVER,
@@ -252,7 +252,7 @@ export default async function OverviewPage() {
           <h1 className="lek-eyebrow">Put by for tax</h1>
           {/* ⚠️ PUT BY MEANS PUT BY, so the figure is what he still has to find. Identical to the
               bill for everybody with nothing taken at source. See lib/taxoptimiser.ts, taxPosition. */}
-          <div className="lek-hero">{gbp0(billFromPosition(tax))}</div>
+          <div className="lek-hero">{gbp2(billFromPosition(tax))}</div>
           <p className="lek-heronote">
             {tax.projected
               ? 'What your figures are heading for across the full tax year.'
@@ -285,15 +285,15 @@ export default async function OverviewPage() {
           {tax.cisSuffered > 0 ? (
             <p style={S.heroBasis}>
               {tax.projected
-                ? `${gbp0(tax.cisSuffered)} of it is on course to come off through CIS across the year, so this is what is left to find.`
-                : `${gbp0(tax.cisSuffered)} of it has already gone to HMRC through CIS, so this is what is left to find.`}
-              {' '}The bill itself is about {gbp0(tax.setAside)}.
+                ? `${gbp2(tax.cisSuffered)} of it is on course to come off through CIS across the year, so this is what is left to find.`
+                : `${gbp2(tax.cisSuffered)} of it has already gone to HMRC through CIS, so this is what is left to find.`}
+              {' '}The bill itself is about {gbp2(tax.setAside)}.
               {tax.refundLikely > 0 ? (
                 // ⚠️ THE {' '} AFTER THE FIGURE IS LOAD BEARING. JSX drops the whitespace between an
                 // expression and the text on the NEXT line, so this rendered "£2,623rather than a
                 // bill" on the live Overview. Caught by looking at the screen, not by any test.
                 <>{' '}On these figures January looks like a repayment of around{' '}
-                  {gbp0(tax.refundLikely)}{' '}rather than a bill, though only your filed return
+                  {gbp2(tax.refundLikely)}{' '}rather than a bill, though only your filed return
                   settles that.</>
               ) : null}
             </p>
@@ -488,11 +488,11 @@ export default async function OverviewPage() {
             <div className="lek-two">
               <div>
                 <div className="lek-tile-label">If you claimed nothing</div>
-                <div className="lek-big">{gbp0(l.withoutLekhio)}</div>
+                <div className="lek-big">{gbp2(l.withoutLekhio)}</div>
               </div>
               <div>
                 <div className="lek-tile-label">With what you claimed</div>
-                <div className="lek-big" style={{ color: GREEN }}>{gbp0(l.withLekhio)}</div>
+                <div className="lek-big" style={{ color: GREEN }}>{gbp2(l.withLekhio)}</div>
               </div>
             </div>
 
@@ -503,9 +503,9 @@ export default async function OverviewPage() {
                 <li key={line.key} style={S.line}>
                   <div style={S.lineTop}>
                     <span style={S.lineLabel}>{line.label}</span>
-                    <span style={S.lineSaved}>{gbp0(line.saved)} saved</span>
+                    <span style={S.lineSaved}>{gbp2(line.saved)} saved</span>
                   </div>
-                  <div style={S.basis}>{gbp0(line.deducted)} off your profit. {line.basis}</div>
+                  <div style={S.basis}>{gbp2(line.deducted)} off your profit. {line.basis}</div>
                 </li>
               ))}
             </ul>
@@ -523,7 +523,7 @@ export default async function OverviewPage() {
             product has already once quoted a man a CIS refund that did not exist. */}
         {l.refundDue > 0 && (
           <p style={S.refund}>
-            <b>{gbp0(l.refundDue)}</b> of CIS has been taken off your pay this year. That is your
+            <b>{gbp2(l.refundDue)}</b> of CIS has been taken off your pay this year. That is your
             money, and it comes back to you when your return is filed.
           </p>
         )}

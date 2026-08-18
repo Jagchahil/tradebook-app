@@ -136,8 +136,8 @@ const SABOTAGES = [
   {
     name: 'F4 the Overview announces a projection as a thing that happened',
     apply: (d) => edit(d, 'app/app/page.tsx',
-      '`${gbp0(tax.cisSuffered)} of it is on course to come off through CIS across the year, so this is what is left to find.`',
-      '`${gbp0(tax.cisSuffered)} of it has already gone to HMRC through CIS, so this is what is left to find.`'),
+      '`${gbp2(tax.cisSuffered)} of it is on course to come off through CIS across the year, so this is what is left to find.`',
+      '`${gbp2(tax.cisSuffered)} of it has already gone to HMRC through CIS, so this is what is left to find.`'),
   },
   {
     // ⚠️ THE HALF SENTENCE TRAP, WHICH THIS PACKET WALKED INTO ONCE. Correcting the opening and

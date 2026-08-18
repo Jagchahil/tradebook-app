@@ -13,7 +13,7 @@ import { bankFeedOffered } from '../../../lib/bankfeed';
 import { paymentsOnAccount, FACTS } from '../../../lib/taxengine';
 import { buildQuarterPack, quarterBounds, quarterForDate } from '../../../lib/quarterpack';
 import { mtdStatedFrom } from '../../../lib/circumstances';
-import { gbp0 } from '../../../lib/money';
+import { gbp0, gbp2 } from '../../../lib/money';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
   INK, LINE, MUTED, PANEL, PAPER, RIVER, RIVER_DEEP, RIVER_TINT, SURFACE, edge,
@@ -240,7 +240,21 @@ export default async function TaxHubPage() {
               CIS subcontractor they are thousands apart, and the words over this figure say "where
               you stand", which is a question about his position and not about our arithmetic.
               lib/taxoptimiser.ts, taxPosition, carries both and explains why. */}
-          <div className="lek-hero">{gbp0(billFromPosition(tax))}</div>
+          {/* ═══════════════════════════════════════════════════════════════════════════
+              🔴 PENCE, AND THAT IS B26, 18 August 2026. This hero printed gbp0 while the chat
+              printed formatGbp on the SAME call, so on one day and one set of books the two read
+              "£10,492" and "£10,492.00" under a sentence in app/api/thread/route.ts promising
+              "It is the same figure your Tax screen leads with".
+
+              The costume belongs to the figure, not the door. Every surface that prints
+              billFromPosition() now writes it the same way: this hero, the Overview hero,
+              the web chat, WhatsApp and the 08:00 payments on account alert.
+
+              ⚠️ THE FIGURE DOES NOT MOVE. It is the same call it always was, and it is still a
+              projection: test/f23bill.test.mjs section E proves it falls £126 between two
+              mornings on unchanged books, and the note directly below says so in words.
+              ═══════════════════════════════════════════════════════════════════════════ */}
+          <div className="lek-hero">{gbp2(billFromPosition(tax))}</div>
           <p className="lek-heronote">
             {tax.projected
               ? 'What the year is heading for, on everything you have confirmed so far.'
@@ -260,12 +274,12 @@ export default async function TaxHubPage() {
           {tax.cisSuffered > 0 ? (
             <p style={S.heroBasis}>
               {tax.projected
-                ? `Your contractors are on course to hand HMRC ${gbp0(tax.cisSuffered)} of this under CIS across the year, so that much of it is paid as you go rather than in January.`
-                : `Your contractors have already handed HMRC ${gbp0(tax.cisSuffered)} of this under CIS, so that part is paid.`}
-              {' '}The bill itself works out at about {gbp0(tax.setAside)}.
+                ? `Your contractors are on course to hand HMRC ${gbp2(tax.cisSuffered)} of this under CIS across the year, so that much of it is paid as you go rather than in January.`
+                : `Your contractors have already handed HMRC ${gbp2(tax.cisSuffered)} of this under CIS, so that part is paid.`}
+              {' '}The bill itself works out at about {gbp2(tax.setAside)}.
               {tax.refundLikely > 0 ? (
                 <>{' '}On these figures more has been taken than the year is going to cost, so January
-                  looks like a repayment of around {gbp0(tax.refundLikely)} rather than a bill. That is
+                  looks like a repayment of around {gbp2(tax.refundLikely)} rather than a bill. That is
                   an estimate and it moves as you confirm more. Only your filed return settles it.</>
               ) : null}
             </p>
@@ -325,7 +339,7 @@ export default async function TaxHubPage() {
           <h2 className="lek-h2">January asks for more than the bill</h2>
           <p style={S.body}>
             Because the bill is over {gbp0(FACTS.poaThreshold)}, HMRC also asks for two payments on
-            account towards the following year: about {gbp0(poa.eachPayment)} each, due{' '}
+            account towards the following year: about {gbp2(poa.eachPayment)} each, due{' '}
             {poa.firstDue} and {poa.secondDue}. The first one lands on the same day as the bill
             itself, which is the part that catches people. Your student loan, if one is being
             collected, is never part of payments on account.

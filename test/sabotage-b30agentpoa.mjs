@@ -207,8 +207,8 @@ const CONTROLS = [
   },
   {
     name: 'gbp() is written out as the gbp0() it is defined to be, in the body',
-    apply: ({ dir }) => edit(dir, AG, '${gbp(estBill)} for the year plus about ${gbp(poa)} on account.',
-      '${gbp0(estBill)} for the year plus about ${gbp0(poa)} on account.'),
+    apply: ({ dir }) => edit(dir, AG, 'Over ${gbp(FACTS.poaThreshold)}, HMRC also asks',
+      'Over ${gbp0(FACTS.poaThreshold)}, HMRC also asks'),
   },
   {
     name: 'the local p is renamed, consistently, and nothing reads its name',

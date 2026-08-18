@@ -208,7 +208,7 @@ console.log('F4: a projected figure is never announced in the past tense');
   const home = read('app/app/page.tsx');
   const hub = read('app/app/tax/page.tsx');
   ok('the Overview CIS sentence branches on whether it is a projection',
-    /tax\.projected\s*\n?\s*\?\s*`\$\{gbp0\(tax\.cisSuffered\)\} of it is on course to come off/.test(home));
+    /tax\.projected\s*\n?\s*\?\s*`\$\{gbp2\(tax\.cisSuffered\)\} of it is on course to come off/.test(home));
   ok('the Tax hub CIS sentence branches too',
     /tax\.projected\s*\n?\s*\?\s*`Your contractors are on course to hand HMRC/.test(hub));
   // ⚠️ THE WHOLE SENTENCE, NOT ITS FIRST CLAUSE. The first attempt at this fix left "so that part

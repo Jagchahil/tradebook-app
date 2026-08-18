@@ -115,8 +115,8 @@ const SABOTAGES = [
   {
     name: 'the WhatsApp text quotes the blend while numbers{} keeps the real bill',
     apply: (d) => edit(d, 'lib/agent.ts',
-      'waText: `your Self Assessment bill is heading for about ${gbp(estBill)}',
-      'waText: `your Self Assessment bill is heading for about ${gbp(blendedBill)}'),
+      'waText: `your Self Assessment bill is heading for about ${gbp2(estBill)}',
+      'waText: `your Self Assessment bill is heading for about ${gbp2(blendedBill)}'),
   },
   {
     name: 'the set aside BUTTON carries the blend, which is the £537 of working capital',
@@ -127,8 +127,8 @@ const SABOTAGES = [
   {
     name: 'the body quotes the blend',
     apply: (d) => edit(d, 'lib/agent.ts',
-      'body: `Your Self Assessment bill is heading for about ${gbp(estBill)}',
-      'body: `Your Self Assessment bill is heading for about ${gbp(blendedBill)}'),
+      'body: `Your Self Assessment bill is heading for about ${gbp2(estBill)}',
+      'body: `Your Self Assessment bill is heading for about ${gbp2(blendedBill)}'),
   },
   // ── The one bill function ────────────────────────────────────────────────────────────────
   {
@@ -210,8 +210,8 @@ const SABOTAGES = [
   {
     name: 'agent.ts imports the optimiser directly, breaking the staged suites',
     apply: (d) => edit(d, 'lib/agent.ts',
-      "import { gbp0 } from './money';",
-      "import { gbp0 } from './money';\nimport { selfAssessmentBill } from './taxoptimiser';"),
+      "import { gbp0, gbp2 } from './money';",
+      "import { gbp0, gbp2 } from './money';\nimport { selfAssessmentBill } from './taxoptimiser';"),
   },
   // ── The threshold, which must be tested against the real figure ──────────────────────────
   {
@@ -228,10 +228,59 @@ const SABOTAGES = [
       '      : paymentsOnAccount(base.tax, taxYearEnd(today).getUTCFullYear(), base.atSource);',
       '      : paymentsOnAccount(estBill ?? 0, taxYearEnd(today).getUTCFullYear(), base.atSource);'),
   },
+  // ── B26, 18 August 2026. THE ONE BILL IS WRITTEN ONE WAY, AND THERE ARE FIVE DOORS. ───────
+  //
+  // Section E block 29 reads all five off disk by name. A revert at ANY of them puts the product
+  // back to quoting one number two ways, which is the whole of B26, so each door gets its own
+  // sabotage rather than one that reverts them together.
+  {
+    name: 'B26: the Tax page hero goes back to whole pounds while the chat keeps its pence',
+    apply: (d) => edit(d, 'app/app/tax/page.tsx',
+      '<div className="lek-hero">{gbp2(billFromPosition(tax))}</div>',
+      '<div className="lek-hero">{gbp0(billFromPosition(tax))}</div>'),
+  },
+  {
+    name: 'B26: the OVERVIEW hero goes back, which is the same figure on the other screen',
+    apply: (d) => edit(d, 'app/app/page.tsx',
+      '<div className="lek-hero">{gbp2(billFromPosition(tax))}</div>',
+      '<div className="lek-hero">{gbp0(billFromPosition(tax))}</div>'),
+  },
+  {
+    name: 'B26: the 08:00 alert BODY goes back to whole pounds on the bill',
+    apply: (d) => edit(d, 'lib/agent.ts',
+      'body: `Your Self Assessment bill is heading for about ${gbp2(estBill)}.',
+      'body: `Your Self Assessment bill is heading for about ${gbp(estBill)}.'),
+  },
+  {
+    name: 'B26: only the alert WHATSAPP text goes back, which is the partial revert',
+    apply: (d) => edit(d, 'lib/agent.ts',
+      'waText: `your Self Assessment bill is heading for about ${gbp2(estBill)},',
+      'waText: `your Self Assessment bill is heading for about ${gbp(estBill)},'),
+  },
+  {
+    name: 'B26: the drift the other way, the web chat stripped to whole pounds',
+    apply: (d) => edit(d, 'app/api/thread/route.ts',
+      'return `Put by ${formatGbp(leadFigure)} for tax.',
+      'return `Put by ${gbp0(leadFigure)} for tax.'),
+  },
+  {
+    name: 'B26: and WhatsApp stripped, the lane the sentence promises the screen agrees with',
+    apply: (d) => edit(d, 'lib/waintents.ts',
+      'return `Put by ${formatGbp(setAside)} for tax.',
+      'return `Put by ${gbpShort(setAside)} for tax.'),
+  },
 ];
 
 // NO-OP CONTROLS. Each changes the files without changing behaviour, and must stay GREEN.
 const CONTROLS = [
+  {
+    // ⚠️ B26's CONTROL. The hero comment block is the biggest thing this packet added to a screen
+    // file, and a suite that reds on a touched comment is only detecting that a file was opened.
+    name: 'B26: the comment above the Tax page hero is reworded, and nothing moves',
+    apply: (d) => edit(d, 'app/app/tax/page.tsx',
+      '🔴 PENCE, AND THAT IS B26, 18 August 2026.',
+      '🔴 PENCE, AND THAT IS B26, decided 18 August 2026.'),
+  },
   {
     name: 'a comment is reworded in agent.ts',
     apply: (d) => edit(d, 'lib/agent.ts',

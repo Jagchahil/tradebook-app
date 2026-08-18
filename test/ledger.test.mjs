@@ -34,12 +34,20 @@ const stage = mkdtempSync(path.join(tmpdir(), 'ledger-'));
 const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
 // 🔴 THE OPTIMISER IS STAGED ALONGSIDE, AND IT IS NOT DECORATION. lib/ledger.ts and
 // lib/taxoptimiser.ts each carry their own copy of the use of home rule, because a lib module may
-// not take a new lib import (three suites stage these files with a fixed dependency list and Node's
-// type stripping cannot resolve an extensionless import). Two copies of a money rule drift, and the
-// copy that drifts is the one he is looking at, so the two are run side by side further down.
+// not take a new lib import (a suite that stages these files by a fixed dependency list has to be
+// told, and Node's type stripping cannot resolve an extensionless import). Two copies of a money
+// rule drift, and the copy that drifts is the one he is looking at, so the two are run side by
+// side further down.
+//
+// ⚠️ "THREE SUITES" WAS WRONG AND B26 DERIVED IT, 18 August 2026. Five suites load lib/ledger.ts;
+// three of them copy the WHOLE lib directory and do not care (numbers, tradingallowance,
+// wave9_useofhome). Only TWO stage a fixed list, and test/capitalwiring.test.mjs ALREADY carried
+// 'money'. So the cost of lib/ledger.ts taking lib/money.ts was one word, in this list.
 for (const f of [
   'taxengine', 'nistudentloan', 'ltdengine', 'personalincome', 'propertyengine', 'autonomy',
   'taxoptimiser', 'ledger', 'incomeproof', 'quarterpack', 'personal',
+  // lib/money.ts, which lib/ledger.ts's headline() formats through since B26.
+  'money',
   // lib/scotland.ts, one exported sentence with no imports of its own. Both money documents
   // above print it, so the fixed dependency list this suite stages has to carry it too.
   'scotland',
@@ -263,6 +271,48 @@ ok('...and it reuses getOptimiserInput rather than assembling a SECOND set of fi
 // made.
 
 const ledgerSrc = rf(path.join(root, 'lib/ledger.ts'), 'utf8');
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 ONE MESSAGE, ONE FORMAT. B26, 18 August 2026, and the production walk found it.
+//
+// On 18 August the savings answer on /app/thread read "keeping £1,374 off your tax bill this year"
+// and, four lines below, "Costs you logged: £1,374.00". One figure, one message, two formats. The
+// headline arrives at the builder ALREADY FORMATTED, so every guard the savings packet wrote,
+// which checks the builder's output, was blind to it.
+//
+// ⚠️ SO THE GUARD IS ON THE HEADLINE'S OWN OUTPUT AND ON THE SCREEN THAT PRINTS IT, not on the
+// builder. And it is on the SHAPE (a pence bearing figure) plus the ABSENCE of a hand rolled
+// pound, so it cannot rot into defending a particular sum.
+{
+  const M = await import(pathToFileURL(path.join(stage, 'money.ts')).href);
+  const h = headline(l);
+  ok('🔴 B26: the headline writes his figure the way the rest of its own message writes it',
+    h.includes(M.gbp2(l.saved)) && /£[\d,]+\.\d{2}/.test(h));
+  ok('...and it is no longer the whole pound one, so this is not vacuous',
+    M.gbp2(l.saved) !== M.gbp0(l.saved) && !h.includes(`${M.gbp0(l.saved)} off`));
+  // ⚠️ COMMENTS STRIPPED FIRST, AND THIS GUARD FOUND OUT WHY ON ITS OWN FIRST RUN, WHICH IS THE
+  //    FIFTH TIME IN THIS REPO. The comment block above headline() QUOTES the old hand rolled
+  //    pound so nobody has to go and find it, and the naive form read its own explanation as the
+  //    defect. Safe form, so a https:// inside a comment is not truncated into a false negative.
+  const ledgerCode = ledgerSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  ok('🔴 ...and lib/ledger.ts hand rolls no pound at all now, which is what let the two drift',
+    !/£\$\{[A-Za-z0-9_.]+\.toLocaleString/.test(ledgerCode) && /from '\.\/money'/.test(ledgerCode));
+}
+
+// AND THE SCREEN THE SENTENCE SITS ON WEARS THE SAME FORMAT. A headline in pence over a panel in
+// whole pounds is the identical fault with the surfaces swapped, which is the trap this packet
+// walked up to: app/app/page.tsx prints headline(l) directly above these four figures.
+{
+  const home = rf(path.join(root, 'app/app/page.tsx'), 'utf8');
+  ok('🔴 B26: the /app savings card wears the format of the sentence above it',
+    /headline\(l\)/.test(home)
+    && /gbp2\(l\.withoutLekhio\)/.test(home)
+    && /gbp2\(l\.withLekhio\)/.test(home)
+    && /gbp2\(line\.saved\)/.test(home)
+    && /gbp2\(l\.refundDue\)/.test(home));
+  ok('...and no figure on that card is left in whole pounds',
+    !/gbp0\(l\.with/.test(home) && !/gbp0\(line\./.test(home) && !/gbp0\(l\.refundDue\)/.test(home));
+}
 // The savings lane's reader. B19 moved the assembly out of the WhatsApp route into this file on
 // 18 August 2026 so the thread and the in app accountant could reach it, so the pins below that
 // used to read `wa` follow it here. See the repointing note above each one.

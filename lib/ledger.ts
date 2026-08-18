@@ -61,6 +61,7 @@
 
 import { FACTS, asPence, personalAllowance } from './taxengine';
 import { combinedIncomeTax } from './personalincome';
+import { gbp2 } from './money';
 
 // Below this, a "saved" figure is noise dressed as a fact. Three months is when the projection in
 // lib/taxoptimiser.ts is allowed to speak, and the same honesty applies here.
@@ -423,10 +424,33 @@ export function ledger(input: LedgerInput): Ledger {
 // sentence now says whose costs they are and what the costs did, which is both more accurate and,
 // on a screen he opens to see what he owes, more useful.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND IT IS FORMATTED THROUGH lib/money.ts NOW, WHICH IT NEVER WAS. B26, 18 August 2026.
+//
+// This was the ONE money string in the savings lane the B19 packet did not touch, because it
+// arrives at the builder already formatted and the builder is right not to reformat it. So on
+// 18 August the reply on /app/thread read
+//
+//   "keeping £1,374 off your tax bill this year"
+//
+// and four lines below it "Costs you logged: £1,374.00". One message, one figure, two formats.
+// It was not wrong before and it was not wrong after. It was INCONSISTENT, and no assertion in
+// this repo could have seen it: every guard the packet wrote checks the BUILDER's output. A walk
+// saw it on the first read.
+//
+// ⚠️ THE HAND ROLLED POUND IS WHAT MADE IT POSSIBLE. `£${n.toLocaleString('en-GB')}` was the last
+// money string in this file that did not go through lib/money.ts, which is the file whose whole
+// job is that there is one way to write a pound. The format is now the same call the rest of the
+// message makes, so the two cannot come apart again by anybody editing one of them.
+//
+// ⚠️ AND IT MOVES A FIGURE ON /app, DELIBERATELY. app/app/page.tsx prints this sentence over the
+// savings card, and that card's own figures moved with it in the same commit. A headline in pence
+// over a panel in whole pounds would be the identical fault with the surfaces swapped.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 export function headline(l: Ledger): string {
   if (!l.enough) return l.note ?? '';
   if (l.saved <= 0) return 'Nothing saved yet. Get your costs in, by hand or by statement, and every one starts counting.';
-  return `The costs you have logged are keeping £${l.saved.toLocaleString('en-GB')} off your tax bill this year.`;
+  return `The costs you have logged are keeping ${gbp2(l.saved)} off your tax bill this year.`;
 }
 
 // ── One assembler, every surface ─────────────────────────────────────────────────────────────────

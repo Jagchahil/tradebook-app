@@ -131,6 +131,9 @@ const SAV = 'lib/savingsanswer.ts';
 const WAI = 'lib/waintents.ts';
 const DB = 'lib/supabase.ts';
 const VAT = 'lib/vatanswer.ts';
+// B26: the ledger's headline and the screen that prints it.
+const LED = 'lib/ledger.ts';
+const HOME = 'app/app/page.tsx';
 const LP = 'test/laneparity.test.mjs';
 
 const WA_LANE = '          } else if (isSavingsQuestion(text)) {\n            await handleSavingsQuestion(from);';
@@ -298,9 +301,42 @@ const SABOTAGES = [
     apply: ({ dir }) => edit(dir, TH, TH_LANE,
       "  if (isSavingsQuestion(q)) return 'Send me a receipt or two first and I will show you exactly what I have saved you.';"),
   },
+  // ── B26, 18 August 2026. ONE MESSAGE, ONE FORMAT, AND THE SCREEN IT SITS ON. ─────────────
+  //
+  // The savings answer read "keeping £1,374 off your tax bill this year" over "Costs you logged:
+  // £1,374.00". Every guard the B19 packet wrote checks the BUILDER's output, and the builder is
+  // right: the headline reaches it already formatted. So the drift can only be caught on
+  // headline()'s own output and on the screen that prints it, and these prove it now is.
+  {
+    name: '🔴 B26: headline() goes back to hand rolling its own pound, and the message disagrees with itself',
+    apply: ({ dir }) => edit(dir, LED,
+      'return `The costs you have logged are keeping ${gbp2(l.saved)} off your tax bill this year.`;',
+      "return `The costs you have logged are keeping £${l.saved.toLocaleString('en-GB')} off your tax bill this year.`;"),
+  },
+  {
+    name: '🔴 B26: the /app savings card is stripped back to whole pounds under a headline in pence',
+    apply: ({ dir }) => edit(dir, HOME,
+      '<div className="lek-big">{gbp2(l.withoutLekhio)}</div>',
+      '<div className="lek-big">{gbp0(l.withoutLekhio)}</div>'),
+  },
+  {
+    name: '🔴 B26: only the per line figures are stripped, which is the partial revert',
+    apply: ({ dir }) => edit(dir, HOME,
+      '<span style={S.lineSaved}>{gbp2(line.saved)} saved</span>',
+      '<span style={S.lineSaved}>{gbp0(line.saved)} saved</span>'),
+  },
 ];
 
 const CONTROLS = [
+  {
+    // ⚠️ B26's CONTROL. The comment block this packet added above headline() is the largest thing
+    // it put in lib/ledger.ts, and a suite that reds on a touched comment is detecting a file being
+    // opened rather than a figure moving.
+    name: 'B26: the comment above headline() is reworded, and nothing moves',
+    apply: ({ dir }) => edit(dir, LED,
+      '// 🔴 AND IT IS FORMATTED THROUGH lib/money.ts NOW, WHICH IT NEVER WAS. B26, 18 August 2026.',
+      '// 🔴 AND IT IS FORMATTED THROUGH lib/money.ts NOW, WHICH IT NEVER WAS. B26, 18 Aug 2026.'),
+  },
   {
     name: 'a comment inside lib/savingsanswer.ts is reworded',
     apply: ({ dir }) => edit(dir, SAV,

@@ -17,7 +17,7 @@ import { aprilDelta, PROPERTY_FACTS } from './propertyengine';
 import { chaseMessage } from './waintents';
 import { savingsMoves, type Move } from './rakhamoves';
 import { computePosition, type BusinessType, type OwnerInput } from './position';
-import { gbp0 } from './money';
+import { gbp0, gbp2 } from './money';
 import { SCOTLAND_LINE } from './scotland';
 
 // --- Input ---------------------------------------------------------------------
@@ -735,8 +735,8 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
         // It is only true of a man with no student loan and no tax deducted at source. For anybody
         // else it is a claim he can check against the two figures in the same sentence and find
         // wrong, which is the worst kind of copy: confident, checkable and false.
-        body: `Your Self Assessment bill is heading for about ${gbp(estBill)}. Over ${gbp(FACTS.poaThreshold)}, HMRC also asks for half of next year's tax up front, so January is bigger than the bill itself: ${gbp(estBill)} for the year plus about ${gbp(poa)} on account.${loanClause} Brutal if it surprises you, boring if you set aside for it, and your set aside number can carry it from here.`,
-        waText: `your Self Assessment bill is heading for about ${gbp(estBill)}, which switches on payments on account: January asks for roughly ${gbp(estBill + poa)} in total`,
+        body: `Your Self Assessment bill is heading for about ${gbp2(estBill)}. Over ${gbp(FACTS.poaThreshold)}, HMRC also asks for half of next year's tax up front, so January is bigger than the bill itself: ${gbp2(estBill)} for the year plus about ${gbp2(poa)} on account.${loanClause} Brutal if it surprises you, boring if you set aside for it, and your set aside number can carry it from here.`,
+        waText: `your Self Assessment bill is heading for about ${gbp2(estBill)}, which switches on payments on account: January asks for roughly ${gbp2(estBill + poa)} in total`,
         numbers: { estBill, poa, threshold: FACTS.poaThreshold },
         action: { kind: 'set_aside', amount: estBill, label: 'Tax set aside' },
       });

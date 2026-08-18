@@ -24,7 +24,7 @@ import { savingsAnswerForUser } from '../../../lib/savingsanswer';
 import { niAnswerForUser, studentLoanAnswerForUser, propertyAnswerForUser } from '../../../lib/laneanswers';
 import { paymentsOnAccount, FACTS } from '../../../lib/taxengine';
 import { quarterForDate } from '../../../lib/quarterpack';
-import { gbp0 } from '../../../lib/money';
+import { gbp0, gbp2 } from '../../../lib/money';
 import {
   bumpAiUsage,
   countActiveSubscribers,
@@ -738,7 +738,7 @@ async function totalsAnswer(userId: string, q: TotalsQuestion): Promise<string> 
     const poa = paymentsOnAccount(tax.selfAssessmentTax, startYear + 1, tax.cisSuffered);
     collection = `${sameFigure}, and Self Assessment collects it in one bill, due by ${poa.firstDue}.`;
     if (poa.required) {
-      collection += ` Because the bill is over ${gbp0(FACTS.poaThreshold)}, HMRC also asks for two payments on account towards the following year, about ${gbp0(poa.eachPayment)} each, due ${poa.firstDue} and ${poa.secondDue}.`;
+      collection += ` Because the bill is over ${gbp0(FACTS.poaThreshold)}, HMRC also asks for two payments on account towards the following year, about ${gbp2(poa.eachPayment)} each, due ${poa.firstDue} and ${poa.secondDue}.`;
     }
     // ⚠️ LAST, NOT SPLICED INTO THE SAMENESS CLAUSE. Appending it to sameFigure would give a
     // sentence with three "and"s in it once the January date and the instalments arrive.

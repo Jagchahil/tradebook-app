@@ -230,7 +230,7 @@ ok('🔴 the owe answer is taxPosition on getOptimiserInput, the tax hub\'s own 
 const LEAD_FIGURE = /billFromPosition\(tax\)/;
 ok('🔴 the figure spoken is the hub\'s hero number, chosen by the same FUNCTION in both files',
   LEAD_FIGURE.test(routeCode) && LEAD_FIGURE.test(taxHubCode)
-  && /formatGbp\(leadFigure\)/.test(routeCode) && /gbp0\(billFromPosition\(tax\)\)/.test(taxHubCode));
+  && /formatGbp\(leadFigure\)/.test(routeCode) && /gbp2\(billFromPosition\(tax\)\)/.test(taxHubCode));
 ok('🔴 AND NEITHER SURFACE KEEPS A HAND WRITTEN COPY OF THE RULE',
   !/tax\.cisSuffered > 0 \? tax\.setAsideAfterCis : tax\.setAside/.test(routeCode)
   && !/tax\.cisSuffered > 0 \? tax\.setAsideAfterCis : tax\.setAside/.test(taxHubCode));

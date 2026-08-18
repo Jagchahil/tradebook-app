@@ -43,8 +43,13 @@ ok('🔴 nor the second', !/With Lekhio/.test(home));
 ok('the panel still has a heading', /What your costs are worth/.test(home));
 ok('the comparison still has both sides', /If you claimed nothing/.test(home) && /With what you claimed/.test(home));
 // The figures themselves must be untouched.
-ok('the without figure is still drawn', /gbp0\(l\.withoutLekhio\)/.test(home));
-ok('the with figure is still drawn', /gbp0\(l\.withLekhio\)/.test(home));
+//
+// ⚠️ THE FIGURE, NOT ITS FORMATTER. B26 moved this card to two places on 18 August 2026 and these
+// two went red, which is the repo's own "pin the shape, not the words" lesson in its cheapest
+// form: R2-F28 was a COPY change, and what these guard is that the figures survived it. Naming
+// gbp0 made a formatter choice load bearing on a guard that was never about formatting.
+ok('the without figure is still drawn', /gbp\d\(l\.withoutLekhio\)/.test(home));
+ok('the with figure is still drawn', /gbp\d\(l\.withLekhio\)/.test(home));
 ok('and the headline sentence is still the ledger\'s own', /headline\(l\)/.test(home));
 
 console.log('B. R2-F29. A possessive only works in front of a name');

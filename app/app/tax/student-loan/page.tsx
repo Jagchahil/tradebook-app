@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { getOptimiserInput, getStudentLoanSettings, readCircumstances } from '../../../../lib/supabase';
+import { readOptimiserOrNull, getStudentLoanSettings, readCircumstances } from '../../../../lib/supabase';
 import { taxPosition } from '../../../../lib/taxoptimiser';
 import { STUDENT_PLANS, type StudentPlan } from '../../../../lib/nistudentloan';
 import { asPercent } from '../../../../lib/taxengine';
@@ -10,6 +10,7 @@ import { gbp0, gbp2 } from '../../lib/money';
 import { A11Y_CSS, APP_CSS, FONT, SPACE, TYPE } from '../../../../lib/tokens';
 import { INK, MUTED, ON_RIVER, PAPER, RIVER_DEEP } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
+import { RecordsUnreadable } from '../../RecordsUnreadable';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -66,10 +67,15 @@ export default async function StudentLoanPage({
   // either way. The PLAN is still only ever his to give: the thresholds differ by thousands between
   // plans, so guessing one would put a wrong figure on his Overview under our name.
   const [optimiser, fin, circumstances] = await Promise.all([
-    getOptimiserInput(user.id),
+    readOptimiserOrNull(user.id),
     getStudentLoanSettings(user.id),
     readCircumstances(user.id).catch(() => []),
   ]);
+
+  // 🔴 B24. A FAILED READ IS NOT A YEAR OF ZEROS, AND UNTIL TODAY THIS PAGE COULD NOT TELL THE
+  // TWO APART. readOptimiserOrNull folds the thrown read and the unreadable rows into ONE null, and
+  // the line goes up INSTEAD OF the figures rather than a confident zero he cannot argue with.
+  if (!optimiser) return <RecordsUnreadable current="/app/tax" title="Student loan" />;
   // ⚠️ null IS "WE COULD NOT READ", NEVER "HE ANSWERED NOTHING", and the sentence below has to
   // respect that or a database wobble turns into us telling a man he never mentioned his loan.
   const answersKnown = Array.isArray(circumstances);

@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { getOptimiserInput, getBusinessProfile } from '../../../../lib/supabase';
+import { readOptimiserOrNull, getBusinessProfile } from '../../../../lib/supabase';
 import { type BusinessType } from '../../../../lib/position';
 import { whatIf } from '../../../../lib/whatif';
 import { gbp0, gbpAbs0 } from '../../lib/money';
@@ -11,6 +11,7 @@ import {
   INK, LINE, MUTED, ON_GREEN_TINT, ON_RIVER, PAPER, RIVER, RIVER_DEEP, SURFACE,
 } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
+import { RecordsUnreadable } from '../../RecordsUnreadable';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -64,9 +65,14 @@ export default async function WhatIfPage({
   const delta = readDelta(one('extra'));
 
   const [optimiser, biz] = await Promise.all([
-    getOptimiserInput(user.id),
+    readOptimiserOrNull(user.id),
     getBusinessProfile(user.id).catch(() => null),
   ]);
+
+  // 🔴 B24. A FAILED READ IS NOT A YEAR OF ZEROS, AND UNTIL TODAY THIS PAGE COULD NOT TELL THE
+  // TWO APART. readOptimiserOrNull folds the thrown read and the unreadable rows into ONE null, and
+  // the line goes up INSTEAD OF the figures rather than a confident zero he cannot argue with.
+  if (!optimiser) return <RecordsUnreadable current="/app/tax/what-if" title="What if" />;
   const structure: BusinessType = biz?.businessType ?? 'sole_trader';
 
   // ⚠️ ONE SOURCE. The figures come from lib/whatif.ts, which routes an individual through

@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../lib/webauth';
 import { SESSION_COOKIE } from '../../lib/websession';
 import {
-  getOptimiserInput, weekRows, weeklyUpdateFactsFor, readAnnouncementSources,
+  readOptimiserOrNull, weekRows, weeklyUpdateFactsFor, readAnnouncementSources,
   readOnboardingProgress, readProvedPhone, pileEntries, readOwnNames, readAccountUse,
   getBusinessProfile, readActivityFeed,
 } from '../../lib/supabase';
@@ -35,6 +35,7 @@ import { AppNav } from './AppNav';
 import { Announcements } from './Announcements';
 import { WeekChart } from './WeekChart';
 import { FeedDays, FEED_CSS } from './Feed';
+import { RecordsUnreadable } from './RecordsUnreadable';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -101,7 +102,7 @@ export default async function OverviewPage() {
     optimiser, rows, factsMap, sources, progress, proved, gate, pileRows, ownNames, accountUse, biz,
     feedItems,
   ] = await Promise.all([
-    getOptimiserInput(user.id),
+    readOptimiserOrNull(user.id),
     weekRows(user.id),
     weeklyUpdateFactsFor([user.id]).catch(() => null),
     readAnnouncementSources(user.id).catch(() => null),
@@ -125,6 +126,11 @@ export default async function OverviewPage() {
       entry: (id, month) => entryRef(user.id, id, month),
     }),
   ]);
+
+  // 🔴 B24. A FAILED READ IS NOT A YEAR OF ZEROS, AND UNTIL TODAY THIS PAGE COULD NOT TELL THE
+  // TWO APART. readOptimiserOrNull folds the thrown read and the unreadable rows into ONE null, and
+  // the line goes up INSTEAD OF the figures rather than a confident zero he cannot argue with.
+  if (!optimiser) return <RecordsUnreadable current="/app" title="Your overview" />;
 
   // ⚠️ THE RESUME LINE, AND DOC 103'S EMPTY TEST DECIDES WHEN IT IS ON SCREEN.
   //

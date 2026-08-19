@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { getOptimiserInput, getBusinessProfile } from '../../../../lib/supabase';
+import { readOptimiserOrNull, getBusinessProfile } from '../../../../lib/supabase';
 import { taxPosition, marginalRate } from '../../../../lib/taxoptimiser';
 import {
   recommendVehicle, chargingLabel, type VehicleWant, type Charging,
@@ -14,6 +14,7 @@ import {
   edge,
 } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
+import { RecordsUnreadable } from '../../RecordsUnreadable';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -99,9 +100,14 @@ export default async function Page({
   // them is the affordability half and a marginal rate worked out from his real position, and the
   // copy says which is which rather than quietly using a default as though it were his.
   const [optimiser, biz] = await Promise.all([
-    getOptimiserInput(user.id).catch(() => null),
+    readOptimiserOrNull(user.id),
     getBusinessProfile(user.id).catch(() => null),
   ]);
+
+  // 🔴 B24. A FAILED READ IS NOT A YEAR OF ZEROS, AND UNTIL TODAY THIS PAGE COULD NOT TELL THE
+  // TWO APART. readOptimiserOrNull folds the thrown read and the unreadable rows into ONE null, and
+  // the line goes up INSTEAD OF the figures rather than a confident zero he cannot argue with.
+  if (!optimiser) return <RecordsUnreadable current="/app/tax" title="Buying a vehicle" />;
 
   let mRate = 0;
   let confirmedSpare: number | null = null;

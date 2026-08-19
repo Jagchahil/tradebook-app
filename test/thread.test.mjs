@@ -219,9 +219,26 @@ for (const name of MACHINERY) {
 // leads with taxPosition() on getOptimiserInput(). One question, one figure: the pins below tie
 // the thread to the tax hub BY NAME, the same way MACHINERY ties it to WhatsApp.
 const taxHubCode = stripComments(read('app/app/tax/page.tsx'));
-ok('🔴 the owe answer is taxPosition on getOptimiserInput, the tax hub\'s own call, in both files',
+// 🔴 REPOINTED 19 AUGUST 2026 BY B24, AND IT WAS NOT WEAKENED TO DO IT. The tax hub now reads
+// through readOptimiserOrNull, the one door that folds a THROWN read and an UNREADABLE one into a
+// single null so a page can say so instead of drawing a year of zeros. That is getOptimiserInput
+// plus a refusal, so the anti drift property this pin exists for is untouched: both surfaces still
+// take the SAME input and run the SAME position on it. Deleting the pin would have been silent
+// scope loss and leaving it pointed at a name that moved would have been a guard quietly true about
+// nothing, which is this repo's own rule about an assertion following the work. It now carries a
+// THIRD leg the old two could not say: that the wrapper really IS that read, so an impostor of the
+// same name cannot satisfy the first two.
+const OPTIMISER_READER = /(?:getOptimiserInput|readOptimiserOrNull)\(/;
+ok('🔴 the owe answer is taxPosition on the one optimiser read, the tax hub\'s own call, in both files',
   /taxPosition\(optimiser\)/.test(routeCode) && /taxPosition\(optimiser\)/.test(taxHubCode)
-  && /getOptimiserInput\(/.test(routeCode) && /getOptimiserInput\(/.test(taxHubCode));
+  && OPTIMISER_READER.test(routeCode) && OPTIMISER_READER.test(taxHubCode));
+
+// The third leg, on its own so it matches ONE thing: the door the tax hub goes through is the
+// very function the thread calls directly, not a second reader wearing a helpful name.
+const supabaseSrc = stripComments(read('lib/supabase.ts'));
+const doorAt = supabaseSrc.indexOf('export async function readOptimiserOrNull(');
+ok('🔴 ...and readOptimiserOrNull IS getOptimiserInput, so the two surfaces cannot be two reads',
+  doorAt !== -1 && supabaseSrc.slice(doorAt, doorAt + 400).includes('getOptimiserInput('));
 // ⚠️ REWRITTEN 11 AUGUST 2026, AND IT IS A STRONGER ASSERTION THAN THE ONE IT REPLACES. It used
 // to pin the literal `tax.setAside` on both sides. Both surfaces now lead with what a man still has
 // to FIND, which is the bill less any tax his contractors already handed HMRC, so the field moved

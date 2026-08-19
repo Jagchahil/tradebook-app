@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { readAllowanceElection, getBusinessProfile, getOptimiserInput } from '../../../../lib/supabase';
+import { readAllowanceElection, getBusinessProfile, readOptimiserOrNull } from '../../../../lib/supabase';
 import { quarterForDate } from '../../../../lib/quarterpack';
 import {
   bandOptions, bandLabel, electionRefusal,
@@ -22,6 +22,7 @@ import {
   edge,
 } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
+import { RecordsUnreadable } from '../../RecordsUnreadable';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -126,8 +127,13 @@ export default async function Page({
     getBusinessProfile(user.id).catch(() => null),
     readAllowanceElection(user.id, 'use_of_home', startYear).then((r) => ({ ok: true, row: r })).catch(() => ({ ok: false, row: null })),
     readAllowanceElection(user.id, 'trading_allowance', startYear).then((r) => ({ ok: true, row: r })).catch(() => ({ ok: false, row: null })),
-    getOptimiserInput(user.id).catch(() => null),
+    readOptimiserOrNull(user.id),
   ]);
+
+  // 🔴 B24. A FAILED READ IS NOT A YEAR OF ZEROS, AND UNTIL TODAY THIS PAGE COULD NOT TELL THE
+  // TWO APART. readOptimiserOrNull folds the thrown read and the unreadable rows into ONE null, and
+  // the line goes up INSTEAD OF the figures rather than a confident zero he cannot argue with.
+  if (!optimiser) return <RecordsUnreadable current="/app/you" title="Allowances" />;
 
   const who = { structure: biz?.businessType ?? null, income: biz?.incomeShape ?? null };
   const homeRefusal = electionRefusal('use_of_home', who);

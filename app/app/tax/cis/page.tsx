@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
 import {
-  cisRecordedForYear, getOptimiserInput, incomeRowsWithoutCis, readCircumstances,
+  cisRecordedForYear, readOptimiserOrNull, incomeRowsWithoutCis, readCircumstances,
 } from '../../../../lib/supabase';
 import { worksUnderCis } from '../../../../lib/circumstances';
 import { cisProposal, CIS_RATES } from '../../../../lib/reviewpile';
@@ -18,6 +18,7 @@ import {
   INK, LINE, MUTED, PAPER, RIVER, RIVER_DEEP, RIVER_TINT, SURFACE, edge,
 } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
+import { RecordsUnreadable } from '../../RecordsUnreadable';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -48,7 +49,12 @@ export default async function CisPage({ searchParams }: {
   // lib/websession.ts allowlists /app and below, so this cannot become an open redirect.
   if (!user) redirect('/in?next=%2Fapp%2Ftax%2Fcis');
 
-  const optimiser = await getOptimiserInput(user.id);
+  const optimiser = await readOptimiserOrNull(user.id);
+
+  // 🔴 B24. A FAILED READ IS NOT A YEAR OF ZEROS, AND UNTIL TODAY THIS PAGE COULD NOT TELL THE
+  // TWO APART. readOptimiserOrNull folds the thrown read and the unreadable rows into ONE null, and
+  // the line goes up INSTEAD OF the figures rather than a confident zero he cannot argue with.
+  if (!optimiser) return <RecordsUnreadable current="/app/tax" title="CIS" />;
   const l = ledgerFor(optimiser);
   const refundBuilding = findOptimisations(optimiser).find((o) => o.key === 'cis_refund') ?? null;
 

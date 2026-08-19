@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
 import {
-  getOptimiserInput, getConfirmedTransactionsForRange, getBusinessProfile, readVatProfile,
+  readOptimiserOrNull, getConfirmedTransactionsForRange, getBusinessProfile, readVatProfile,
   hasConfirmedRowsInTaxYear,
 } from '../../../lib/supabase';
 import { taxPosition, setAsideBasisLine, billFromPosition } from '../../../lib/taxoptimiser';
@@ -19,6 +19,7 @@ import {
   INK, LINE, MUTED, PANEL, PAPER, RIVER, RIVER_DEEP, RIVER_TINT, SURFACE, edge,
 } from '../../../lib/apptheme';
 import { AppNav } from '../AppNav';
+import { RecordsUnreadable } from '../RecordsUnreadable';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -59,7 +60,7 @@ export default async function TaxHubPage() {
   const quarterEnd = quarterBounds(startYear, index).end;
 
   const [optimiser, txns, biz, vat, hasPriorYear] = await Promise.all([
-    getOptimiserInput(user.id),
+    readOptimiserOrNull(user.id),
     // The same window /api/quarter-pack reads, so the MTD line below is the pack's own answer.
     getConfirmedTransactionsForRange(user.id, taxYearStart, quarterEnd).catch(() => []),
     // For the partnership caption under the number. Same source /app/pay-yourself reads the share
@@ -71,6 +72,11 @@ export default async function TaxHubPage() {
     // Is there a year behind the door before we draw one. See hasConfirmedRowsInTaxYear.
     hasConfirmedRowsInTaxYear(user.id, startYear - 1).catch(() => false),
   ]);
+
+  // 🔴 B24. A FAILED READ IS NOT A YEAR OF ZEROS, AND UNTIL TODAY THIS PAGE COULD NOT TELL THE
+  // TWO APART. readOptimiserOrNull folds the thrown read and the unreadable rows into ONE null, and
+  // the line goes up INSTEAD OF the figures rather than a confident zero he cannot argue with.
+  if (!optimiser) return <RecordsUnreadable current="/app/tax" title="Where you stand" />;
 
   const tax = taxPosition(optimiser);
   const basis = setAsideBasisLine(optimiser, tax);

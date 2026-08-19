@@ -2,13 +2,14 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { getOptimiserInput } from '../../../../lib/supabase';
+import { readOptimiserOrNull } from '../../../../lib/supabase';
 import { findOptimisations } from '../../../../lib/taxoptimiser';
 import { TAX_YEAR } from '../../../../lib/taxengine';
 import { gbp0 } from '../../lib/money';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import { GREEN_TINT, INK, MUTED, ON_GREEN_TINT, PAPER, SURFACE } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
+import { RecordsUnreadable } from '../../RecordsUnreadable';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,7 +43,12 @@ export default async function WaysToSavePage() {
   // lib/websession.ts allowlists /app and below, so this cannot become an open redirect.
   if (!user) redirect('/in?next=%2Fapp%2Ftax%2Fways-to-save');
 
-  const optimiser = await getOptimiserInput(user.id);
+  const optimiser = await readOptimiserOrNull(user.id);
+
+  // 🔴 B24. A FAILED READ IS NOT A YEAR OF ZEROS, AND UNTIL TODAY THIS PAGE COULD NOT TELL THE
+  // TWO APART. readOptimiserOrNull folds the thrown read and the unreadable rows into ONE null, and
+  // the line goes up INSTEAD OF the figures rather than a confident zero he cannot argue with.
+  if (!optimiser) return <RecordsUnreadable current="/app/tax/ways-to-save" title="Ways to save" />;
   const opts = findOptimisations(optimiser);
 
   return (

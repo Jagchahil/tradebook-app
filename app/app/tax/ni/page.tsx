@@ -2,13 +2,14 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { getBusinessProfile, getOptimiserInput, getStudentLoanSettings } from '../../../../lib/supabase';
+import { getBusinessProfile, readOptimiserOrNull, getStudentLoanSettings } from '../../../../lib/supabase';
 import { niPosition, NI_FACTS } from '../../../../lib/nistudentloan';
 import { FACTS, asPercent } from '../../../../lib/taxengine';
 import { gbp0, gbp2 } from '../../lib/money';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import { GREEN_TINT, INK, MUTED, ON_GREEN_TINT, ON_RIVER, PAPER, RIVER_DEEP } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
+import { RecordsUnreadable } from '../../RecordsUnreadable';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -75,10 +76,15 @@ export default async function NiPage({
   const failedIncome = (Array.isArray(sp.e) ? sp.e[0] : sp.e) !== undefined;
 
   const [optimiser, biz, fin] = await Promise.all([
-    getOptimiserInput(user.id),
+    readOptimiserOrNull(user.id),
     getBusinessProfile(user.id).catch(() => null),
     getStudentLoanSettings(user.id),
   ]);
+
+  // 🔴 B24. A FAILED READ IS NOT A YEAR OF ZEROS, AND UNTIL TODAY THIS PAGE COULD NOT TELL THE
+  // TWO APART. readOptimiserOrNull folds the thrown read and the unreadable rows into ONE null, and
+  // the line goes up INSTEAD OF the figures rather than a confident zero he cannot argue with.
+  if (!optimiser) return <RecordsUnreadable current="/app/tax" title="National Insurance" />;
   const profit = Math.max(0, optimiser.ytdTradeIncome - optimiser.ytdTradeExpenses);
   const salary = Math.max(0, optimiser.employmentIncome);
   const ni = niPosition(salary, profit);

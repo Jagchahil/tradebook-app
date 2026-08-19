@@ -5330,6 +5330,40 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   };
 }
 
+// ═════════════════════════════════════════════════════════════
+// 🔴 ONE THING TO ASK, BECAUSE THE FAILURE HAS TWO SHAPES AND ELEVEN DOORS ASKED NEITHER. B24.
+//
+// getOptimiserInput fails in two entirely different ways, and a caller that catches one of them
+// has caught neither.
+//
+//   1. IT THROWS. Every read it awaits can reject, so the promise rejects, and a server rendered
+//      page hands the customer a Next error boundary instead of his tax.
+//   2. IT RESOLVES, CARRYING rowsUnreadable. A non ok row read does NOT throw. This function
+//      returns the same object it always did, to the byte, with every figure of his at zero and
+//      one field saying why. lib/taxoptimiser.ts wrote the cost down beside that field on the day
+//      it was added: "an unasking caller still prints a guessed zero, so the server rendered tax
+//      pages read a failed database as an empty year to this day."
+//
+// ⚠️ DERIVED AT HEAD, 19 AUGUST 2026, AND THE ITEM SAID ALL ELEVEN WERE BARE. THEY ARE NOT.
+// Three of the eleven pages already catch shape 1 (/app/setup, /app/tax/vehicle and
+// /app/you/elections) and eight do not. NOT ONE of the eleven asks about shape 2. So three doors
+// were half taught, eight were not taught at all, and on either shape the man is shown a year of
+// zeros he never lived.
+//
+// This is the one door. Both shapes fold into a single null, so a caller has ONE thing to ask,
+// and a page that asks it renders RECORDS_UNREADABLE_LINE INSTEAD of its figures, never a zero.
+//
+// ⚠️ IT RETURNS NULL RATHER THAN THROWING, ON PURPOSE. A throw would oblige every caller to
+// write a try, and the eight bare callers are bare precisely because nobody wrote one. A null is
+// refused by the type checker at the first property read, so tsc finds the caller that forgot.
+// ═════════════════════════════════════════════════════════════
+export async function readOptimiserOrNull(userId: string): Promise<OptimiserInput | null> {
+  const input = await getOptimiserInput(userId).catch(() => null);
+  if (!input) return null;
+  if (input.rowsUnreadable === true) return null;
+  return input;
+}
+
 // The autonomy dial (lib/autonomy.ts). Read the user's level, defaulting to the
 // most cautious 'suggest' when unset or unknown.
 export async function getAutonomyLevel(userId: string): Promise<AutonomyLevel> {

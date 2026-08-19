@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
-import { getOptimiserInput, getBusinessProfile, readCircumstances } from '../../../lib/supabase';
+import { readOptimiserOrNull, getBusinessProfile, readCircumstances } from '../../../lib/supabase';
 import { payModel, type BusinessType, type PayPlan } from './plan';
 import { bankFeedOffered } from '../../../lib/bankfeed';
 import { gbp0 } from '../../../lib/money';
@@ -11,6 +11,7 @@ import {
   INK, LINE, MUTED, PAPER, RIVER, RIVER_DEEP, RIVER_TINT, edge,
 } from '../../../lib/apptheme';
 import { AppNav } from '../AppNav';
+import { RecordsUnreadable } from '../RecordsUnreadable';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,12 +55,17 @@ export default async function PayYourselfPage() {
   if (!user) redirect('/in?next=%2Fapp%2Fpay-yourself');
 
   const [optimiser, biz, answers] = await Promise.all([
-    getOptimiserInput(user.id),
+    readOptimiserOrNull(user.id),
     getBusinessProfile(user.id).catch(() => null),
     // ⚠️ NULL IS AN UNREADABLE READ, NEVER A "no". It falls through to the unsure wording below,
     // which is the direction that cannot tell him a bill is settled when it may not be.
     readCircumstances(user.id).catch(() => null),
   ]);
+
+  // 🔴 B24. A FAILED READ IS NOT A YEAR OF ZEROS, AND UNTIL TODAY THIS PAGE COULD NOT TELL THE
+  // TWO APART. readOptimiserOrNull folds the thrown read and the unreadable rows into ONE null, and
+  // the line goes up INSTEAD OF the figures rather than a confident zero he cannot argue with.
+  if (!optimiser) return <RecordsUnreadable current="/app/tax" title="Paying yourself" />;
   const structure: BusinessType = biz?.businessType ?? 'sole_trader';
   // The one answer this screen needs, read the same way /app/you reads its answers. An answer we
   // do not have is null, and null is spelled "unsure" on the screen, never "no".

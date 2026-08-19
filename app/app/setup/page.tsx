@@ -4,7 +4,7 @@ import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
 import {
   readOnboardingProgress, getBusinessProfile, readCircumstances, listBankConnectionsForUser,
-  getOptimiserInput, hasCardOnFile,
+  readOptimiserOrNull, hasCardOnFile,
 } from '../../../lib/supabase';
 import { ledgerFor } from '../../../lib/ledger';
 import { gbp0 } from '../../../lib/money';
@@ -24,6 +24,7 @@ import {
   GREEN, GREEN_TINT, INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RED, RED_TINT, RIVER, RIVER_DEEP,
   RIVER_TINT, SAFFRON_DEEP, SURFACE, edge,
 } from '../../../lib/apptheme';
+import { RecordsUnreadable } from '../RecordsUnreadable';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -743,7 +744,7 @@ async function BankStep({ userId, note }: { userId: string; note: string | null 
 // ---------------------------------------------------------------------------------------------
 async function RevealStep({ userId, note }: { userId: string; note: string | null }) {
   const [optimiser, rows, carded] = await Promise.all([
-    getOptimiserInput(userId).catch(() => null),
+    readOptimiserOrNull(userId),
     readCircumstances(userId),
     hasCardOnFile(userId),
   ]);
@@ -786,7 +787,14 @@ async function RevealStep({ userId, note }: { userId: string; note: string | nul
       <section style={S.card}>
         {note ? <p style={S.warn}>{note}</p> : null}
 
-        {foundMoney && l ? (
+        {/* 🔴 B24. THE READ FAILED, AND THE BRANCH BELOW WOULD HAVE BLAMED HIM FOR IT. Its
+            sentence is "We have not got your figures yet", which is a statement about what HE has
+            done, and on an unreadable read it is a statement about what WE could not do. The signed
+            line says which. This screen keeps its shell rather than taking the whole page, because
+            he is mid signup and still owes the step he is standing on. */}
+        {optimiser === null ? (
+          <RecordsUnreadable inline />
+        ) : foundMoney && l ? (
           <>
             <h1 style={S.h1}>Here is what we have found you.</h1>
             <div style={S.bigWrap}>

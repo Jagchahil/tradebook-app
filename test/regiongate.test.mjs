@@ -423,7 +423,7 @@ console.log('\n6. IT GATES NEW ONBOARDING AND NOTHING ELSE. ALL THREE, ASSERTED'
 {
   const signin = read('app/in/page.tsx');
   const site = read('app/_shared/site.tsx');
-  const mw = read('middleware.ts');
+  const mw = read('proxy.ts');
   ok('🔴 the sign in door has nothing of the gate on it',
     !signin.includes(REGION) && !/region(Confirm|Blocked|Waitlist)/.test(signin));
   ok('...and the site still sends a returning customer straight to it', /href="\/in"/.test(site));

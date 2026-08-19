@@ -91,7 +91,7 @@ const hits = [];
 walk(path.join(webRoot, 'app'), hits);
 walk(path.join(webRoot, 'lib'), hits);
 walk(path.join(webRoot, 'test'), hits);
-const middleware = path.join(webRoot, 'middleware.ts');
+const middleware = path.join(webRoot, 'proxy.ts');
 try {
   statSync(middleware);
   walk(webRoot === path.dirname(middleware) ? path.dirname(middleware) : webRoot, []); // no-op guard
@@ -100,7 +100,7 @@ try {
     .forEach((line, i) => {
       if (!line.includes('lekhio.com')) return;
       if (/not lekhio\.com|NOT lekhio\.com|do not own|unrelated ERP|Lacspace|belongs to/i.test(line)) return;
-      hits.push(`tradebook-web/middleware.ts:${i + 1}: ${line.trim()}`);
+      hits.push(`tradebook-web/proxy.ts:${i + 1}: ${line.trim()}`);
     });
 } catch {
   /* middleware is optional */

@@ -1697,7 +1697,7 @@ const B23_LONG_OBJECT = [
     deaf.length === 0);
 }
 
-// ── THE GENERIC "their", MEASURED ON PRODUCTION, RECORDED RATHER THAN FIXED. ────────────────
+// ── THE GENERIC "their". B42. FOUND ON PRODUCTION, RECORDED 18 AUGUST, CLOSED 19 AUGUST. ────
 //
 // 🔴 FOUND BY WALKING lekhio.app AS +callum ON 18 AUGUST, ON HEAD, WITH NOTHING CHANGED. Typed
 // into /app/thread:
@@ -1707,18 +1707,20 @@ const B23_LONG_OBJECT = [
 //
 // A general tax question, refused as though it were about another person. THIRD_PARTY_RE's "their"
 // alternative cannot tell a possessive about a named person from the SINGULAR THEY, which is how
-// ordinary British English refers to a generic sole trader. Measured: 6 of the 10 below.
+// ordinary British English refers to a generic sole trader. Measured at the time: 6 of the 10.
 //
-// ⚠️ IT IS RECORDED HERE AND DELIBERATELY NOT FIXED, AND THE REASON IS THE GATE'S OWN DOCTRINE.
-// Dropping "their" was built and measured: it closes all six and costs THREE real third party
-// shapes ("whats their turnover", "how much is their profit", "what are their takings like"). That
-// trades a re ask for a possible disclosure, which is the wrong direction by the argument written
-// above NOT_A_PERSON. It needs a way to tell a generic subject from a named one, which is a design
-// decision and not a token deletion, so it is a backlog item with its number rather than a guess.
+// ⚠️ THE CHEAP FIX WAS BUILT AND MEASURED AND IT TRADED THE WRONG WAY. Dropping "their" closes all
+// six and costs THREE real third party shapes ("whats their turnover", "how much is their profit",
+// "what are their takings like"), which trades a re ask for a possible disclosure.
 //
-// ⚠️ THE NUMBER IS ASSERTED SO IT CANNOT MOVE IN THE DARK, exactly as the bare s 0 of 4 and the
-// 8 of 9 above are. IF THIS GOES RED SOMEBODY HAS TOUCHED IT: re measure and write the new number
-// in, and if it went DOWN, say what it cost on the three third party shapes named above.
+// 🔴 WHAT SHIPPED INSTEAD IS AN INDEFINITE GENERIC ANTECEDENT. lib/waintents.ts GENERIC_SUBJECT_RE.
+// A generic question introduces its subject with an indefinite article or a generic quantifier;
+// a question about a third party does not. THE DEFINITE ARTICLE IS DELIBERATELY ABSENT and that is
+// the whole safety: "a builder's turnover" cannot be one man, "the builder's turnover" can be.
+//
+// ⚠️ THE NUMBERS ARE STILL ASSERTED SO THEY CANNOT MOVE IN THE DARK. The 6 became 0. If this goes
+// RED somebody has touched it: re measure and write the new number in, and if the third party
+// corpora below moved AT ALL, that is a disclosure and it comes straight back out.
 {
   const GENERIC_THEIR = [
     'what are the main ways a sole trader can legally reduce their tax bill',
@@ -1733,10 +1735,10 @@ const B23_LONG_OBJECT = [
     'how does a landlord declare their rental income',
   ];
   const refused = GENERIC_THEIR.filter((p) => aboutElse(p));
-  ok(`⚠️ THE GATE REFUSES ${refused.length} OF ${GENERIC_THEIR.length} GENERIC "their" QUESTIONS, walked on production and RECORDED, not fixed`,
-    refused.length === 6);
+  ok(`🔴 THE GATE REFUSES ${refused.length} OF ${GENERIC_THEIR.length} GENERIC "their" QUESTIONS, and it was SIX before B42${refused.length ? `, STILL REFUSED: ${refused.map((p) => JSON.stringify(p)).join('; ')}` : ''}`,
+    refused.length === 0);
   // And the same questions in the first person, which is the control that says the refusal is
-  // about the pronoun and not about the question.
+  // about the pronoun and not about the question. Kept exactly as it was written on 18 August.
   const SAME_AS_SELF = [
     'what are the main ways i can legally reduce my tax bill',
     'how do i work out my tax',
@@ -1745,6 +1747,224 @@ const B23_LONG_OBJECT = [
   const wrong = SAME_AS_SELF.filter((p) => aboutElse(p));
   ok(`⚠️ ...and all ${SAME_AS_SELF.length} of the same questions in the first person are answered, so it is the pronoun${wrong.length ? `, REFUSED: ${wrong.join('; ')}` : ''}`,
     wrong.length === 0);
+
+  // 🔴 ONE PHRASING PER TRADE NOUN, SO NO ALTERNATIVE GOES UNWALKED. Same rule B23 wrote for the
+  // possessive noun list. These are the trades CLAUDE.md names as this product's own audience.
+  //
+  // ⚠️ EVERY PHRASING HERE CARRIES "their" PLUS ONE OF THIRD_PARTY_RE's OWN MONEY NOUNS, AND THAT
+  // IS NOT DECORATION. The first draft of this corpus was written as natural sentences and HALF OF
+  // IT NEVER REACHED THE GATE AT ALL: "does a plasterer pay vat on their labour" was answered
+  // before B42 and after it, because "labour" is not a money noun and THIRD_PARTY_RE never fired.
+  // A phrasing the gate cannot hear proves nothing about the gate, and a sabotage that deleted
+  // "plasterer" from the noun list stayed GREEN because of it.
+  //
+  // ⚠️ AND EVERY MONEY NOUN HERE IS ONE OF THE SIX THAT REACH A REFUSAL, NOT ONE OF THE TEN
+  // THIRD_PARTY_RE LISTS. Writing this corpus found that isAboutSomeoneElse carries TWO money
+  // vocabularies and they do not match: THIRD_PARTY_RE lists ten nouns and the function's last
+  // line lists a narrower set, so "income", "account", "bill" and "vat" never reach a refusal at
+  // all. That is a pre existing gap, it is asserted below on its own, and it is NOT what these
+  // phrasings are for, so they use only the six that work in both.
+  const GENERIC_TRADES = [
+    'how does a self employed person work out their tax',
+    'how does a sub contractor work out their profit',
+    'can a tradesman claim their tools against their tax',
+    'how do most tradesmen handle their books',
+    'does a tradesperson pay tax on their profit',
+    'how does a builder work out their turnover',
+    'how does an electrician work out their turnover',
+    'can a sparky claim their tools against their tax',
+    'does a plasterer pay tax on their profit',
+    'what can a roofer put through their books',
+    'how does a joiner work out their profit',
+    'how does a decorator work out their takings',
+    'how does a tiler work out their takings',
+    'how does a gas engineer work out their tax',
+    'how does a scaffolder work out their profit',
+    'how does a groundworker work out their profit',
+    'how does a landscaper work out their turnover',
+    'does a freelancer pay class 4 on their profit',
+    'how does a contractor work out their tax on a cis job',
+    'how does a limited company pay tax on their profit',
+    'what should a business owner do about their tax',
+    'how does a person work out their tax',
+    'how do most people sort out their tax',
+    'what should anybody do about their tax',
+    'does everyone pay tax on their profit',
+    'how does somebody sort out their books',
+    'does anyone pay vat on their turnover',
+    'can a new sole trader claim their startup costs against their tax',
+    'what should a newly self employed person do about their tax',
+  ];
+  const deafTrades = GENERIC_TRADES.filter((p) => aboutElse(p));
+  ok(`🔴 AND ALL ${GENERIC_TRADES.length} OF THE PER TRADE GENERIC PHRASINGS ARE ANSWERED${deafTrades.length ? `, REFUSED: ${deafTrades.map((p) => JSON.stringify(p)).join('; ')}` : ''}`,
+    deafTrades.length === 0);
+
+  // 🔴 THE TWIN PAIR PROOF, AND IT IS WHAT MAKES THE LINE ABOVE MEAN ANYTHING.
+  //
+  // "all thirty are answered" is also true of thirty sentences the gate never hears. So each
+  // phrasing gets a TWIN, DERIVED FROM IT rather than typed beside it: the indefinite determiner
+  // becomes "the", and an indefinite pronoun becomes "they". Nothing else moves. Every twin must be
+  // REFUSED. A pair where the generic is answered and its definite twin is refused proves the
+  // generic reading is the thing that answered it, and it proves the phrasing reaches the gate.
+  {
+    const twin = (p) => p
+      .replace(/\b(?:a|an|any|every|most|some|all)\b/i, 'the')
+      .replace(/\b(?:someone|somebody|anyone|anybody|everyone)\b/i, 'they');
+    const twins = GENERIC_TRADES.map(twin);
+    const leaked = twins.filter((t) => !aboutElse(t));
+    ok(`🔴 ALL ${twins.length} DEFINITE TWINS ARE STILL REFUSED, so every generic above reaches the gate and the generic reading is what answered it${leaked.length ? `, ANSWERED: ${leaked.map((t) => JSON.stringify(t)).join('; ')}` : ''}`,
+      leaked.length === 0);
+    ok('and the twins are DIFFERENT sentences, so the pair is a pair rather than the same string twice',
+      twins.every((t, i) => t !== GENERIC_TRADES[i]));
+  }
+
+  // 🔴 EVERY NOUN IN GENERIC_SUBJECT_RE IS WALKED BY ONE OF THE PHRASINGS ABOVE, DERIVED OFF THE
+  // REAL PATTERN RATHER THAN OFF A REMEMBERED LIST. A noun nothing walks can be deleted in silence.
+  {
+    const block = read('lib/waintents.ts').match(/const GENERIC_TRADE_NOUNS = \[([\s\S]*?)\];/)[1];
+    const nouns = (block.match(/'([^']+)'/g) || []).map((q) => q.slice(1, -1).replace(/\\\\/g, '\\'));
+    // ⚠️ AND THE DERIVATION PROVES IT DERIVED. A hardcoded copy of the list passes an "is every
+    // noun walked" check for ever, which is how a walker goes blind. The count must match the
+    // quoted entries in the real block, and every noun must be a substring of it.
+    ok(`the noun list was read OFF DISK, ${nouns.length} nouns, and each one is in the real block`,
+      nouns.length === (block.match(/'/g) || []).length / 2
+      && nouns.length >= 20
+      && nouns.every((n) => block.includes(n.replace(/\\/g, '\\\\'))));
+    const walkable = GENERIC_THEIR.concat(GENERIC_TRADES);
+    const unwalked = nouns.filter((n) => {
+      const re = new RegExp(`\\b(?:a|an|any|every|most|some|all)\\s+(?:\\w+\\s+){0,2}(?:${n})s?\\b`, 'i');
+      return !walkable.some((p) => re.test(p));
+    });
+    ok(`🔴 EVERY ONE OF THE ${nouns.length} NOUNS IN GENERIC_SUBJECT_RE IS WALKED${unwalked.length ? `, UNWALKED: ${unwalked.join(', ')}` : ''}`,
+      unwalked.length === 0);
+  }
+
+  // 🔴 THE BOUNDARY, AND IT IS THE HALF THAT MATTERS MORE. THE DEFINITE ARTICLE IS NOT GENERIC.
+  // If any line here stops being refused, B42 has opened a disclosure and it comes back out.
+  const DEFINITE_AND_BARE = [
+    "what is the builder's turnover",
+    "how much is the plumber's profit",
+    'what does the barber next door owe you lot then',
+    'whats their turnover',
+    'how much is their profit',
+    'what are their takings like',
+    'whats their tax bill',
+    'what are their books like',
+    "what is someone else's income",
+    'how much does my mate earn',
+    'whats his turnover like',
+    'hows her profit doing',
+    // ⚠️ THE TWO BELOW ARE THE ONLY REASON THE PATTERN'S SHAPE IS ASSERTED RATHER THAN ASSUMED.
+    // "someone ELSE" is one of THIRD_PARTY_RE's own alternatives, and the generic pronoun would
+    // swallow it without the lookahead. Both of these are refused today ONLY because of it.
+    'does someone else pay tax on their profit',
+    'has someone else got their books in order',
+    // ⚠️ AND THESE TWO ARE THE WORD BOUNDARY. "many" ends in "any", so a pattern without \b reads
+    // "how MANY plumbers" as the generic quantifier "any" and answers a question about another
+    // firm's staff. Natural sentences, and both refused today only because of the boundary.
+    'how many plumbers do they have on their books',
+    'how many builders are on their books',
+  ];
+  const opened = DEFINITE_AND_BARE.filter((p) => !aboutElse(p));
+  ok(`🔴 ALL ${DEFINITE_AND_BARE.length} DEFINITE, BARE AND BOUNDARY SHAPES ARE STILL REFUSED${opened.length ? `, OPENED: ${opened.map((p) => JSON.stringify(p)).join('; ')}` : ''}`,
+    opened.length === 0);
+  // ⚠️ THE CORPUS SIZES ARE PINNED. A sabotage that DELETES the two shapes at risk leaves a corpus
+  // that still passes, which is how a boundary check quietly stops checking the boundary.
+  ok('the boundary and per trade corpora are the size they were measured at, 16 and 29',
+    DEFINITE_AND_BARE.length === 16 && GENERIC_TRADES.length === 29);
+
+  // 🔴 B42's SECOND FINDING. THE GATE CARRIED TWO MONEY VOCABULARIES AND THEY DID NOT MATCH.
+  // THIRD_PARTY_RE listed ten nouns after a possessive; isAboutSomeoneElse's last line listed a
+  // narrower set typed separately, so income, account, bill and vat were heard by the pattern and
+  // then let through on the last line. All four were ANSWERED on head `e1ad685d`, before B42 and
+  // after it. Measured across all 140 phrasings in this file: closing it refuses NOT ONE self
+  // phrasing. The two lists are now one constant.
+  {
+    const nouns = read('lib/waintents.ts').match(/const THIRD_PARTY_MONEY_NOUNS = '([^']+)';/)[1].split('|');
+    const missed = nouns.filter((n) => !aboutElse(`whats their ${n}`));
+    ok(`🔴 ALL ${nouns.length} OF THIRD_PARTY_RE's OWN MONEY NOUNS REACH A REFUSAL, and FOUR of them did not before B42${missed.length ? `, LET THROUGH: ${missed.join(', ')}` : ''}`,
+      nouns.length === 10 && missed.length === 0);
+    // ⚠️ AND THE LIST IS USED TWICE FROM ONE PLACE, which is the thing that stops it drifting again.
+    const src = read('lib/waintents.ts');
+    ok('🔴 THE NOUN LIST IS TYPED ONCE AND INTERPOLATED TWICE, so half the function cannot be updated',
+      (src.match(/THIRD_PARTY_MONEY_NOUNS/g) || []).length === 3
+      && !/\(\?:books\|tax\|figures\|takings\|profit\|income\|account\|bill\|turnover\|vat\)/.test(src));
+    // The self control for the widening: his own money words must still be answered.
+    const SELF_MONEY = ['whats my income', 'how much is my vat', 'whats my bill', 'hows my account'];
+    const lost = SELF_MONEY.filter((p) => aboutElse(p));
+    ok(`🔴 ...and all ${SELF_MONEY.length} of the same nouns in the FIRST PERSON are still answered${lost.length ? `, REFUSED: ${lost.join('; ')}` : ''}`,
+      lost.length === 0);
+  }
+
+  // ⚠️ AND THE ONE B42 DELIBERATELY LEFT OPEN, WITH ITS NUMBER AND ITS REASON.
+  // A BARE PLURAL generic carries no determiner: "how do tradesmen usually do their books". The
+  // variant that hears them was built and MEASURED: it closes all four AND it opens
+  // "do the plumbers next door pay tax on their profit", which is Run 1's original finding shape
+  // with a different trade in it. A fix that opens a disclosure is worse than the re ask it saves.
+  // IF THIS GOES RED somebody closed it. That is allowed, and it is NOT free: re run
+  // BARE_PLURAL_COST below in the same packet and write down what it cost.
+  const BARE_PLURAL_GENERIC = [
+    'how do tradesmen usually do their books',
+    'do plumbers pay tax on their tools',
+    'how do builders work out their profit',
+    'do landlords pay tax on their rental income',
+  ];
+  const stillRefused = BARE_PLURAL_GENERIC.filter((p) => aboutElse(p));
+  ok(`⚠️ THE GATE STILL REFUSES ${stillRefused.length} OF ${BARE_PLURAL_GENERIC.length} BARE PLURAL GENERICS, which is the shape deliberately left open`,
+    stillRefused.length === 3);
+  const BARE_PLURAL_COST = [
+    'do the plumbers next door pay tax on their profit',
+  ];
+  const costOpened = BARE_PLURAL_COST.filter((p) => !aboutElse(p));
+  ok(`🔴 ...and the ${BARE_PLURAL_COST.length} third party shape closing it would COST is still refused${costOpened.length ? `, OPENED: ${costOpened.map((p) => JSON.stringify(p)).join('; ')}` : ''}`,
+    costOpened.length === 0);
+
+  // ⚠️ TWO PRE EXISTING GAPS IN THE GATE, FOUND BY B42 WHILE CHECKING ITS OWN WORK, MEASURED
+  // AGAINST THE FILE AS IT WAS BEFORE B42 AND PINNED HERE RATHER THAN CLAIMED AS NEW.
+  //
+  // BOTH WERE ALREADY ANSWERED ON HEAD `e1ad685d` AND B42 DID NOT MOVE EITHER. They were caught
+  // because two assertions written for B42 asserted a baseline nobody had measured, and the
+  // baseline was wrong rather than the code. That is the cheaper direction to be wrong in and it
+  // is written down here so the next person does not rediscover it as a regression.
+  //
+  //   1. THE LOCATION BRANCH HAS NO TRADE NOUNS. THIRD_PARTY_RE's "next door" alternative lists
+  //      barber, shop, business, bloke, guy, woman, man, lad, fella, neighbour, competitor, mate,
+  //      friend, brother, sister, cousin, landlord, tenant, customer and client, and NOT ONE of
+  //      the trades this product sells to. So "the builders down the road" is not a third party
+  //      to this gate, while "the barber next door" is.
+  //   2. THE NAMED PERSON VERB SHAPE BREAKS ON AN APPOSITIVE. "how much has jerome made" is heard
+  //      and "how much has jerome THE PLUMBER made" is not, because the verb has to sit close to
+  //      the name and a trade description pushes it away.
+  //
+  // ⚠️ THEY ARE PINNED AS THEY ARE, NOT ASSERTED AS CORRECT. If either starts being refused,
+  // somebody has widened the gate, which is a GOOD change and not a free one: re run every self
+  // corpus in this section in the same packet and write down what it cost.
+  const PRE_EXISTING_GAPS = [
+    'what do the builders down the road make on their jobs',
+    'how much has jerome the plumber made this year',
+  ];
+  const nowRefused = PRE_EXISTING_GAPS.filter((p) => aboutElse(p));
+  ok(`⚠️ ${nowRefused.length} OF ${PRE_EXISTING_GAPS.length} PRE EXISTING GATE GAPS ARE REFUSED, measured at 0 of 2 before B42 and unmoved by it`,
+    nowRefused.length === 0);
+
+  // 🔴 A NAMED PERSON WINS OVER A GENERIC NOUN IN THE SAME SENTENCE. The override is scoped to
+  // !named on purpose, and this is what that scoping buys.
+  const NAMED_BEATS_GENERIC = [
+    'how much has jerome made this year',
+    "whats jerome's profit",
+    'how much did priya earn',
+  ];
+  const talkedOut = NAMED_BEATS_GENERIC.filter((p) => !aboutElse(p));
+  ok(`🔴 ALL ${NAMED_BEATS_GENERIC.length} NAMED PERSON QUESTIONS ARE STILL REFUSED${talkedOut.length ? `, OPENED: ${talkedOut.join('; ')}` : ''}`,
+    talkedOut.length === 0);
+  // ⚠️ "how much has jerome the plumber made this year" is NOT in this list, and the reason is
+  // written above: it was already answered before B42 for a different reason entirely.
+  const wearingGeneric = [
+    "whats a plumber like jerome's profit",
+    "what is a sole trader called dave's turnover",
+  ].filter((p) => !aboutElse(p));
+  ok(`🔴 AND A NAMED PERSON WEARING A GENERIC NOUN IS STILL REFUSED, which is what !named buys${wearingGeneric.length ? `, OPENED: ${wearingGeneric.map((p) => JSON.stringify(p)).join('; ')}` : ''}`,
+    wearingGeneric.length === 0);
 }
 
 // ── AND THE ONE THAT WAS MEASURED AND LEFT OPEN, ASSERTED SO THE DECISION CANNOT ROT. ───────

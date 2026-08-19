@@ -256,6 +256,126 @@ async function readClaudeReply(res: Response, feature: string): Promise<ClaudeRe
   }
 }
 
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B43. THE FLAG THAT NOBODY READ. 19 AUGUST 2026.
+//
+// The API tells us, on every single reply, whether it finished or whether OUR OWN CEILING cut it
+// off: `stop_reason: 'max_tokens'`. Before today that flag was read in exactly ONE place in the
+// whole estate, inside parseReceipt, whose ceiling had already been raised to 1,600 so it barely
+// needed it. The five calls that still sat at 300 read nothing. The ClaudeReply type's own comment,
+// four hundred lines up, has said the whole time that a cut off reply and a failure "deserve
+// opposite log lines and opposite fixes". They had the same one, which was none.
+//
+// PROVED ON PRODUCTION, 18 August: a claim question at /app/thread came back ending
+// "Home office. If you work from home", mid sentence, with nothing saying it had been cut.
+//
+// ⚠️ THE CEILING IS NOT THE FIX AND MUST NEVER BE MISTAKEN FOR IT. Raising a ceiling moves the
+// cliff further away, it does not remove it, and the man who falls off the new one gets exactly
+// what the man who fell off the old one got. Reading the flag is what closes it. The ceilings move
+// as well, below, because 300 was measurably too tight for what these prompts actually produce.
+//
+// ⚠️ AND THE TWO KINDS OF CALL GET OPPOSITE ANSWERS, WHICH IS THE WHOLE POINT.
+//
+//   A PARSE that was cut is REFUSED and never written. parseSpokenTransaction, parseSchedule and
+//   draftInvoice all turn a man's words into rows or figures, and half a parse is not half an
+//   answer, it is a wrong number in a bookkeeping product. Every one of those callers already
+//   carries an honest "I could not read that" sentence for a null, so refusing needs NO new copy.
+//
+//   An ANSWER that was cut is TRIMMED back to its last complete sentence and told on itself, in
+//   the one signed line below. Half a sentence about his tax with nothing marking it is the house
+//   disease this item is named after.
+//
+// ⚠️ WHAT THE MEASUREMENT ACTUALLY FOUND, WRITTEN DOWN BECAUSE IT CAME OUT AGAINST THE ITEM.
+// The item said a cut parse was already corrupting books. It is not, and it could not have been.
+// Both parse prompts specify their entire reply shape, and the WORST reply either can produce,
+// built to the readers' own field caps, is 284 characters for the schedule and 220 for the entry.
+// That is under 300 even at the impossible ratio of one token per character, and about 95 and 74
+// tokens at a real JSON ratio, so a 300 ceiling had roughly threefold headroom and could not cut
+// them. And cutting those worst replies at EVERY ONE of their characters produces ZERO prefixes
+// that JSON.parse accepts, so even a cut one already fell to null. The refusal below is therefore
+// not a rescue, it is the conversion of an ACCIDENTAL guard into a designed one: the accidental
+// one is a side effect of JSON.parse throwing, and it disappears the day somebody adds a rescue.
+// Somebody already has. rescueTruncatedReceipt, forty lines up, deliberately reads money out of a
+// truncated prefix. That is the precedent this guard exists in front of.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+
+// The ceiling for the SHORT answering lanes. Deliberately not 4,000, which is the in app
+// accountant's: these three prompts ask for one to three short sentences plus, on the money lane,
+// a source link on its own line, which is about 120 tokens. 300 was too tight because the model
+// answers a broad question with a structured reply rather than two sentences, and production
+// proved it. 700 is a little over twice the observed cut point: it fits the answer the model
+// really produces, and it stays short enough that a WhatsApp reply is a thing you read on a phone
+// rather than scroll. A bigger number here would let a two sentence promise become an essay.
+const ANSWER_MAX_TOKENS = 700;
+
+// 🔴 SIGNED COPY. Jag, 19 August 2026, by delegation, in his own words: "yes go with your
+// recommendation". NO SESSION MAY SOFTEN, LENGTHEN, SHORTEN OR REWORD THIS LINE. It is typed once,
+// here, so there is exactly one of it in the estate and a guard can count it.
+export const ANSWER_CUT_NOTE =
+  'That is as much as I can fit in one go. Ask me about any part of it and I will go deeper.';
+
+// Did OUR ceiling cut this reply off? The only thing in this file that decides that question.
+function wasCutOff(data: ClaudeReply): boolean {
+  return data.stop_reason === 'max_tokens';
+}
+
+// For the PARSE paths. True means the caller must return null and let its existing honest sentence
+// do the talking. The log line names the cause, which is the distinction the ClaudeReply comment
+// asked for: "our ceiling cut it short" is not "the model wrote nonsense".
+// ⚠️ NEVER THE CONTENT IN THE LOG. The feature name and the cause, nothing else.
+function refuseIfCut(data: ClaudeReply, feature: string): boolean {
+  if (!wasCutOff(data)) return false;
+  console.error(`[claude] ${feature}: cut off at our own token ceiling. Refused rather than guessed.`);
+  return true;
+}
+
+// Trim to the last COMPLETE sentence. Only ever called on a reply we KNOW was cut.
+//
+// ⚠️ THREE PROPERTIES IT MUST HAVE, AND EACH ONE IS THERE BECAUSE THE OBVIOUS VERSION LACKS IT.
+//
+//  1. IT NEVER RETURNS NOTHING. A cut reply with no sentence terminator anywhere keeps every word
+//     the man was given. Trimming a fragment to an empty string and appending a note would hand him
+//     the note and nothing else, which is worse than the fragment.
+//
+//  2. A FULL STOP INSIDE A NUMBER IS NOT A SENTENCE END. "£47.20" is not two sentences, because a
+//     terminator only counts when whitespace or the end of the string follows it. AND, only on a
+//     cut reply, a full stop that both follows a digit and sits at the very end is NOT counted
+//     either, because that is the exact shape of a decimal cut in half: "you owe £47." when the
+//     model was writing £47.20. Keeping that would turn a truncation into a WRONG FIGURE, which is
+//     the one thing this product may never do. The cost is trimming back one sentence further in
+//     the rare case where a reply genuinely ends on a number, and that trade is not close.
+//
+//  3. IT IS NEVER CALLED ON A REPLY THAT WAS NOT CUT. finishAnswer returns an uncut reply byte for
+//     byte, so a complete answer that legitimately ends without a full stop, a source URL on its
+//     own line for instance, is untouched. That is the guarantee, and it is asserted.
+function trimToLastCompleteSentence(text: string): string {
+  const CLOSERS = '"’”\')]';
+  let cut = -1;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch !== '.' && ch !== '!' && ch !== '?') continue;
+    let end = i + 1;
+    while (end < text.length && CLOSERS.includes(text[end])) end++;
+    if (end < text.length && !/\s/.test(text[end])) continue;   // mid word or mid number
+    if (ch === '.' && end >= text.length && i > 0 && /[0-9]/.test(text[i - 1])) continue; // half a decimal
+    cut = end;
+  }
+  if (cut < 0) return text;
+  const kept = text.slice(0, cut).trim();
+  return kept.length > 0 ? kept : text;
+}
+
+// The finisher for every ANSWER path. An uncut reply passes through untouched.
+// ⚠️ THE SIGNED LINE IS APPENDED LAST, AFTER houseCopy has already run on the model's own words, so
+// nothing can rewrite a character of it. That ordering is deliberate.
+function finishAnswer(copy: string | null, data: ClaudeReply): string | null {
+  if (!copy) return null;
+  if (!wasCutOff(data)) return copy;
+  console.error('[claude] answer cut off at our own token ceiling. Trimmed and marked.');
+  return `${trimToLastCompleteSentence(copy)}\n\n${ANSWER_CUT_NOTE}`;
+}
+
+
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 // 🔴 THE CEILING THAT REFUSED EVERY LONG RECEIPT, 12 AUGUST 2026. RUN 2's florist photographed
 // a 27 line cash and carry till roll, perfectly printed, and was told "I could not read that
@@ -474,6 +594,9 @@ export async function parseSpokenTransaction(text: string): Promise<ParsedEntry 
   const data = await readClaudeReply(res, 'entry_parse');
   if (!data) return null;
   logUsage('entry_parse', data);
+
+  // B43. A cut parse is refused, never guessed at. See THE FLAG THAT NOBODY READ above.
+  if (refuseIfCut(data, 'entry_parse')) return null;
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   if (!textBlock) return null;
 
@@ -557,6 +680,11 @@ export async function draftInvoice(description: string): Promise<DraftedInvoice 
   const data = await readClaudeReply(res, 'invoice_draft');
   if (!data) return null;
   logUsage('invoice_draft', data);
+
+  // B43. A cut invoice draft is refused, never half read. This one was NOT in the item and was
+  // found by the shape guard below: 500 tokens against a reply whose line_items array grows with
+  // the job, which is the same shape that refused every long till roll on 12 August.
+  if (refuseIfCut(data, 'invoice_draft')) return null;
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   if (!textBlock) return null;
 
@@ -778,7 +906,7 @@ export async function answerMoneyQuestion(
       method: 'POST',
       headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
-      body: JSON.stringify({ model: MODEL_FAST, max_tokens: 300, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({ model: MODEL_FAST, max_tokens: ANSWER_MAX_TOKENS, messages: [{ role: 'user', content: prompt }] }),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error';
@@ -794,7 +922,7 @@ export async function answerMoneyQuestion(
   if (!data) return null;
   logUsage('money_question', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
-  return houseCopy(textBlock);
+  return finishAnswer(houseCopy(textBlock), data);
 }
 
 // Answer a "can I claim X?" expense question for a UK sole trader. Strictly
@@ -823,7 +951,7 @@ export async function answerExpenseQuestion(question: string): Promise<string | 
       method: 'POST',
       headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
-      body: JSON.stringify({ model: MODEL_FAST, max_tokens: 300, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({ model: MODEL_FAST, max_tokens: ANSWER_MAX_TOKENS, messages: [{ role: 'user', content: prompt }] }),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error';
@@ -839,7 +967,7 @@ export async function answerExpenseQuestion(question: string): Promise<string | 
   if (!data) return null;
   logUsage('expense_check', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
-  return houseCopy(textBlock);
+  return finishAnswer(houseCopy(textBlock), data);
 }
 
 // --- WhatsApp support draft. When a customer asks for a human or reports a problem in WhatsApp, we open
@@ -880,7 +1008,7 @@ export async function draftSupportReply(
       method: 'POST',
       headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
-      body: JSON.stringify({ model: MODEL_SMART, max_tokens: 300, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({ model: MODEL_SMART, max_tokens: ANSWER_MAX_TOKENS, messages: [{ role: 'user', content: prompt }] }),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error';
@@ -896,7 +1024,7 @@ export async function draftSupportReply(
   if (!data) return null;
   logUsage('support_draft', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
-  return houseCopy(textBlock);
+  return finishAnswer(houseCopy(textBlock), data);
 }
 
 // --- Sharpen a playbook answer. Jag writes or pastes a rough answer to a common question in the console
@@ -935,6 +1063,12 @@ export async function improveSupportAnswer(question: string, draft: string): Pro
   const data = await readClaudeReply(res, 'support_improve');
   if (!data) return null;
   logUsage('support_improve', data);
+
+  // B43. REFUSED rather than trimmed, and this one is deliberately not an answer path. What comes
+  // back here is saved into Jag's support playbook, and draftSupportReply then GROUNDS every future
+  // customer draft in it. A half rewritten answer saved once is served for ever, so the console
+  // gets its existing "could not improve that, try again" and Jag keeps the draft he wrote.
+  if (refuseIfCut(data, 'support_improve')) return null;
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   return houseCopy(textBlock);
 }
@@ -1235,7 +1369,7 @@ export async function answerAccountantQuestion(question: string, context?: strin
     .map((c) => c.text as string)
     .join('')
     .trim();
-  return textBlock ? textBlock : null;
+  return finishAnswer(textBlock ? textBlock : null, data);
 }
 
 // --- Scheduling: turn "price up a job for Dave tomorrow at 8am" into a diary event ---
@@ -1294,6 +1428,9 @@ export async function parseSchedule(text: string, nowIso: string): Promise<Parse
   const data = await readClaudeReply(res, 'schedule_parse');
   if (!data) return null;
   logUsage('schedule_parse', data);
+
+  // B43. A cut parse is refused, never guessed at. See THE FLAG THAT NOBODY READ above.
+  if (refuseIfCut(data, 'schedule_parse')) return null;
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   if (!textBlock) return null;
 

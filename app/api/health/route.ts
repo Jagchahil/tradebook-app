@@ -48,6 +48,16 @@ function stripeMode(): 'live' | 'test' | 'missing' {
   return 'missing';
 }
 
+// THE COMMIT THIS BUILD WAS MADE FROM. Vercel sets VERCEL_GIT_COMMIT_SHA at build time.
+//
+// ⚠️ VALIDATED RATHER THAN TRUSTED. Anything that is not 40 hex characters comes back as `local`,
+// so a truncated, prefixed or otherwise surprising value can never be reported as a commit. A
+// field that might be a sha is worse than one that says it does not know.
+function buildSha(): string {
+  const sha = process.env.VERCEL_GIT_COMMIT_SHA || '';
+  return /^[0-9a-f]{40}$/.test(sha) ? sha : 'local';
+}
+
 function authorised(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
@@ -292,6 +302,28 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(
     {
       ok: healthy,
+      // 🔴 B54. WHICH BUILD IS THIS. 19 August 2026.
+      //
+      // Nothing the product served said which commit it was, so "is the newest push live" cost a
+      // Vercel login EVERY SINGLE TIME. Derived at head `e1ad685d`: ZERO hits across app/, lib/,
+      // next.config.mjs and package.json for VERCEL_GIT_COMMIT_SHA, VERCEL_GIT_COMMIT_REF,
+      // NEXT_PUBLIC_COMMIT, NEXT_PUBLIC_BUILD, BUILD_ID or buildId.
+      //
+      // ⚠️ WHY IT IS WORTH A FIELD RATHER THAN A SHRUG. This corpus's own rule is NEVER READ A
+      // PRODUCTION WALK INSIDE TWO MINUTES OF A PUSH, and the substitute it sanctions is a PROBE
+      // OF THE BUILD. Until today that probe needed a password, so every session either logged in,
+      // asked Jag, or wrote down that it could not check. Two sessions running burned time on
+      // exactly this, and a third would have.
+      //
+      // 🔴 THE SHA AND NOTHING ELSE. Never the branch name, which says what we are working on;
+      // never a token; never a deployment URL, which is a door. The repo is PUBLIC, so the commit
+      // hash tells a stranger nothing he could not read on GitHub, and it tells us the one thing
+      // we cannot read any other way without signing in.
+      //
+      // `local` when the variable is unset, which is every machine that is not Vercel. It is a
+      // word rather than an empty string so a reader can tell "this is a laptop" from "this field
+      // stopped being set", and test/buildstamp.test.mjs asserts it is one or the other.
+      build: buildSha(),
       db,
       // Told apart on purpose. `db: false, key: "not-privileged"` says the database is answering
       // and we have LOST OUR PRIVILEGES, which is a completely different emergency from the

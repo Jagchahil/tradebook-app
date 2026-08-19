@@ -19,7 +19,7 @@ const codeOnly = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // 1. NO ORIGIN IS REFLECTED IN PRODUCTION WITHOUT THE ENVIRONMENT BEING ASKED.
 //
-// middleware.ts reflected http://localhost:<any port> into Access-Control-Allow-Origin in
+// proxy.ts reflected http://localhost:<any port> into Access-Control-Allow-Origin in
 // production, while the comment two lines above said "in development any localhost port is
 // allowed". Nothing authenticated leaked: Access-Control-Allow-Credentials is set nowhere in either
 // repo and these routes carry a Bearer token, never a cookie. The defect was that a comment
@@ -29,8 +29,8 @@ const codeOnly = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/
 // guarded by an environment check in the SAME expression. A future second one fails here.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 console.log('\n=== 1. no development origin is trusted in production ===\n');
-const mw = read(path.join(root, 'middleware.ts'));
-ok('middleware.ts exists', mw.length > 0);
+const mw = read(path.join(root, 'proxy.ts'));
+ok('proxy.ts exists', mw.length > 0);
 const code = codeOnly(mw);
 for (const m of code.matchAll(/^.*(?:localhost|127\.0\.0\.1).*$/gm)) {
   const line = m[0];
@@ -39,10 +39,10 @@ for (const m of code.matchAll(/^.*(?:localhost|127\.0\.0\.1).*$/gm)) {
     /NODE_ENV|VERCEL_ENV/.test(line) || /NODE_ENV|VERCEL_ENV/.test(code.slice(Math.max(0, m.index - 200), m.index + line.length)));
 }
 // The reason the blast radius was small, asserted so it stays small. ⚠️ codeOnly FIRST: the first
-// version of this line read the raw file, and the comment I had just written in middleware.ts
+// version of this line read the raw file, and the comment I had just written in proxy.ts
 // explaining that this header is set nowhere CONTAINED THE HEADER NAME, so the guard failed on its
 // own explanation. Comments are not code. It is the third time that has bitten in one day.
-const corsSources = [path.join(root, 'middleware.ts'), path.join(root, 'next.config.mjs')]
+const corsSources = [path.join(root, 'proxy.ts'), path.join(root, 'next.config.mjs')]
   .concat(existsSync(MOBILE) ? [path.join(MOBILE, 'lib', 'api.ts')] : []);
 for (const f of corsSources) {
   const src = codeOnly(read(f));
@@ -160,7 +160,7 @@ for (const [label, base] of REPOS) {
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 console.log('\n=== 4. no dash used as punctuation in anything Run 7 wrote ===\n');
 const TOUCHED = [
-  path.join(root, 'middleware.ts'),
+  path.join(root, 'proxy.ts'),
   path.join(root, '.github', 'dependabot.yml'),
   path.join(root, 'supabase', 'APPLY_2026-08-16_khoji_documents_rls.sql'),
 ];

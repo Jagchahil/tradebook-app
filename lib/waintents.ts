@@ -2075,10 +2075,85 @@ export function isVatQuestion(body: string): boolean {
 // ⚠️ THE POSSESSIVE IS THE SIGNAL, NOT THE NOUN. "my mate", "the barber next door", "her", "their"
 // carry it; "the barber" alone might be his own trade. So a third party word must appear WITH a
 // question about money, and first person words anywhere in the message call it off.
-const THIRD_PARTY_RE =
-  /\b(?:the\s+)?(?:barber|shop|business|bloke|guy|woman|man|lad|fella|neighbour|neighbor|competitor|mate|friend|brother|sister|cousin|landlord|tenant|customer|client)\s+(?:next door|down the road|over the road|opposite|upstairs|across)\b|\b(?:my (?:mate|friend|brother|sister|cousin|neighbour|neighbor))\b|\b(?:his|her|their|someone else'?s?|somebody else'?s?|anyone else'?s?)\s+(?:books|tax|figures|takings|profit|income|account|bill|turnover|vat)\b/i;
+// 🔴 ONE LIST, USED TWICE. See the block at the end of isAboutSomeoneElse: these ten nouns were
+// typed here and a NARROWER set was typed again on that function's last line, so four of them never
+// reached a refusal. A vocabulary that appears twice drifts, and this one already had.
+const THIRD_PARTY_MONEY_NOUNS = 'books|tax|figures|takings|profit|income|account|bill|turnover|vat';
+
+const THIRD_PARTY_RE = new RegExp(
+  `\\b(?:the\\s+)?(?:barber|shop|business|bloke|guy|woman|man|lad|fella|neighbour|neighbor|competitor|mate|friend|brother|sister|cousin|landlord|tenant|customer|client)\\s+(?:next door|down the road|over the road|opposite|upstairs|across)\\b`
+  + `|\\b(?:my (?:mate|friend|brother|sister|cousin|neighbour|neighbor))\\b`
+  + `|\\b(?:his|her|their|someone else'?s?|somebody else'?s?|anyone else'?s?)\\s+(?:${THIRD_PARTY_MONEY_NOUNS})\\b`,
+  'i',
+);
 
 const FIRST_PERSON_RE = /\b(?:my own|i|me|mine)\b/i;
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B42. THE FIRST QUESTION A NEW CUSTOMER TYPES WAS REFUSED, AND THE REASON WAS A PRONOUN.
+//
+// Walked on production on 18 August as +callum, on head, with nothing changed. Typed at
+// /app/thread: "what are the main ways a sole trader can legally reduce their tax bill", answered
+// with "I can only see your books, so I have no idea and could not tell you if I did."
+//
+// THIRD_PARTY_RE's `their` alternative cannot tell a possessive about a NAMED PERSON from the
+// SINGULAR THEY, which is how ordinary British English refers to a generic sole trader. Measured:
+// 6 of 10 generic phrasings refused, and all three of the same questions in the first person
+// answered, so it was the pronoun and not the question.
+//
+// ⚠️ THE CHEAP FIX WAS BUILT AND MEASURED AND IT TRADES THE WRONG WAY. Dropping `their` closes all
+// six and costs THREE real third party shapes ("whats their turnover", "how much is their profit",
+// "what are their takings like"). That trades a re ask for a possible DISCLOSURE, which is the
+// direction the argument above NOT_A_PERSON exists to avoid. So `their` stays.
+//
+// 🔴 WHAT SEPARATES THEM IS AN INDEFINITE GENERIC ANTECEDENT IN THE SAME QUESTION. A generic
+// question introduces its subject with an indefinite article or a generic quantifier: "A sole
+// trader ... their tax bill", "most sparkies ... their books", "someone ... their vat". A question
+// about a third party does not: "whats their turnover" has no antecedent at all, because the
+// antecedent is a person both people already have in mind.
+//
+// ⚠️ THE DEFINITE ARTICLE IS DELIBERATELY ABSENT FROM THE DETERMINER LIST, AND THAT IS THE WHOLE
+// SAFETY. "a builder's turnover" cannot be one man. "THE builder's turnover" can be the man next
+// door, and this gate was built for him. Measured: "what is the builder's turnover" and "how much
+// is the plumber's profit" are still refused, and so is every one of Run 1's original shapes.
+//
+// MEASURED IN BOTH DIRECTIONS ON EVERY CORPUS IN test/laneparity.test.mjs BEFORE IT WAS TAKEN:
+//   OPENED  6 of 6 of the generic phrasings, and 14 of 15 across an extended corpus carrying one
+//           phrasing per trade this product sells to.
+//   COST    NOTHING. Not one phrasing that was refused before is answered after, across the three
+//           third party "their" shapes, B23's 9 misses, B23's 6 controls, B19's savings shapes,
+//           all six THIRD_PARTY_RE alternatives and the three one word gap possessives.
+//   AND     nothing newly refused across all 81 self phrasings.
+//
+// 🔴 WHAT IS DELIBERATELY LEFT OPEN, WITH THE NUMBER, BECAUSE CLOSING IT OPENS A DISCLOSURE.
+// A BARE PLURAL generic has no determiner to key on: "how do tradesmen usually do their books",
+// "do plumbers pay tax on their tools". The variant that hears them was built and measured: it
+// closes all four AND it opens "do the plumbers next door pay tax on their profit", which is Run
+// 1's original finding shape with a different trade in it. A fix that opens a disclosure hole is
+// worse than the re ask it saves. test/laneparity.test.mjs asserts the open number so it cannot
+// move in the dark.
+//
+// ⚠️ AND EVERY NOUN IN THE LIST IS WALKED BY A PHRASING IN THAT SUITE, OR IT IS NOT IN THE LIST.
+// Same rule as B23's possessive noun list. An unexercised alternative is not a feature, it is a
+// hole with a name.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const GENERIC_TRADE_NOUNS = [
+  'sole\\s+trader', 'self\\s+employed(?:\\s+person)?', 'sub\\s?contractor', 'tradesman',
+  'tradesmen', 'tradesperson', 'builder', 'plumber', 'electrician', 'spark(?:y|ies)',
+  'plasterer', 'roofer', 'joiner', 'decorator', 'tiler', 'gas\\s+engineer', 'scaffolder',
+  'groundworker', 'landscaper', 'landlord', 'freelancer', 'contractor', 'limited\\s+company',
+  'business\\s+owner', 'person', 'people',
+];
+
+// The determiner run is TWO WORDS, which is the same bound B23 wrote for its object noun run:
+// the smallest that hears everything measured. It carries "a NEW sole trader" and "a NEWLY SELF
+// EMPLOYED person" and nothing longer is walked by any phrasing.
+export const GENERIC_SUBJECT_RE = new RegExp(
+  `\\b(?:a|an|any|every|most|some|all)\\s+(?:\\w+\\s+){0,2}(?:${GENERIC_TRADE_NOUNS.join('|')})s?\\b`
+  // ⚠️ AND NEVER "someone ELSE", which is one of THIRD_PARTY_RE's own alternatives.
+  + `|\\b(?:someone|somebody|anyone|anybody|everyone)\\b(?!\\s+else)`,
+  'i',
+);
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 // 🔴 AND A PERSON WITH A NAME MATCHED NONE OF IT. Run 3, 13 August 2026.
@@ -2329,10 +2404,32 @@ export function isAboutSomeoneElse(body: string, selfNames: string[] = []): bool
   // question is squarely about the other party.
   if (/\bcompared to\b|\bvs\b|\bversus\b/i.test(b)) return false;
   if (FIRST_PERSON_RE.test(b) && !/\byou lot\b|\byou\b/i.test(b)) return false;
+  // 🔴 B42. AN INDEFINITE GENERIC ANTECEDENT MEANS THE SINGULAR THEY, NOT A MAN.
+  // ⚠️ SCOPED TO `!named` ON PURPOSE. A question that NAMES somebody is refused whatever else is in
+  // it, so "how much has jerome made" cannot be talked out of the gate by a generic noun landing in
+  // the same sentence. The generic reading only ever overrides the PRONOUN shapes.
+  if (!named && GENERIC_SUBJECT_RE.test(b)) return false;
   // A named person carries its own money verb inside the pattern, so it does not have to prove one
   // twice. The original shape still does, exactly as before.
   if (named) return true;
-  return /\bowe|owes|owed|earn|earns|made|makes|turnover|profit|tax|takings|books|figures|pay|pays\b/i.test(b);
+  // 🔴 B42's SECOND FINDING, AND IT WAS FOUND BY WRITING THE CORPUS RATHER THAN BY READING.
+  // THIS FUNCTION CARRIED TWO MONEY VOCABULARIES AND THEY DID NOT MATCH. THIRD_PARTY_RE lists ten
+  // nouns after a possessive; this line listed a narrower set typed separately, and FOUR of the ten
+  // were missing from it: income, account, bill and vat. So "whats their income", "whats their
+  // vat", "whats their bill" and "whats their account" were ALL ANSWERED, on head `e1ad685d`,
+  // before B42 and after it. The gate heard the question and then let it through on the last line.
+  //
+  // ⚠️ IT IS THE DISCLOSURE DIRECTION, WHICH IS THE EXPENSIVE ONE. Nothing escaped: the model has
+  // the four rules and the whose money is this rule above it, so the second lock held. But a gate
+  // that hears "their income" and then does not refuse it is not a gate, and this product's own
+  // argument above NOT_A_PERSON says which way to be wrong.
+  //
+  // MEASURED BEFORE IT WAS TAKEN, on every corpus in test/laneparity.test.mjs, 140 phrasings:
+  // NOT ONE self phrasing becomes refused, and it closes all four. The trade is free.
+  //
+  // ⚠️ AND THE TWO LISTS ARE NOW ONE. The nouns come from a single constant, so the next person to
+  // add a money word to the possessive pattern cannot add it to only half the function.
+  return new RegExp(`\\b(?:owe|owes|owed|earn|earns|made|makes|pay|pays|${THIRD_PARTY_MONEY_NOUNS})\\b`, 'i').test(b);
 }
 
 export const SOMEONE_ELSE_ANSWER =

@@ -332,9 +332,10 @@ const SABOTAGES = [
   },
   {
     name: 'F21 the barber question reaches her own figures',
+    // ⚠️ RE ANCHORED 19 AUGUST 2026 BY B42, for the same reason as sabotage-b22gateorder.
     apply: (d) => edit(d, 'lib/waintents.ts',
-      '  return /\\bowe|owes|owed|earn|earns|made|makes|turnover|profit|tax|takings|books|figures|pay|pays\\b/i.test(b);',
-      '  return false;'),
+      "|${THIRD_PARTY_MONEY_NOUNS})\\\\b`, 'i').test(b);",
+      "|${THIRD_PARTY_MONEY_NOUNS})\\\\b`, 'i').test('');"),
   },
   {
     name: 'F21 the refusal lane is removed from the router',

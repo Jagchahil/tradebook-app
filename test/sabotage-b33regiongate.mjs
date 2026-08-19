@@ -37,7 +37,7 @@ function scratch() {
   for (const d of ['lib', 'test', 'app', 'supabase']) {
     cpSync(path.join(root, d), path.join(dir, d), { recursive: true });
   }
-  cpSync(path.join(root, 'middleware.ts'), path.join(dir, 'middleware.ts'));
+  cpSync(path.join(root, 'proxy.ts'), path.join(dir, 'proxy.ts'));
   return dir;
 }
 
@@ -76,7 +76,7 @@ function baseline() {
     console.log('🔴 BROKEN HARNESS: an UNMODIFIED scratch tree is already RED.');
     console.log('   Nothing below would mean anything. Check, in this order:');
     console.log('   1. every directory these suites READ is copied by scratch() (supabase/ is one)');
-    console.log('   2. middleware.ts is copied too, because regiongate section 6 reads it');
+    console.log('   2. proxy.ts is copied too, because regiongate section 6 reads it');
     console.log('   3. df -h on TMPDIR: a suite that dies of ENOSPC scores as caught');
     process.exit(1);
   }

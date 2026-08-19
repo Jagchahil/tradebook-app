@@ -10,7 +10,7 @@ const DRAFT_GLOBAL_DAILY = Number(process.env.DRAFT_GLOBAL_DAILY || 500);
 // give across serverless instances. Keyed in the same ai_usage table.
 const DRAFT_IP_DAILY = Number(process.env.DRAFT_IP_DAILY || 40);
 
-// CORS (including the OPTIONS preflight) is handled centrally in middleware.ts,
+// CORS (including the OPTIONS preflight) is handled centrally in proxy.ts,
 // which allows our web origin plus any localhost port for the Expo web build.
 
 export async function POST(req: NextRequest) {

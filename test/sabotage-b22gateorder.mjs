@@ -176,9 +176,12 @@ const SABOTAGES = [
     // rewritten to widen the money verb list, which is the clause that actually decides three of
     // them. A sabotage that does not bite is broken, not passing.
     name: '🔴 the third party gate is widened, so the "one of four" this fix does NOT close silently becomes two',
+    // ⚠️ RE ANCHORED 19 AUGUST 2026 BY B42. This line used to carry a SECOND typed money vocabulary
+    // and now interpolates the one constant, so the old anchor went DEAD. Same sabotage, same
+    // intent: widen the money verb list and check the "one of four" does not silently become two.
     apply: ({ dir }) => edit(dir, 'lib/waintents.ts',
-      "  return /\\bowe|owes|owed|earn|earns|made|makes|turnover|profit|tax|takings|books|figures|pay|pays\\b/i.test(b);",
-      "  return /\\bowe|owes|owed|earn|earns|made|makes|turnover|profit|tax|takings|books|figures|pay|pays|return\\b/i.test(b);"),
+      "|${THIRD_PARTY_MONEY_NOUNS})\\\\b`, 'i').test(b);",
+      "|${THIRD_PARTY_MONEY_NOUNS}|return)\\\\b`, 'i').test(b);"),
   },
   {
     name: '🔴 the gate starts refusing honest self phrasings, which is the direction that costs a customer his answer',

@@ -18,7 +18,8 @@
 //     So the list of band derived surfaces is DERIVED FROM THE FILES ON DISK at run time and held
 //     BY EQUALITY. A new one fails here until somebody writes down which way it went and why.
 //
-//   . SOMEONE MODELS SCOTLAND AND THE NOTICE STAYS UP. "Scottish rates are coming to Lekhio" under
+//   . SOMEONE MODELS SCOTLAND AND THE CAVEAT STAYS UP. B36 deleted the promise on 19 August 2026,
+//     so the line no longer says rates are coming, but the caveat itself under
 //     a figure that already uses them is a worse lie than the one it replaced, because it reads as
 //     a caveat and is actually an untruth. So the engine is watched: the day lib/taxengine.ts or
 //     the mobile mirror learns a Scottish band, THIS SUITE GOES RED and whoever did it has to
@@ -70,7 +71,14 @@ ok('🔴 it names England, Wales and Northern Ireland',
   /England, Wales and Northern Ireland/.test(LINE));
 ok('🔴 it says the figure is INCOME TAX, not tax in general',
   /income tax/i.test(LINE));
-ok('🔴 it says Scottish rates are coming', /Scottish rates are coming/i.test(LINE));
+// 🔴 REVERSED BY B36, 19 August 2026, AND THE OLD LINE IS QUOTED HERE SO THE REVERSAL CANNOT BE
+// SILENT. It read `/Scottish rates are coming/i.test(LINE)`, which made this suite the thing
+// DEFENDING a promise the product makes nowhere else. The region gate one click from these same
+// calculators refuses to promise anybody anything, and a caveat that promises while the gate
+// refuses is a contradiction a customer can see in two clicks. The sentence now states what is
+// true and stops, which is this file's own house rule three paragraphs up.
+ok('🔴 it PROMISES NOTHING, which is the whole of B36',
+  !/\bcoming\b|\bwill be\b|\bplanned\b|\bon the way\b|\bwe are (adding|building|working)\b/i.test(LINE));
 
 // WHAT IT MUST NOT SAY. Each of these is a way an honest caveat turns into a new false claim.
 ok('⚠️ it does NOT claim we know where he lives',
@@ -766,7 +774,10 @@ ok('and the card keeps the sentence whole', /body: `\$\{\w+\.body\} \$\{SCOTLAND
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // 4. THE RATCHET ITSELF. THIS IS THE ASSERTION THAT IS MEANT TO FAIL ONE DAY.
 //
-// While no Scottish band is modelled, "Scottish rates are coming to Lekhio" is true. The moment one
+// While no Scottish band is modelled, the caveat is true. ⚠️ IT USED TO SAY MORE THAN THAT: until
+// B36 on 19 August 2026 the sentence promised "Scottish rates are coming to Lekhio", which the
+// region gate one click away refused to promise anybody. The promise is gone and the caveat
+// stays, so this ratchet now watches a plain statement of fact rather than a roadmap. The moment one
 // is, it is a false statement sitting under a correct figure. So the engine and its hand written
 // mobile mirror are watched, and whoever models Scotland is stopped here and made to delete the
 // notice on purpose rather than leave it up by accident.

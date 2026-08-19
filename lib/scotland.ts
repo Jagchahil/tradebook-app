@@ -43,7 +43,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 export const SCOTLAND_LINE =
-  'Income tax is worked out at the England, Wales and Northern Ireland rates, and Scottish rates are coming to Lekhio.';
+  'Income tax is worked out at the England, Wales and Northern Ireland rates.';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // 🔴 THE DETERMINISTIC ANSWER. B16, 17 August 2026, AND IT IS WHY THIS FILE HAS A SECOND EXPORT.

@@ -40,7 +40,7 @@
 
 import { FACTS, vatRegistrationRequired, mtdForIncomeTaxRequired, concept } from './taxengine';
 import { quarterBounds, quarterForDate } from './quarterpack';
-import { gbp0 } from './money';
+import { gbp0, gbpAbs2 } from './money';
 
 // The honest nothing. Sent when no verified fact applies to him this week.
 //
@@ -50,7 +50,12 @@ export const QUIET_LINE = 'All logged. Nothing new needs your attention this wee
 
 // Whole pounds, en-GB grouping. Copied in shape from lib/agent.ts line 216
 // (`const gbp = (n: number) => ...`), so the weekly line reads identically to every nudge and
-// card the product already sends. Pence on a Sunday evening is noise.
+// card the product already sends.
+//
+// ⚠️ THIS IS THE STATUTORY FIGURES ONLY, SINCE B37 ON 19 AUGUST 2026. It prints the VAT
+// registration threshold and the rolling 12 month turnover it is being compared against, and the
+// law writes £90,000 rather than £90,000.00. The WEEK'S OWN figures, which a customer can ask a
+// second surface about, go through money() below and print pence.
 export function gbp(n: number): string {
   // One formatter, in lib/money.ts. This wrapper stays because it is imported by name in several
   // places and the export is part of this module's shape.
@@ -297,10 +302,22 @@ export interface WeeklySummaryInput extends WeeklyUpdateInput {
   expenses: number;
 }
 
-// Whole pounds with a sign that reads like English rather than like a spreadsheet. gbp() above
-// prints a bare number and would render a loss as "£-140", which is not a sentence.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE WEEK'S FIGURES GO TO THE PENNY. B37, 19 August 2026, AND IT REVERSES A LINE ABOVE.
+//
+// The comment at the top of this file said "Pence on a Sunday evening is noise", and it was an
+// honest reading of a Sunday message on its own. It stopped being true the moment the same three
+// figures could be asked for on a second surface: the chat answers "You have brought in
+// £22,910.00" and this sent "£22,910 in" to the SAME customer on the SAME channel, one screen
+// apart. That is B26's rule from the other side. The costume belongs to the FIGURE, not to the
+// hour it is sent at, and nobody is misled by pence while one product quoting one number two ways
+// misleads everybody.
+//
+// gbpAbs2 is the magnitude only, which is what this wrapper always wanted: the sentences below say
+// "in", "out" and "more out than in", so the direction is in the English and never in a minus sign.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 function money(n: number): string {
-  return gbp(Math.abs(Number.isFinite(n) ? n : 0));
+  return gbpAbs2(n);
 }
 
 // The figures line on its own, so a surface that draws its own layout can take the numbers without

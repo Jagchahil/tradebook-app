@@ -21,6 +21,20 @@
 
 import { LTD, corporationTax, employerNIC, dividendTax, planLtd, salaryRungs, type LtdPlan } from './ltdengine';
 
+// ⚠️ ONE FORMATTER, AND THERE WERE TWO IDENTICAL LOCAL COPIES IN THIS FILE. B41, 19 August 2026.
+//
+// This is lib/money.ts gbp0 character for character, and it was NOT until today: both copies read
+// `£${Math.round(n)...}`, which puts the sign INSIDE the pound, so a slice that costs him more than
+// it gives him printed "£-40". A copy rather than an import because test/payyourself.test.mjs and
+// test/payyourselfweb.test.mjs stage this module with a hand written dependency list.
+// test/moneyone.test.mjs runs this body against the real gbp0 on every gate.
+const money = (n: number): string => {
+  const v = Number.isFinite(n) ? n : 0;
+  const r = Math.round(v) || 0;
+  const abs = Math.abs(r).toLocaleString('en-GB');
+  return r < 0 ? `-£${abs}` : `£${abs}`;
+};
+
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 // ---------------------------------------------------------------------------------------------
@@ -67,8 +81,6 @@ export function wall(profitBeforeSalary: number, salary: number, slice = 1000): 
   const after = planLtd(Math.max(0, profitBeforeSalary) + slice * 2, salary);
   const nextKeeps = r2(after.takeHome - next.takeHome);
   const atACliff = nextKeeps < keeps - 1;   // a pound of noise is not a cliff
-
-  const money = (n: number) => `£${Math.round(n).toLocaleString('en-GB')}`;
 
   return {
     slice,
@@ -122,8 +134,6 @@ export function drawable(
   // Losses brought forward reduce it, which is why this takes a signed number.
   const available = r2(Math.max(0, plan.dividends + reservesBroughtForward));
   const blocked = wanted > available + 0.01;
-
-  const money = (n: number) => `£${Math.round(n).toLocaleString('en-GB')}`;
 
   if (!blocked) {
     return {

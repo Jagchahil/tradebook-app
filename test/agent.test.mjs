@@ -671,7 +671,25 @@ eq('Q4 label', A.mtdQuarter(new Date('2027-02-01T00:00:00Z')).label, '2026-27Q4'
     selfAssessmentBill: 12000,
     selfAssessmentPoa: { tax: 12000, deductedAtSource: 0 },
   }));
-  const LINE = 'Income tax is worked out at the England, Wales and Northern Ireland rates, and Scottish rates are coming to Lekhio.';
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 DERIVED FROM lib/scotland.ts, NEVER TYPED OUT. B36, 19 August 2026.
+  //
+  // This suite had the sentence written out here as a string literal. B36 changed the sentence,
+  // by decision, and SIX assertions in this block went red on an engine that was doing exactly
+  // what it was told. Nothing was broken except the copy of the constant kept in the test.
+  //
+  // test/scotland.test.mjs has ALWAYS derived it, with this same regex, and says in its own
+  // header that the sentence lives in one place because "one caveat becomes nine slightly
+  // different caveats and then eight missing ones". A test that retypes the constant it is
+  // testing is the ninth caveat, and this codebase keeps deleting those.
+  //
+  // ⚠️ AND THE EMPTY STRING GUARD BELOW IS NOT DECORATION. `''.includes('')` is TRUE, so a regex
+  // that stopped matching would make every assertion in this block pass against nothing at all.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const scotSrc = readFileSync(path.join(lib, 'scotland.ts'), 'utf8');
+  const LINE = (/export const SCOTLAND_LINE\s*(?::\s*string\s*)?=\s*\n?\s*'([^']*)'/.exec(scotSrc) ?? [])[1] ?? '';
+  ok('🔴 the Scotland sentence was DERIVED from lib/scotland.ts, not typed into this file',
+    LINE.length > 40 && LINE.endsWith('.'));
   const CLAUSE = LINE.slice(0, -1);
 
   ok('the corpus fired at least one disclosed and one undisclosed signal (vacuity)',
@@ -699,7 +717,7 @@ eq('Q4 label', A.mtdQuarter(new Date('2027-02-01T00:00:00Z')).label, '2026-27Q4'
   ok('every disclosed card ends with the sentence, whole',
     disclosed.every((x) => x.body.endsWith(LINE)));
   ok('and says it exactly once, never twice',
-    disclosed.every((x) => (x.body.match(/Scottish rates are coming to Lekhio/g) ?? []).length === 1));
+    disclosed.every((x) => x.body.split(LINE).length - 1 === 1));
 
   // 🔴 NOTHING ON AgentInput SAYS WHERE HE LIVES, which is why the sentence cannot be conditional
   // on it. Derived from the interface rather than remembered.

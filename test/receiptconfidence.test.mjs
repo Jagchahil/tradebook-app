@@ -183,10 +183,10 @@ ok('and its own section, drawn only when there is one', /knownUnsure\.length > 0
 const secStart = pageSrc.indexOf('{knownUnsure.length > 0 && (');
 const section = secStart >= 0 ? pageSrc.slice(secStart, secStart + 1800) : '';
 ok('the section exists to test', section.length > 0);
-ok('it still prints the amount rather than hiding it', /gbp0\(g\.total\)/.test(section));
+ok('it still prints the amount rather than hiding it', /gbp2\(g\.total\)/.test(section));
 ok('it still files in ONE press, because the founder quit at two files out of eight',
   (section.match(/type="submit"/g) ?? []).length === 1);
-ok('the line names the figure', /uncertainAmountLine\(gbp0\(g\.total\)\)/.test(section));
+ok('the line names the figure', /uncertainAmountLine\(gbp2\(g\.total\)\)/.test(section));
 // It must never tell her to take a better photograph. That sentence was said twice on 12 August
 // about a perfectly printed till roll when the fault was our own token ceiling.
 ok('🔴 it never blames her photograph', !/clearer photo|better photo|photograph usually/i.test(section));

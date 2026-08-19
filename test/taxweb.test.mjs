@@ -426,9 +426,9 @@ ok('the page types no MTD threshold of its own',
 // to lose in a refactor is the sentence, and the sentence is what stops the fix becoming the bug.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 ok('🔴 the tiles are the pack\'s figures and the page adds nothing to them',
-  /gbp0\(sub\.trade\.expenses\)/.test(summaryCode) && /gbp0\(sub\.trade\.net\)/.test(summaryCode));
+  /gbp2\(sub\.trade\.expenses\)/.test(summaryCode) && /gbp2\(sub\.trade\.net\)/.test(summaryCode));
 ok('🔴 AND MONEY HELD OUT OF Out IS NAMED ON THE SAME SCREEN',
-  /sub\.trade\.capitalCost > 0/.test(summaryCode) && /gbp0\(sub\.trade\.capitalCost\)/.test(summaryCode));
+  /sub\.trade\.capitalCost > 0/.test(summaryCode) && /gbp2\(sub\.trade\.capitalCost\)/.test(summaryCode));
 ok('...with the reason, in his words, not a footnote number',
   /not in Out above/.test(summaryCode) && /never in one/.test(summaryCode));
 ok('🔴 and the line is drawn ONLY when there is one, doc 103\'s empty test',

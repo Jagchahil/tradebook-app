@@ -6,6 +6,7 @@ import {
   readKnowledgeState,
   readStudioAssets,
 } from '../../../../../lib/supabase';
+import { gbp2 } from '../../../../../lib/money';
 import { overview } from '../../../../../lib/team';
 import { funnel } from '../../../../../lib/metrics';
 import { cronAlarms } from '../../../../../lib/cronwatch';
@@ -30,8 +31,11 @@ function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ab, bb);
 }
 
+// lib/money.ts gbp2, and it was `£${(pence / 100).toFixed(2)}` until 19 August 2026, which prints
+// "£1034.30" with no thousands separator. That is neither of this product's money families and it
+// is the eighteenth formatter B30 removed from lib/digest.ts, alive on the internal desk.
 function gbp(pence: number): string {
-  return `£${(pence / 100).toFixed(2)}`;
+  return gbp2(pence / 100);
 }
 
 export async function GET(req: NextRequest) {

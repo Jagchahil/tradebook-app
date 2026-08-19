@@ -7,7 +7,7 @@ import { buildQuarterPack, quarterBounds, quarterForDate, taxYearLabel } from '.
 import { bankFeedOffered } from '../../../../lib/bankfeed';
 import { wholeFirmCaption } from '../../../../lib/position';
 import { mtdStatedFrom } from '../../../../lib/circumstances';
-import { gbp0 } from '../../lib/money';
+import { gbp0, gbp2 } from '../../lib/money';
 import { outstandingUpdate, overdueUpdate, updateDue, UPDATE_ORDINAL } from '../due';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
@@ -197,15 +197,15 @@ export default async function TaxSummaryPage() {
             <div className="lek-grid">
               <div className="lek-tile">
                 <div className="lek-tile-label">In</div>
-                <div className="lek-tile-value" style={{ color: ON_GREEN_TINT }}>{gbp0(sub.trade.income)}</div>
+                <div className="lek-tile-value" style={{ color: ON_GREEN_TINT }}>{gbp2(sub.trade.income)}</div>
               </div>
               <div className="lek-tile">
                 <div className="lek-tile-label">Out</div>
-                <div className="lek-tile-value" style={{ color: RIVER }}>{gbp0(sub.trade.expenses)}</div>
+                <div className="lek-tile-value" style={{ color: RIVER }}>{gbp2(sub.trade.expenses)}</div>
               </div>
               <div className="lek-tile">
                 <div className="lek-tile-label">Profit</div>
-                <div className="lek-tile-value">{gbp0(sub.trade.net)}</div>
+                <div className="lek-tile-value">{gbp2(sub.trade.net)}</div>
               </div>
             </div>
             <p style={S.quiet}>
@@ -245,7 +245,7 @@ export default async function TaxSummaryPage() {
                 ═══════════════════════════════════════════════════════════════════════════════ */}
             {sub.trade.capitalCost > 0 ? (
               <p style={S.quiet}>
-                {gbp0(sub.trade.capitalCost)} more went out on{' '}
+                {gbp2(sub.trade.capitalCost)} more went out on{' '}
                 {sub.trade.capitalCount === 1 ? 'a car' : `${sub.trade.capitalCount} cars`}, and an
                 update does not report{sub.trade.capitalCount === 1 ? ' it' : ' them'} as a cost. A
                 car comes off over several years, never in one, so it is not in Out above. Your
@@ -260,8 +260,8 @@ export default async function TaxSummaryPage() {
               <div style={S.propBlock}>
                 <h2 className="lek-h2">Property, reported separately</h2>
                 <p style={S.quiet}>
-                  {gbp0(sub.property.income)} of rent in, {gbp0(sub.property.expenses)} out, so{' '}
-                  {gbp0(sub.property.net)} of property profit so far.{' '}
+                  {gbp2(sub.property.income)} of rent in, {gbp2(sub.property.expenses)} out, so{' '}
+                  {gbp2(sub.property.net)} of property profit so far.{' '}
                   {/* The figures are the same either way. Only the claim about what an update does
                       with them belongs to a man who makes one. */}
                   {makesUpdates
@@ -282,7 +282,7 @@ export default async function TaxSummaryPage() {
                     A landlord who paid £2,440 to his lender must be able to see where it went. */}
                 {sub.property.financeCost > 0 ? (
                   <p style={S.quiet}>
-                    A further <b>{gbp0(sub.property.financeCost)}</b> went out on mortgage interest,
+                    A further <b>{gbp2(sub.property.financeCost)}</b> went out on mortgage interest,
                     and it is deliberately not in the profit above. Since Section 24 the interest on
                     a residential let is not deducted from your rental income: it comes back as a
                     20% credit against your tax instead, which is worked out for you on the Tax
@@ -304,7 +304,7 @@ export default async function TaxSummaryPage() {
                 The figure is right for this page and stays. What it is a figure OF is now said. */}
             {sub.cisSuffered > 0 ? (
               <p style={S.refund}>
-                <b>{gbp0(sub.cisSuffered)}</b> of CIS has been deducted since 6 April
+                <b>{gbp2(sub.cisSuffered)}</b> of CIS has been deducted since 6 April
                 {isPartnership ? ' from the firm\u2019s payments' : ' from your pay'}. That is tax
                 already handed over on your behalf, and it is counted when the year is settled.
                 {isPartnership ? ' Your own share of it is on your Overview, and that is the figure that reaches your return.' : ''}
@@ -493,7 +493,7 @@ export default async function TaxSummaryPage() {
             </p>
           ) : (
             <p style={S.body}>
-              Your income since 6 April is {gbp0(pack.ytd.grossQualifyingIncome)}, which is{' '}
+              Your income since 6 April is {gbp2(pack.ytd.grossQualifyingIncome)}, which is{' '}
               {mtdPos === 'unstated_over' ? 'over' : 'under'} the {gbp0(pack.ytd.mtdThreshold)} Making
               Tax Digital for Income Tax line for {pack.taxYear}. That is this year, and this year is
               not the test: HMRC decides it from your {taxYearLabel(startYear - 2)} tax return, and
@@ -514,8 +514,8 @@ export default async function TaxSummaryPage() {
         <section className="lek-card">
           <h2 className="lek-h2">These three months on their own</h2>
           <p style={S.quiet}>
-            {pack.period.label}: {gbp0(pack.trade.income)} in, {gbp0(pack.trade.expenses)} out,{' '}
-            {gbp0(pack.trade.net)} of trade profit. Useful for seeing what the quarter itself did.
+            {pack.period.label}: {gbp2(pack.trade.income)} in, {gbp2(pack.trade.expenses)} out,{' '}
+            {gbp2(pack.trade.net)} of trade profit. Useful for seeing what the quarter itself did.
             {/* The disclaimer answers the heading above it. For a director there is no update claim
                 to correct, so the sentence would be arguing with nobody. */}
             {makesUpdates ? <>{' '}It is not what an update reports.</> : null}

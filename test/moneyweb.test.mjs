@@ -201,7 +201,7 @@ for (const [name, src] of [['app/app/entry', pageEntry], ['app/app/money', pageM
 // £60,000 sitting in plain sight two rows below the total that no longer counts it.
 ok('🔴 /app/money prints what went out on cars whenever there is some',
   /log\.capitalCost > 0/.test(codeOnly(pageMoney))
-  && /gbp0\(log\.capitalCost\)/.test(codeOnly(pageMoney)));
+  && /gbp2\(log\.capitalCost\)/.test(codeOnly(pageMoney)));
 ok('...and says why it is not in Out, in words',
   /not in Out/.test(pageMoney) && /several years/.test(pageMoney));
 ok('🔴 and the row itself is marked, so the row and the total stop contradicting',
@@ -224,7 +224,7 @@ ok('the car line is drawn only when there is one, doc 103 empty test',
 // by nothing. So the claim is guarded from both ends.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 ok('🔴 the car sentence names the COST beside the relief, so neither can be mistaken for the other',
-  /\$\{gbp0\(cost\)\} left your account/.test(pageEntry)
+  /\$\{gbp2\(cost\)\} left your account/.test(pageEntry)
   && /of it comes off your profit this year/.test(pageEntry));
 ok('...and says where the rest went, because a man told only the small number thinks it is lost',
   /written down a little at a time/.test(pageEntry));
@@ -254,7 +254,7 @@ ok('🔴 and the driving share is stated before the pound figure, not after it',
 // IS ALREADY DOING". The reasoning was written once, for one case, and then applied to both.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 ok('🔴 the not-a-car button says what it DOES when the row already says car, in pounds',
-  /storedKind\s*\n?\s*\? `It was not a car\. Put the whole \$\{gbp0\(cost\)\} in my costs`/.test(pageEntry));
+  /storedKind\s*\n?\s*\? `It was not a car\. Put the whole \$\{gbp2\(cost\)\} in my costs`/.test(pageEntry));
 ok('...and keeps the honest wording for a row nobody has ever been asked about',
   /: 'It was not a car, leave it as it is'/.test(pageEntry));
 // ⚠️ THE PROMISE OF INACTION MAY ONLY APPEAR ON THE BRANCH WHERE IT IS TRUE. A label claiming
@@ -268,7 +268,7 @@ ok('...and keeps the honest wording for a row nobody has ever been asked about',
 }
 ok('a failed read is told apart from a missing row',
   /rows !== null/.test(pageEntry) && /Nothing is lost/.test(pageEntry));
-ok('pounds are written by lib/money', pageEntry.includes("from '../../../lib/money'") && /gbp0\(entry\.amount\)/.test(pageEntry));
+ok('pounds are written by lib/money', pageEntry.includes("from '../../../lib/money'") && /gbp2\(entry\.amount\)/.test(pageEntry));
 
 // 🔴 THE ONE WAY RULE, ON THE NEW SURFACE. Only money out gets the strike-out form, and the
 // correction goes through the SAME route with the SAME fields as the month page.

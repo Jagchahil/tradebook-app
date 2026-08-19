@@ -6,7 +6,7 @@ import { getOptimiserInput, getStudentLoanSettings, readCircumstances } from '..
 import { taxPosition } from '../../../../lib/taxoptimiser';
 import { STUDENT_PLANS, type StudentPlan } from '../../../../lib/nistudentloan';
 import { asPercent } from '../../../../lib/taxengine';
-import { gbp0 } from '../../lib/money';
+import { gbp0, gbp2 } from '../../lib/money';
 import { A11Y_CSS, APP_CSS, FONT, SPACE, TYPE } from '../../../../lib/tokens';
 import { INK, MUTED, ON_RIVER, PAPER, RIVER_DEEP } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
@@ -106,7 +106,7 @@ export default async function StudentLoanPage({
         <>
           <section className="lek-card">
             <h1 className="lek-h2">What January collects</h1>
-            <div className="lek-big" style={S.figure}>{gbp0(tax.studentLoan)}</div>
+            <div className="lek-big" style={S.figure}>{gbp2(tax.studentLoan)}</div>
             <p style={S.quiet}>
               {tax.studentLoan > 0
                 ? 'Collected with the January tax bill, not month by month. It is already inside the set aside figure on your Overview, so putting that by covers this too.'

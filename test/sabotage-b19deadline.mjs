@@ -269,6 +269,34 @@ const SABOTAGES = [
       '  isDeadlineQuestion: { on: ALL3, why: \'\' },',
       "  isDeadlineQuestion: { on: WA_THREAD, why: 'a reason long enough to pass the length check on its own' },"),
   },
+
+  // ── B44, 19 AUGUST 2026. ONE WORD, THREE SPELLINGS, ONE LANE. Section 3a holds this, and every
+  // ── assertion in it is a PARITY rather than a pinned answer, so these three sabotages are the
+  // ── only thing that can say whether it is watching anything at all.
+  {
+    name: '\u{1F534} B44: asksAmount stops hearing "whats", the state the item measured on 18 August',
+    apply: ({ dir }) => edit(dir, 'lib/waintents.ts',
+      "  if (!/\\bwhats?\\b/.test(b)) return false;",
+      "  if (!/\\bwhat\\b/.test(b)) return false;"),
+  },
+  {
+    name: '\u{1F534} B44: the date exception forgets the copula, so "whats the date" becomes a figure question',
+    apply: ({ dir }) => edit(dir, 'lib/waintents.ts',
+      "  if (/\\bwhat(?:s|'s| is| are)?\\s+(?:the\\s+)?(date|day|time|month)\\b/.test(b)) return false;",
+      "  if (/\\bwhat\\s+(date|day|time|month)\\b/.test(b)) return false;"),
+  },
+  {
+    name: '\u{1F534} B44: the date exception forgets the article only, which is the half a reader would miss',
+    apply: ({ dir }) => edit(dir, 'lib/waintents.ts',
+      "(?:the\\s+)?(date|day|time|month)",
+      "(date|day|time|month)"),
+  },
+  {
+    name: '\u{1F534} B44: the deadline exception stops hearing "whats", so a deadline becomes a figure',
+    apply: ({ dir }) => edit(dir, 'lib/waintents.ts',
+      "  if (/\\bwhats?\\b.{0,30}\\bdeadline\\b/.test(b)) return false;",
+      "  if (/\\bwhat\\b.{0,30}\\bdeadline\\b/.test(b)) return false;"),
+  },
 ];
 
 const CONTROLS = [

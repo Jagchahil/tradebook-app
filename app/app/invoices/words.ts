@@ -23,7 +23,7 @@
 // has no field for it, so it cannot. VATREVCON37100, and lib/vat.ts holds the reasoning.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
-import { gbp0, gbp2 } from '../../../lib/money';
+import { gbp0, gbpOwed } from '../../../lib/money';
 
 export interface InvoiceListRow {
   id: string;
@@ -240,9 +240,12 @@ export interface ChaserContext {
 // The two voices stay identical on every figure the WhatsApp chaser has ever met, which is what
 // the parity test in test/invoicesweb.test.mjs pins, and they part company only where the
 // alternative is a wrong number on a demand for money.
+// 🔴 THE RULE MOVED TO lib/money.ts ON 19 AUGUST 2026, and the reason is the sentence above it:
+// the claim that the two chaser voices were identical was true here and false in lib/waintents.ts,
+// which is what a rule kept privately by one of its two users buys you. The argument travelled
+// with it. This wrapper stays because the name reads better at the call site.
 function owedFigure(n: number): string {
-  const v = Number.isFinite(n) ? n : 0;
-  return Math.round(v * 100) % 100 === 0 ? gbp0(v) : gbp2(v);
+  return gbpOwed(n);
 }
 
 export function chaserDraft(tone: ChaserTone, c: ChaserContext): string {

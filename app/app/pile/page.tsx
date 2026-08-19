@@ -437,7 +437,7 @@ export default async function PilePage({
                   <li key={v.id} style={S.line}>
                     <div style={S.rowTop}>
                       <span style={S.vendor}>{v.vendor}</span>
-                      <span style={S.amount}>{gbp0(v.gross)}</span>
+                      <span style={S.amount}>{gbp2(v.gross)}</span>
                     </div>
                     <p style={S.meta}>
                       We read the VAT on this one as <b style={S.cat}>{gbp2(v.read)}</b>.
@@ -489,7 +489,7 @@ export default async function PilePage({
                   <li key={g.key} style={S.line}>
                     <div style={S.rowTop}>
                       <span style={S.vendor}>{g.vendor}</span>
-                      <span style={S.amount}>{gbp0(g.total)}</span>
+                      <span style={S.amount}>{gbp2(g.total)}</span>
                     </div>
                     <p style={S.meta}>
                       {g.count === 1 ? 'One payment' : `${g.count} payments`}, filed as{' '}
@@ -551,7 +551,7 @@ export default async function PilePage({
                   <li key={g.key} style={S.line}>
                     <div style={S.rowTop}>
                       <span style={S.vendor}>{g.vendor}</span>
-                      <span style={S.amount}>{gbp0(g.total)}</span>
+                      <span style={S.amount}>{gbp2(g.total)}</span>
                     </div>
                     <p style={S.meta}>
                       {g.count === 1 ? 'One receipt' : `${g.count} receipts`}, filed as{' '}
@@ -607,13 +607,13 @@ export default async function PilePage({
                   <li key={g.key} style={S.line}>
                     <div style={S.rowTop}>
                       <span style={S.vendor}>{g.vendor}</span>
-                      <span style={S.amount}>{gbp0(g.total)}</span>
+                      <span style={S.amount}>{gbp2(g.total)}</span>
                     </div>
                     <p style={S.meta}>
                       {g.count === 1 ? 'One receipt' : `${g.count} receipts`}, filed as{' '}
                       <b style={S.cat}>{g.suggested}</b>.
                     </p>
-                    <p style={S.meta}>{uncertainAmountLine(gbp0(g.total))}</p>
+                    <p style={S.meta}>{uncertainAmountLine(gbp2(g.total))}</p>
                     <VatNote show={vatRegistered} category={g.suggested} text={g.vendor} />
                   </li>
                 ))}
@@ -639,7 +639,7 @@ export default async function PilePage({
             <section key={g.key} className="lek-card lek-careful">
               <div style={S.rowTop}>
                 <span style={S.vendor}>{g.vendor}</span>
-                <span style={S.amount}>{gbp0(g.total)}</span>
+                <span style={S.amount}>{gbp2(g.total)}</span>
               </div>
               <p style={S.meta}>{g.count === 1 ? 'One payment' : `${g.count} payments`}.</p>
               <p style={S.reason}>{looksPersonal(g.vendor, null, ownNames, g.kind === 'income' ? g.total : -g.total)?.why ?? g.reason}</p>
@@ -681,7 +681,7 @@ export default async function PilePage({
             <section key={g.key} className="lek-card">
               <div style={S.rowTop}>
                 <span style={S.vendor}>{g.vendor}</span>
-                <span style={S.amount}>{gbp0(g.total)}</span>
+                <span style={S.amount}>{gbp2(g.total)}</span>
               </div>
               {/* ⚠️ REFUSING TO BULK FILE IT IS NOT THE SAME AS NOT KNOWING WHAT IT IS.
                   Trainline is travel. We will not file it in a screenful because whether the journey
@@ -854,7 +854,7 @@ export default async function PilePage({
             <section key={g.key} className="lek-card">
               <div style={S.rowTop}>
                 <span style={S.vendor}>{g.vendor}</span>
-                <span style={S.amount}>{gbp0(g.total)}</span>
+                <span style={S.amount}>{gbp2(g.total)}</span>
               </div>
               <p style={S.meta}>
                 {g.count === 1 ? 'One payment' : `${g.count} payments`} in.

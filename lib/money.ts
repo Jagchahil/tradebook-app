@@ -1,4 +1,39 @@
-// lib/money.ts. ONE WAY TO WRITE A POUND.
+// lib/money.ts. THE POUND, AND THE EIGHT COPIES OF IT THAT ARE CHECKED AGAINST IT.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS FILE USED TO OPEN "ONE WAY TO WRITE A POUND" AND IT WAS NOT TRUE. B41, 19 August 2026.
+//
+// A doctrine comment that describes an intention rather than the code is how B26 stayed invisible
+// for three weeks, and this line was one. Measured at head: EIGHT formatters live outside this
+// file, in six other modules, and B41 was sized on a belief that there were two. THREE OF THE
+// EIGHT WERE WRONG IN THE EXACT WAY THIS FILE WAS WRITTEN ON 28 JULY TO STOP, the sign inside the
+// pound: lib/quarterpack.ts printed a loss making quarter as "£-1,200.00" on a document a man
+// hands a lender, lib/invoicepdf.ts printed a credit note as "£-120.00" on a PDF going out under
+// our user's own business name, and lib/payyourself.ts printed a cliff as "£-40". A fourth kind
+// was worse and quieter: the three copies in lib/waintents.ts had no non number guard, so a figure
+// that failed to compute reached a WhatsApp reply as "£NaN".
+//
+// THE EIGHT, AND THE ONE REASON THEY ARE COPIES RATHER THAN IMPORTS.
+//
+//   lib/waintents.ts    formatGbp = gbpAbs2, gbpShort = gbpAbs0, gbpOwed = gbpOwed
+//   lib/quarterpack.ts  gbp = gbp2
+//   lib/invoicepdf.ts   gbp = gbp2
+//   lib/incomeproof.ts  gbp = gbp2
+//   lib/trialnudge.ts   gbp = gbp0
+//   lib/payyourself.ts  money = gbp0
+//
+// Every one of those modules is STAGED BY A SUITE with a hand written dependency list so the node
+// runner can drive it with no bundler, and test/capitalwiring.test.mjs pins lib/quarterpack.ts's
+// list at exactly two relative imports. Importing this file into them would rewrite six staging
+// blocks to delete duplicates that now behave identically. That is the trade, and the honest half
+// of it is test/moneyone.test.mjs: it lifts each copy's BODY out of its own source and runs it
+// against the real function here over a table with a negative, a zero, a fraction, a thousands
+// boundary and a NaN. A reformat cannot fool it and a comment cannot satisfy it. It proves it can
+// see a difference before it reports there is none.
+//
+// ⚠️ SO THE RULE FOR THE NEXT SESSION IS: A NINTH COPY IS ALLOWED, AND HIDING IT IS NOT. Add it to
+// the list in test/moneyone.test.mjs and to the list above, or delete it and import from here.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 //
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 // WHY THIS FILE EXISTS, AND IT IS THE SAME REASON ledgerFor() EXISTS.
@@ -76,4 +111,26 @@ export function gbpAbs0(n: number): string {
 
 export function gbpAbs2(n: number): string {
   return `£${Math.abs(safe(n)).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// A DEMAND FOR PAYMENT. WHOLE POUNDS WHEN THE FIGURE IS WHOLE, PENCE WHEN THERE ARE PENCE.
+//
+// The third family, and the only one with a customer of the customer on the other end of it. It
+// was argued and built on 1 August 2026 inside app/app/invoices/words.ts as a private owedFigure,
+// and the argument is this: before VAT a total was whatever the tradesman typed, whole pounds
+// nearly every time, so rounding was invisible. VAT makes pence ordinary. £127 of work at the
+// standard rate is £152.40, and a message saying "invoice INV-0004 for £152" against a document
+// that reads £152.40 invites a payment 40p short, which leaves the invoice unpaid, the list
+// calling it late, and a man chasing his own customer over our rounding.
+//
+// 🔴 IT LIVES HERE RATHER THAN THERE BECAUSE ONE OF THE TWO CHASERS NEVER GOT IT. B39's tail,
+// 19 August 2026. words.ts's own comment claimed "the two voices stay identical on every figure
+// the WhatsApp chaser has ever met", and the parity test proved it at £450 only, which is the one
+// figure where the bug cannot show. lib/waintents.ts chaseMessage was still printing gbpShort, so
+// the SAME invoice a man chased from the web for £152.40 he chased from WhatsApp for £152.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export function gbpOwed(n: number): string {
+  const v = safe(n);
+  return Math.round(v * 100) % 100 === 0 ? gbp0(v) : gbp2(v);
 }

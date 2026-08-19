@@ -142,11 +142,11 @@ export default async function NiPage({
           <div style={S.figRow}>
             <div>
               <div className="lek-tile-label">Class 4 so far this year</div>
-              <div className="lek-big">{gbp0(ni.class4)}</div>
+              <div className="lek-big">{gbp2(ni.class4)}</div>
             </div>
           </div>
           <p style={S.quiet}>
-            On your confirmed profit of {gbp0(profit)}. Nothing below {gbp0(FACTS.class4LowerLimit)},
+            On your confirmed profit of {gbp2(profit)}. Nothing below {gbp0(FACTS.class4LowerLimit)},
             then {asPercent(FACTS.class4MainRate)}% up to {gbp0(FACTS.class4UpperLimit)}, then{' '}
             {asPercent(FACTS.class4UpperRate)}% above that. It is collected through Self Assessment
             with your tax, never as a separate bill, and it is already inside the set aside figure on
@@ -173,7 +173,7 @@ export default async function NiPage({
               This year is not on course to count towards your State Pension: profits under{' '}
               {gbp0(FACTS.class2SmallProfitsThreshold)} and no wages doing it for you. You can pay
               Class 2 voluntarily, {gbp2(ni.class2Voluntary.weeklyRate)} a week, about{' '}
-              {gbp0(ni.class2Voluntary.annual)} a year, to keep the record whole. Your decision, and
+              {gbp2(ni.class2Voluntary.annual)} a year, to keep the record whole. Your decision, and
               worth a look before the year is settled.
             </p>
           ) : (
@@ -207,7 +207,7 @@ export default async function NiPage({
         <section className="lek-card">
           <h2 className="lek-h2">Your job&apos;s National Insurance</h2>
           <p style={S.quiet}>
-            About {gbp0(ni.class1)} of Class 1 comes off a {gbp0(salary)} salary across the year,
+            About {gbp2(ni.class1)} of Class 1 comes off a {gbp2(salary)} salary across the year,
             taken by your employer on the payslip. Nothing for you to do with it here.
           </p>
           {/* The annual maximum is about paying Class 1 AND Class 4 in one year. Without a trade

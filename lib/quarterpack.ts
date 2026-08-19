@@ -579,9 +579,15 @@ function esc(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+// lib/money.ts gbp2, character for character, and it was NOT until 19 August 2026: it printed
+// the sign inside the pound, so a loss making quarter's pack read "£-1,200.00" on a document a man
+// may hand to a lender. A copy rather than an import because six suites stage this module with a
+// hand written dependency list and test/capitalwiring.test.mjs pins that list at exactly two
+// relative imports. test/moneyone.test.mjs runs this body against the real gbp2 on every gate.
 function gbp(n: number): string {
   const v = Number.isFinite(n) ? n : 0;
-  return `£${v.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const abs = Math.abs(v).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return v < 0 ? `-£${abs}` : `£${abs}`;
 }
 
 function titleCase(s: string): string {

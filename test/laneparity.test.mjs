@@ -162,6 +162,55 @@ ok('...while lib/waintents.ts holds the one definition it is imported from',
   (read('lib/waintents.ts').match(/export function asksAmount/g) || []).length === 1);
 
 // ---------------------------------------------------------------------------------------------
+// 3a. B44. ONE WORD, THREE SPELLINGS, ONE LANE. 19 August 2026.
+// ---------------------------------------------------------------------------------------------
+// `\bwhat\b` does not match "whats", so "what is my tax bill due" reached the TOTALS lane and
+// "whats my tax bill due" reached the DEADLINE lane. This is the same defect B34 fixed one function
+// over and the same one B2-F3 fixed on "taxman" against `\btax\b`.
+//
+// ⚠️ THE ASSERTION IS PARITY, NOT WIDTH, AND THAT IS DELIBERATE. Asserting "whats X is an amount
+// question" would pin today's answer and defend it after the answer should change. Asserting that
+// the three spellings AGREE cannot rot: whatever the product decides "what is X" means, the man who
+// left the apostrophe off on a phone gets the same thing.
+//
+// MEASURED at head before the edit: 15 of these 18 tails had the spellings disagreeing. After: 0.
+{
+  const TAILS = [
+    'my tax bill due', 'my tax bill', 'my vat due', 'due', 'owed', 'my next deadline',
+    'the date my tax is due', 'the day it is due', 'the month it is due', 'the time it is due',
+    'the deadline', 'the deadline for my tax', 'due in january', 'my january bill',
+    'the taxman going to want', 'my set aside', 'left to pay', 'coming off my invoice',
+  ];
+  const disagreed = TAILS.filter((t) => {
+    const a = W.asksAmount(`what is ${t}`);
+    return W.asksAmount(`what's ${t}`) !== a || W.asksAmount(`whats ${t}`) !== a;
+  });
+  ok(`🔴 ALL THREE SPELLINGS OF "what" GET ONE LANE, ACROSS ${TAILS.length} TAILS${disagreed.length ? ` [split: ${disagreed.join(', ')}]` : ''}`,
+    disagreed.length === 0);
+
+  // ⚠️ AND THE CORPUS HAS TO CONTAIN BOTH ANSWERS, or a function that returned true for everything
+  // would satisfy the line above. This is the vacuity check, and it is the reason the tails include
+  // four date shapes and a deadline.
+  ok('🔴 AND THE TAILS SPLIT BOTH WAYS, or a matcher that says yes to everything passes the line above',
+    TAILS.some((t) => W.asksAmount(`whats ${t}`)) && TAILS.some((t) => !W.asksAmount(`whats ${t}`)));
+
+  // The date exception had to learn the copula in the same edit. Widening only the gate would move
+  // "whats the date my tax is due" OUT of the deadline lane, which is a date question answered with
+  // a figure: a regression bought with a consistency.
+  const DATES = ['what date is my tax due', 'what is the date my tax is due', 'whats the date my tax is due',
+    "what's the day it is due", 'whats the month it is due', 'what is the time it is due'];
+  const claimed = DATES.filter((d) => W.asksAmount(d));
+  ok(`🔴 A QUESTION ABOUT A DATE IS NEVER AN AMOUNT QUESTION, IN ANY SPELLING${claimed.length ? ` [claimed: ${claimed.join(', ')}]` : ''}`,
+    claimed.length === 0);
+  ok('...while the same sentence without the date word still asks for a figure',
+    W.asksAmount('whats my tax due') && W.asksAmount('what is my tax due'));
+  ok('...and a deadline is still not an amount, in any spelling',
+    !W.asksAmount('whats the deadline for my tax') && !W.asksAmount('what is the deadline for my tax'));
+  ok('...and "how much" still settles it whatever else is in the sentence',
+    W.asksAmount('how much tax is due on 31 january'));
+}
+
+// ---------------------------------------------------------------------------------------------
 // 4. THE PHRASES, HELD BY EQUALITY SO ONE CANNOT BE QUIETLY DROPPED.
 // ---------------------------------------------------------------------------------------------
 // Every entry is a sentence a customer would actually type. The expected lane is the one a reader

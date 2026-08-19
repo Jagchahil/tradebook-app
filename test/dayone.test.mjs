@@ -188,7 +188,7 @@ const flat = (s) => s.replace(/\s+/g, ' ');
   // missing one and -1 is less than everything, so an ordering test on a missing marker cannot fail.
   const homeCode = codeOnly(home);
   const iGuard = homeCode.indexOf('week.income === 0 && week.expenses === 0 ?');
-  const iZeros = homeCode.indexOf('{gbp0(week.income)} in, {gbp0(week.expenses)} out.');
+  const iZeros = homeCode.indexOf('{gbp2(week.income)} in, {gbp2(week.expenses)} out.');
   ok('both week markers exist, so the ordering below can actually fail', iGuard >= 0 && iZeros >= 0);
   ok('🔴 AND THE GUARD IS CHECKED BEFORE THE SENTENCE IT REPLACES', iGuard < iZeros);
   ok('🔴 THE "ALL LOGGED" REASSURANCE CANNOT REACH A MAN WHO HAS LOGGED NOTHING',
@@ -213,7 +213,7 @@ const flat = (s) => s.replace(/\s+/g, ' ');
     && /You have not confirmed any income since 6 April/.test(sum));
   const sumCode = codeOnly(sum);
   const iZero = sumCode.indexOf('pack.ytd.grossQualifyingIncome <= 0 ?');
-  const iClaim = sumCode.indexOf('Your income since 6 April is {gbp0(pack.ytd.grossQualifyingIncome)}');
+  const iClaim = sumCode.indexOf('Your income since 6 April is {gbp2(pack.ytd.grossQualifyingIncome)}');
   ok('both summary markers exist', iZero >= 0 && iClaim >= 0);
   ok('🔴 AND THE EMPTY ARM IS CHECKED FIRST, or the claim is made anyway', iZero < iClaim);
   ok('it still refuses to treat this year as the MTD test, which was always right',

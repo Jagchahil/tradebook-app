@@ -4,7 +4,7 @@ import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
 import { transactionsInMonth } from '../../../lib/supabase';
 import { logFor, monthTitle, dayLabel } from '../../../lib/moneylog';
-import { gbp0 } from '../../../lib/money';
+import { gbp2 } from '../../../lib/money';
 import { verifyEntryRef, refBelongsTo } from '../entryref';
 import {
   CAPITAL_QUESTION_FROM, capitalOptions, capitalQuestion, capitalRelief, isCapitalKind,
@@ -141,7 +141,7 @@ export default async function EntryPage({
             className="lek-figure"
             style={entry.personal ? S.amountOff : (entry.amount >= 0 ? S.amountIn : undefined)}
           >
-            {gbp0(entry.amount)}
+            {gbp2(entry.amount)}
           </p>
 
           <dl style={S.meta}>
@@ -212,7 +212,7 @@ export default async function EntryPage({
                 <p style={S.quiet}>
                   {storedKind === 'not_a_car'
                     ? 'You told us this was not a car, so it comes off your profit in full this year.'
-                    : `You told us this was a car${storedPct && storedPct < 100 ? `, and ${storedPct}% of the driving is work` : ''}. ${gbp0(cost)} left your account and ${gbp0(capitalRelief(cost, storedKind, storedPct ?? 100).thisYear)} of it comes off your profit this year. The rest is not lost: a car is written down a little at a time, every year you own it.`}
+                    : `You told us this was a car${storedPct && storedPct < 100 ? `, and ${storedPct}% of the driving is work` : ''}. ${gbp2(cost)} left your account and ${gbp2(capitalRelief(cost, storedKind, storedPct ?? 100).thisYear)} of it comes off your profit this year. The rest is not lost: a car is written down a little at a time, every year you own it.`}
                 </p>
               ) : (
                 <p style={S.quiet}>
@@ -255,7 +255,7 @@ export default async function EntryPage({
                   <input type="hidden" name="capital_kind" value="not_a_car" />
                   <button type="submit" className="lek-ghost">
                     {storedKind
-                      ? `It was not a car. Put the whole ${gbp0(cost)} in my costs`
+                      ? `It was not a car. Put the whole ${gbp2(cost)} in my costs`
                       : 'It was not a car, leave it as it is'}
                   </button>
                   {storedKind ? (

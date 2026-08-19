@@ -245,13 +245,23 @@ console.log('\n=== the whole summary (pull) ===\n');
 
 const sum = (over) => W.weeklySummaryText({ ...base, income: 0, expenses: 0, ...over });
 
-ok('the figures are printed in whole pounds', sum({ income: 1200, expenses: 340 }).startsWith('Your week: £1,200 in, £340 out.'));
-ok('a profitable week says what it leaves', sum({ income: 1200, expenses: 340 }).includes('That leaves £860.'));
-ok('a losing week is not dressed up as profit', sum({ income: 100, expenses: 400 }).includes('£300 more out than in.'));
+// 🔴 THE WEEK'S FIGURES PRINT PENCE, SINCE B37 ON 19 AUGUST 2026, AND THIS ASSERTION USED TO SAY
+// THE OPPOSITE. It was right about the code and wrong about the product: the chat answers the same
+// question with "You have brought in £22,910.00" and this message said "£22,910 in" to the same man
+// on the same channel. The reversed line is kept as an assertion rather than deleted so that
+// putting whole pounds back can never be silent.
+ok("the week's figures print to the penny, the costume the chat gives the same three numbers",
+  sum({ income: 1200, expenses: 340 }).startsWith('Your week: £1,200.00 in, £340.00 out.'));
+// ⚠️ THE FULL STOP IS PART OF THE MATCH, AND IT WAS NOT BEFORE. Written as includes('That leaves
+// £860.') this passed against "That leaves £860.00." as well, so it could not have told you the
+// costume had changed. A guard that cannot see the change it is next to is the whole reason B26
+// stayed invisible for three weeks.
+ok('a profitable week says what it leaves', sum({ income: 1200, expenses: 340 }).includes('That leaves £860.00.'));
+ok('a losing week is not dressed up as profit', sum({ income: 100, expenses: 400 }).includes('£300.00 more out than in.'));
 ok('a losing week never prints a minus sign', !/[-−]\d/.test(sum({ income: 100, expenses: 400 })));
 ok('an empty week says nothing was logged, not zero profit', sum().startsWith('Your week: nothing logged.'));
 ok('an empty week prints no profit line', !sum().includes('That leaves'));
-ok('a week with only costs still reports them', sum({ expenses: 55 }).includes('£0 in, £55 out'));
+ok('a week with only costs still reports them', sum({ expenses: 55 }).includes('£0.00 in, £55.00 out'));
 
 // The personal line is the same sentence the push used, so moving channel changed no reasoning.
 ok('a quiet week carries the honest quiet line', sum({ income: 10, expenses: 1 }).includes(W.QUIET_LINE));

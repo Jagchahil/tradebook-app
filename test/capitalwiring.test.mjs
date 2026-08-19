@@ -753,7 +753,7 @@ ok('and every kind the product knows is covered by that answer either way',
 
   ok('🔴 the summary page names the money it is no longer counting',
     /sub\.trade\.capitalCost > 0/.test(codeOnly(summary))
-    && /gbp0\(sub\.trade\.capitalCost\)/.test(codeOnly(summary)));
+    && /gbp2\(sub\.trade\.capitalCost\)/.test(codeOnly(summary)));
   ok('...and says why, rather than leaving a hole',
     /not in Out above/.test(summary) && /never in one/.test(summary));
   // ⚠️ AND IT QUOTES THE COST, NEVER THE ALLOWANCE. This page reads one tax year of rows, so a car

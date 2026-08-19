@@ -15,7 +15,7 @@ import { categoriseBankLine } from '../../../lib/categories';
 import {
   isMonthKey, logFor, monthKeyOf, monthTitle, stepMonth, dayLabel,
 } from '../../../lib/moneylog';
-import { gbp0 } from '../../../lib/money';
+import { gbp0, gbp2 } from '../../../lib/money';
 import { entryRef } from '../entryref';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
@@ -158,15 +158,15 @@ export default async function MoneyPage({
         <div className="lek-grid">
           <div className="lek-tile">
             <div className="lek-tile-label">In</div>
-            <div className="lek-tile-value" style={{ color: ON_GREEN_TINT }}>{gbp0(log.income)}</div>
+            <div className="lek-tile-value" style={{ color: ON_GREEN_TINT }}>{gbp2(log.income)}</div>
           </div>
           <div className="lek-tile">
             <div className="lek-tile-label">Out</div>
-            <div className="lek-tile-value" style={{ color: RIVER }}>{gbp0(log.expenses)}</div>
+            <div className="lek-tile-value" style={{ color: RIVER }}>{gbp2(log.expenses)}</div>
           </div>
           <div className="lek-tile">
             <div className="lek-tile-label">Profit</div>
-            <div className="lek-tile-value">{gbp0(log.profit)}</div>
+            <div className="lek-tile-value">{gbp2(log.profit)}</div>
           </div>
         </div>
 
@@ -180,7 +180,7 @@ export default async function MoneyPage({
             ═══════════════════════════════════════════════════════════════════════════════════ */}
         {log.capitalCost > 0 ? (
           <p style={S.quiet}>
-            {gbp0(log.capitalCost)} more went out on {log.capitalCount === 1 ? 'a car' : `${log.capitalCount} cars`}.
+            {gbp2(log.capitalCost)} more went out on {log.capitalCount === 1 ? 'a car' : `${log.capitalCount} cars`}.
             {' '}That is not in Out: a car comes off over several years, never in one.
             {' '}Tap {log.capitalCount === 1 ? 'the line' : 'a line'} below to see what it is worth this year.
           </p>
@@ -254,7 +254,7 @@ export default async function MoneyPage({
                       sweep existed to stop. lib/money.ts puts the sign outside the pound, "-£42"
                       rather than "£-42", because that is how a person writes one. */}
                   <span style={e.personal ? S.amountOff : (e.amount >= 0 ? S.amountIn : S.amount)}>
-                    {gbp0(e.amount)}
+                    {gbp2(e.amount)}
                   </span>
                 </div>
                 <div style={S.rowMeta}>

@@ -37,9 +37,14 @@ const BOTTOM = 780;
 
 // Money on a document a customer pays from always shows its pence. The summary screens round;
 // paper does not. Same rule the public page states at length.
+// lib/money.ts gbp2, character for character, and it was NOT until 19 August 2026. A credit note
+// line printed "£-120.00" on a PDF going out under our user's own business name, which is the very
+// thing app/invoice-generator/Generator.tsx's comment says must never happen while this file did
+// it. Staged alone by test/invoicepdf.test.mjs, so a copy, pinned by test/moneyone.test.mjs.
 function gbp(n: number): string {
   const v = Number.isFinite(n) ? n : 0;
-  return `£${v.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const abs = Math.abs(v).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return v < 0 ? `-£${abs}` : `£${abs}`;
 }
 
 function dateWords(value: string | null): string {

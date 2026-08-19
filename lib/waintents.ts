@@ -660,14 +660,38 @@ export function isDeadlineQuestion(body: string): boolean {
 // regex in a route, or in a test, would be the second definition this codebase keeps deleting.
 // test/laneparity.test.mjs walks both routers over the same phrases and requires one lane each.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B44, 19 AUGUST 2026. B34's SHAPE, ONE FUNCTION OVER, AND THE NAIVE FIX WOULD HAVE BROKEN A
+// LANE THAT WAS ALREADY RIGHT.
+//
+// `\bwhat\b` does not match "whats", because the word boundary fails on the s. So "what is my tax
+// bill due" reached the TOTALS lane and "whats my tax bill due" reached the DEADLINE lane: two
+// spellings of one word, two lanes, on a question about a figure. MEASURED across 18 tails in
+// three spellings each ("what is X", "what's X", "whats X"): 15 of the 18 had the spellings
+// DISAGREEING before this edit, and 0 of 18 disagree after it.
+//
+// ⚠️ AND THE CLAUSE BELOW IT HAD TO LEARN THE COPULA IN THE SAME EDIT, WHICH IS THE HALF A
+// CHARACTER CLASS WOULD HAVE MISSED. Widening only the gate moves "whats the date my tax is due"
+// out of the deadline lane and into the totals lane, because the date exception is written
+// `\bwhat\s+(date|day|time|month)\b` and "whats the date" does not match it. That is a date
+// question answered with a figure: a REGRESSION bought with a consistency.
+//
+// 🔴 SO THE DATE EXCEPTION NOW HEARS THE COPULA AND THE ARTICLE, AND THAT MOVES FOUR "what is"
+// SHAPES TOO. "what is the date my tax is due", "what is the day it is due", and the same for
+// month and time, have been classed as AMOUNT questions since this function was written, because
+// only the bare "what date" form was excepted. They now reach the deadline lane. **Four shapes
+// change on a spelling this item said would not change, they all move INTO the deadline lane
+// rather than out of it, and they are all date questions. It is on the copy sign off sheet.**
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 export function asksAmount(body: string): boolean {
   const b = body.trim().toLowerCase();
   // A named quantity settles it, whatever else is in the sentence.
   if (/\b(how much|how many)\b/.test(b)) return true;
-  if (!/\bwhat\b/.test(b)) return false;
-  // The "what" shapes that are after a date rather than a figure.
-  if (/\bwhat\s+(date|day|time|month)\b/.test(b)) return false;
-  if (/\bwhat\b.{0,30}\bdeadline\b/.test(b)) return false;
+  if (!/\bwhats?\b/.test(b)) return false;
+  // The "what" shapes that are after a date rather than a figure. The copula and the article are
+  // both optional, because "what date", "what is the date" and "whats the date" are one question.
+  if (/\bwhat(?:s|'s| is| are)?\s+(?:the\s+)?(date|day|time|month)\b/.test(b)) return false;
+  if (/\bwhats?\b.{0,30}\bdeadline\b/.test(b)) return false;
   return true;
 }
 
@@ -1014,9 +1038,61 @@ export function matchTotalsQuestion(body: string, now: Date = new Date()): Total
   return { kind, sinceISO: period.sinceISO, periodLabel: period.label, allTime: period.sinceISO === null, category };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS MODULE'S TWO MONEY FORMATTERS, AND THEY ARE lib/money.ts's gbpAbs2 AND gbpAbs0 UNDER
+// OTHER NAMES. B41, 19 August 2026, MEASURED RATHER THAN REMOVED.
+//
+// They are copies, and copies are what lib/money.ts exists to stop. They stay because this module
+// is IMPORT FREE ON PURPOSE and four suites depend on that property: test/invoicesweb.test.mjs,
+// test/moneyweb.test.mjs and test/receiptvat.test.mjs each stage this file ALONE so the real voice
+// and the real arithmetic go on the bench with no bundler, and the vatAnswer family takes its
+// formatter as an ARGUMENT for the same reason (see the note above vatAnswer). One runtime import
+// of ./money would end that, and the cost would land on the suites rather than on a customer.
+//
+// ⚠️ SO THE DRIFT IS GUARDED INSTEAD OF PREVENTED. test/moneyone.test.mjs asserts these two agree
+// with lib/money.ts character for character across a table that includes a negative, a zero, a
+// thousands boundary and a fraction. If somebody edits one of the four, that suite goes red and
+// names which. A copy nobody checks is the risk; a copy checked every gate run is a copy.
+//
+// AND THEY SIT TOGETHER ON PURPOSE. gbpShort used to live 320 lines further down beside the
+// property matcher it was written for, which is how a reader concluded there was one formatter here
+// and not two.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 export function formatGbp(n: number): string {
-  return `£${Math.abs(n).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // ⚠️ THE NON NUMBER GUARD IS NOT DECORATION, AND THIS COPY WAS MISSING IT UNTIL 19 AUGUST 2026.
+  // lib/money.ts safe() turns a NaN into a zero because a man whose figure failed to compute should
+  // see a quiet screen, not evidence that something broke. Without it this printed "£NaN" into a
+  // WhatsApp reply. Found by test/moneyone.test.mjs on its first run, never by a customer.
+  const v = Number.isFinite(n) ? n : 0;
+  return `£${Math.abs(v).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+
+// ⚠️ STATUTORY FIGURES ONLY, SINCE B39 ON 19 AUGUST 2026, AND IT HAS EXACTLY ONE CALLER.
+// The law writes a student loan threshold as £26,065, never £26,065.00, and B26's carve out keeps
+// it that way on every surface. Everything that is the CUSTOMER'S OWN money goes through formatGbp
+// above and prints pence, which is what the other four callers of this were doing wrongly: an
+// invoice total in a chaser sent to his customer, and his rent.
+const gbpShort = (n: number) => `£${Math.round(Math.abs(Number.isFinite(n) ? n : 0)).toLocaleString('en-GB')}`;
+
+// A DEMAND FOR PAYMENT. lib/money.ts gbpOwed, and the argument for it is written out there.
+//
+// 🔴 THIS IS THE THIRD COPY IN THIS MODULE AND IT IS THE ONE THAT WAS MISSING. The web chaser in
+// app/app/invoices/words.ts has printed pence when there are pence since 1 August 2026; this one
+// went on printing gbpShort, so the same £152.40 invoice was chased from the web for £152.40 and
+// from WhatsApp for £152, which is a payment 40p short and an invoice that stays late. The parity
+// test pinned the two voices at £450, the one figure where the difference cannot show.
+const gbpOwed = (n: number): string => {
+  const v = Number.isFinite(n) ? n : 0;
+  if (Math.round(v * 100) % 100 !== 0) {
+    const abs2 = Math.abs(v).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return v < 0 ? `-£${abs2}` : `£${abs2}`;
+  }
+  // `|| 0` because Math.round(-0.4) is -0 and that prints "£-0". lib/money.ts gbp0 normalises it
+  // away for the same reason, and the two must agree on every input or the two chaser voices part.
+  const r = Math.round(v) || 0;
+  const abs = Math.abs(r).toLocaleString('en-GB');
+  return r < 0 ? `-£${abs}` : `£${abs}`;
+};
 
 // --- "What do I owe", the WhatsApp sentence around the tax hub's own figure ----
 //
@@ -1231,7 +1307,7 @@ export function studentLoanAnswer(input: {
       : 'I do not know your student loan plan yet. Set it under Money, Student loan, and I will track the repayment on your real numbers.';
   }
   if (input.annual <= 0) {
-    return `Nothing due so far: your income this tax year (${formatGbp(input.income)}) is under the ${input.planLabel} threshold of ${formatGbp(input.threshold)}. If income grows past it, I will have the figure ready.`;
+    return `Nothing due so far: your income this tax year (${formatGbp(input.income)}) is under the ${input.planLabel} threshold of ${gbpShort(input.threshold)}. If income grows past it, I will have the figure ready.`;
   }
   return `On your income so far this tax year, about ${formatGbp(input.annual)} of student loan (${input.planLabel}) is building up. It lands in one lump on your January Self Assessment bill, so put about ${formatGbp(input.annual / 12)} a month aside and it will never bite. Full picture in the app under Money, Student loan.`;
 }
@@ -1339,7 +1415,6 @@ export function goalAnswer(goals: { title: string; amount: number }[], pot: numb
 // rent for the yard" is the user PAYING rent (a trade expense) and must not
 // match; a question must not match either.
 
-const gbpShort = (n: number) => `£${Math.round(Math.abs(n)).toLocaleString('en-GB')}`;
 
 export interface RentIn {
   amount: number;
@@ -1414,10 +1489,10 @@ export function propertyAnswer(
   }
   const where = propertyCount > 0 ? ` across ${propertyCount} ${propertyCount === 1 ? 'property' : 'properties'}` : '';
   const april = extra2027 > 0
-    ? ` Heads up: the new property rates from April 2027 would add about ${gbpShort(extra2027)} a year on these numbers. You will hear it from me first, not from a January surprise.`
+    ? ` Heads up: the new property rates from April 2027 would add about ${formatGbp(extra2027)} a year on these numbers. You will hear it from me first, not from a January surprise.`
     : '';
   const scot = scotlandLine ? ` ${scotlandLine}` : '';
-  return `Property this tax year${where}: ${gbpShort(rents)} of rent in, adding about ${gbpShort(taxAdded)} to your tax bill (rent carries no National Insurance).${april}${scot}`;
+  return `Property this tax year${where}: ${formatGbp(rents)} of rent in, adding about ${formatGbp(taxAdded)} to your tax bill (rent carries no National Insurance).${april}${scot}`;
 }
 
 // --- Instant invoice from a logged sale (the Tyms mechanic) ---------------------
@@ -1443,9 +1518,9 @@ export function chaseMessage(
 ): string {
   const name = customer.trim() || 'there';
   if (daysOver >= 30) {
-    return `Hi ${name}, invoice ${number} for ${gbpShort(total)} is now ${daysOver} days outstanding. I would appreciate payment this week so I can keep things straight on my side. Here it is again: ${link}. Thanks for sorting it.`;
+    return `Hi ${name}, invoice ${number} for ${gbpOwed(total)} is now ${daysOver} days outstanding. I would appreciate payment this week so I can keep things straight on my side. Here it is again: ${link}. Thanks for sorting it.`;
   }
-  return `Hi ${name}, hope all is well. Just a friendly nudge on invoice ${number} for ${gbpShort(total)}, sent ${daysOver} days ago. Here it is again in case it is handy: ${link}. Cheers.`;
+  return `Hi ${name}, hope all is well. Just a friendly nudge on invoice ${number} for ${gbpOwed(total)}, sent ${daysOver} days ago. Here it is again in case it is handy: ${link}. Cheers.`;
 }
 
 // "chase invoice 12", "chase INV-0012", "chase up dave's invoice", "who owes me".

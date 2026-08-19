@@ -145,7 +145,7 @@ const SABOTAGES = [
   {
     name: 'the amount is hidden instead of shown, which helps nobody check it',
     apply: (d) => edit(d, 'app/app/pile/page.tsx',
-      '                    <p style={S.meta}>{uncertainAmountLine(gbp0(g.total))}</p>', ''),
+      '                    <p style={S.meta}>{uncertainAmountLine(gbp2(g.total))}</p>', ''),
   },
   {
     name: '🔴 it starts blaming her photograph, the sentence said twice on 12 August',

@@ -25,7 +25,7 @@ import { bankFeedOffered } from '../../lib/bankfeed';
 import { normaliseVendor } from '../../lib/memory';
 import { categoriseBankLine } from '../../lib/categories';
 import { selectAnnouncements } from '../../lib/announcements';
-import { gbp0, gbp2, gbpAbs0 } from '../../lib/money';
+import { gbp2, gbpAbs0 } from '../../lib/money';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, RADIUS, SPACE, TYPE } from '../../lib/tokens';
 import {
   GREEN, INK, LINE, MUTED, ON_GREEN_TINT, ON_RIVER, ON_SAFFRON_TINT, PANEL, PAPER, RIVER,
@@ -352,15 +352,15 @@ export default async function OverviewPage() {
                 <div className="lek-tile-label">In</div>
                 {/* ON_GREEN_TINT, not GREEN: brand green on a surface tile reads at 4.40, just under
                     the ratchet. The deeper green ink is what the guard holds against both surfaces. */}
-                <div className="lek-tile-value" style={{ color: ON_GREEN_TINT }}>{gbp0(moneyIn)}</div>
+                <div className="lek-tile-value" style={{ color: ON_GREEN_TINT }}>{gbp2(moneyIn)}</div>
               </div>
               <div className="lek-tile">
                 <div className="lek-tile-label">Out</div>
-                <div className="lek-tile-value" style={{ color: RIVER }}>{gbp0(moneyOut)}</div>
+                <div className="lek-tile-value" style={{ color: RIVER }}>{gbp2(moneyOut)}</div>
               </div>
               <div className="lek-tile">
                 <div className="lek-tile-label">Profit</div>
-                <div className="lek-tile-value">{gbp0(profit)}</div>
+                <div className="lek-tile-value">{gbp2(profit)}</div>
               </div>
             </div>
             <p style={S.quiet}>
@@ -437,9 +437,9 @@ export default async function OverviewPage() {
             ) : (
               <>
                 <p className="lek-week-line">
-                  {gbp0(week.income)} in, {gbp0(week.expenses)} out.{' '}
+                  {gbp2(week.income)} in, {gbp2(week.expenses)} out.{' '}
                   {weekProfit >= 0
-                    ? `That leaves ${gbp0(weekProfit)}.`
+                    ? `That leaves ${gbp2(weekProfit)}.`
                     : `That is ${gbpAbs0(weekProfit)} more out than in.`}
                 </p>
                 <p style={S.quiet}>{weeklyLine(weekSaid)}</p>

@@ -18,6 +18,8 @@
 
 // --- colour -------------------------------------------------------------------------------------
 // The product's palette. River is the brand blue, Saffron the accent that runs under the wordmark.
+import { gbp0 } from '../../lib/money';
+
 export const C = {
   ink: '#111111',
   ink2: '#3D3D3D',
@@ -162,8 +164,9 @@ export const S = {
   } as React.CSSProperties,
 } as const;
 
-export const gbp = (pence: number) =>
-  `£${(pence / 100).toLocaleString('en-GB', { maximumFractionDigits: 0 })}`;
+// lib/money.ts gbp0. It took pence and rounded to whole pounds by hand, which put the sign inside
+// the pound on any negative. Internal desk, but the same rule: one place writes a pound.
+export const gbp = (pence: number) => gbp0(pence / 100);
 
 export const shortDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }) : '';

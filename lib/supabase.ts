@@ -11897,7 +11897,7 @@ export async function mintSignInCode(email: string): Promise<string | null> {
   }
 }
 
-import type { AuthSendHealth } from './cronwatch';
+import type { AuthSendHealth, SignupLinkHealth } from './cronwatch';
 
 // 🔴 THE PROBE THE P0 DID NOT HAVE. Four codes were asked for and none arrived, and /api/health
 // said 200 the whole time, because nothing in the product was watching the one email a locked out
@@ -11929,6 +11929,110 @@ export async function getAuthSendHealth(windowMinutes = 60): Promise<AuthSendHea
       else if (r?.outcome === 'failed') failed += 1;
     }
     return { attempted: sent + failed, sent, failed, windowMinutes };
+  } catch {
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B65. CAN THE PEOPLE WHO FINISHED SIGNING UP ACTUALLY GET BACK IN. 20 August 2026.
+//
+// The argument for the shape, the grace and the lookback is in lib/cronwatch.ts above
+// signupLinkAlarm. This is the read, and it is two requests.
+//
+//   1. The addresses that PROVED themselves: signup_codes rows with consumed_at set, older than the
+//      grace and inside the lookback. This set is one row per SUCCESSFUL signup, so it is small.
+//      An abandoned signup has no consumed code and never appears here at all, which is the whole
+//      reason this watch can exist without going permanently red on ordinary funnel drop off.
+//   2. Which of those addresses has a signups row carrying a user_id. The rest are locked out.
+//
+// 🔴 THE JOIN IS ON `email`, NEVER ON `email_norm`, AND GETTING THAT BACKWARDS WOULD HAVE BEEN
+// SILENT AND TOTAL. email_norm strips plus tags and gmail dots (lib/trialidentity.ts,
+// normaliseEmail), on purpose, so that a fresh trial cannot be bought with a plus sign. It is the
+// natural looking key and it is the wrong one: every jagchahil12+persona address in the estate
+// normalises to ONE value, so a join on it would collapse twenty two accounts into a single row
+// and answer confidently in both directions. signups.email holds the address as typed, and
+// setSignupUserId patches on exactly that, lower cased, which is what makes it the right key here.
+//
+// ⚠️ ONE KNOWN FALSE POSITIVE, WRITTEN DOWN RATHER THAN LEFT TO BE REDISCOVERED.
+// readLatestSignupCode keys on email_norm, so two plus tagged addresses on the same base share a
+// code queue and the newest code is the live one for both. If A asks for a code and B types it, the
+// row consumed carries A's address while the link is written for B, and A shows here as unlinked
+// until A completes properly. It is not a security hole: a normalisation class is always the same
+// mailbox, so nothing crosses a person. It is reachable in the persona estate, where one inbox
+// holds every code, and effectively unreachable for a real customer. When this alarm fires, read
+// the row before concluding anything.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+// The row ceiling on request 1. Exported because the guard drives the capped boundary exactly
+// rather than guessing where it is.
+export const SIGNUP_LINK_READ_LIMIT = 120;
+
+// ⚠️ THE GRACE AND THE LOOKBACK ARE PASSED IN RATHER THAN DEFAULTED HERE, AND IT IS NOT
+// STYLE. This function sits in the part of lib/supabase.ts that three suites stage on its own as a
+// bare accessors file, with config() and headers() hand written above it, so anything in here that
+// imports a VALUE from another module breaks five suites that were nothing to do with it. A type
+// import is erased and is fine; a constant is not. The policy lives in lib/cronwatch.ts beside the
+// alarm that reads it, and app/api/health/route.ts wires the two together, which is also where the
+// numbers are easiest to find.
+export async function getSignupLinkHealth(
+  graceMinutes: number,
+  lookbackDays: number,
+  now: Date = new Date(),
+): Promise<SignupLinkHealth | null> {
+  const { url } = config();
+  if (!url) return null;
+  const youngest = new Date(now.getTime() - graceMinutes * 60_000).toISOString();
+  const oldest = new Date(now.getTime() - lookbackDays * 24 * 60 * 60_000).toISOString();
+  const shape = { graceMinutes, lookbackDays };
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/signup_codes?select=email,consumed_at&consumed_at=not.is.null`
+        + `&consumed_at=lte.${encodeURIComponent(youngest)}&consumed_at=gte.${encodeURIComponent(oldest)}`
+        + `&order=consumed_at.desc&limit=${SIGNUP_LINK_READ_LIMIT}`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{ email?: string; consumed_at?: string }> | null;
+    if (!Array.isArray(rows)) return null;
+    const capped = rows.length >= SIGNUP_LINK_READ_LIMIT;
+
+    // One address may have proved more than once. The question is about the ADDRESS, so they
+    // collapse, and the OLDEST proof is kept because that is how long he has been waiting.
+    const provedAt = new Map<string, string>();
+    for (const r of rows) {
+      const key = String(r?.email ?? '').trim().toLowerCase();
+      const at = String(r?.consumed_at ?? '');
+      // A quote or a comma would break out of the in.() list below. No real address carries one,
+      // and a row that does is skipped rather than escaped, because escaping is where injections
+      // come from and skipping one row can only ever make this quieter, never wrong in the
+      // direction that matters.
+      if (!key || !at || /["',]/.test(key)) continue;
+      const seen = provedAt.get(key);
+      if (!seen || at < seen) provedAt.set(key, at);
+    }
+    const proved = provedAt.size;
+    if (proved === 0) return { proved: 0, unlinked: 0, oldestProvedAt: null, ...shape, capped };
+
+    const list = [...provedAt.keys()].map((e) => `"${e}"`).join(',');
+    const lres = await fetch(
+      `${url}/rest/v1/signups?select=email&user_id=not.is.null`
+        + `&email=in.(${encodeURIComponent(list)})&limit=${SIGNUP_LINK_READ_LIMIT * 4}`,
+      { headers: headers() },
+    );
+    if (!lres.ok) return null;
+    const lrows = (await lres.json().catch(() => null)) as Array<{ email?: string }> | null;
+    if (!Array.isArray(lrows)) return null;
+    const linked = new Set(lrows.map((r) => String(r?.email ?? '').trim().toLowerCase()));
+
+    let unlinked = 0;
+    let oldestProvedAt: string | null = null;
+    for (const [email, at] of provedAt) {
+      if (linked.has(email)) continue;
+      unlinked += 1;
+      if (oldestProvedAt === null || at < oldestProvedAt) oldestProvedAt = at;
+    }
+    return { proved, unlinked, oldestProvedAt, ...shape, capped };
   } catch {
     return null;
   }

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { listCronRuns, readKnowledgeState, getReminderBacklog, getAuthSendHealth } from '../../../lib/supabase';
-import { cronAlarms, blockingAlarms, unseenAlarms, cronsServing, reminderAlarm, remindersServing, authSendAlarm, authSendsServing } from '../../../lib/cronwatch';
+import { listCronRuns, readKnowledgeState, getReminderBacklog, getAuthSendHealth, getSignupLinkHealth } from '../../../lib/supabase';
+import { cronAlarms, blockingAlarms, unseenAlarms, cronsServing, reminderAlarm, remindersServing, authSendAlarm, authSendsServing, signupLinkAlarm, signupLinksServing,
+  SIGNUP_LINK_GRACE_MINUTES, SIGNUP_LINK_LOOKBACK_DAYS } from '../../../lib/cronwatch';
 import { knowledgeAlarms, knowledgeStatus } from '../../../lib/knowledgewatch';
 
 // A tiny health check for uptime monitoring. Reports whether the app is up and
@@ -110,6 +111,11 @@ export async function GET(req: NextRequest) {
     // do without.
     const authSends = await getAuthSendHealth();
     const deadMailer = authSendAlarm(authSends);
+    // 🔴 AND CAN THE PEOPLE WHO ALREADY GOT IN GET BACK IN. B65. See lib/cronwatch.ts,
+    // signupLinkAlarm. A code that sends perfectly and an account that mints perfectly still leave
+    // a man locked out if the address never reaches the account, and until today nothing looked.
+    const signupLinks = await getSignupLinkHealth(SIGNUP_LINK_GRACE_MINUTES, SIGNUP_LINK_LOOKBACK_DAYS);
+    const strandedSignups = signupLinkAlarm(signupLinks);
     // ⚠️ THE OPERATOR VIEW IS STRICT ON PURPOSE, and differs from the public one. This body is a
     // to-do list for whoever is holding the pager, so a cron that has never run belongs in its
     // `ok: false`. The PUBLIC body answers a different question, "is the site serving", and a job
@@ -122,7 +128,7 @@ export async function GET(req: NextRequest) {
     // spot the public path had. brain !== null was already here; the crons half was missing it. An
     // operator who cannot read the history has a problem, and the strict view is where it belongs.
     const ok = missing.length === 0 && runs !== null && alarms.length === 0 && brain !== null && brainAlarms.length === 0
-      && lateReminders === null && deadMailer === null;
+      && lateReminders === null && deadMailer === null && strandedSignups === null;
     return NextResponse.json(
       {
         ok,
@@ -141,7 +147,7 @@ export async function GET(req: NextRequest) {
           bankTokenKey: Boolean(process.env.BANK_TOKEN_KEY),
         },
         crons: runs ?? 'unreadable',
-        alarms: [...blockingAlarms(alarms), ...(lateReminders ? [lateReminders] : []), ...(deadMailer ? [deadMailer] : [])],
+        alarms: [...blockingAlarms(alarms), ...(lateReminders ? [lateReminders] : []), ...(deadMailer ? [deadMailer] : []), ...(strandedSignups ? [strandedSignups] : [])],
         // WHAT IS ACTUALLY WAITING. The operator side names it because naming it is the whole use
         // of the row: a count and an age tell whoever holds the pager whether this is a gate that
         // shut a minute ago or an engine that stopped in the night.
@@ -149,6 +155,16 @@ export async function GET(req: NextRequest) {
         // THE LOGIN DOOR, IN COUNTS. Never an address: lib/logindoor.ts hashed it before it was
         // written, and the operator side needs the shape of the failure, not who it happened to.
         signin: authSends === null ? 'unreadable' : { attempted: authSends.attempted, sent: authSends.sent, failed: authSends.failed, windowMinutes: authSends.windowMinutes },
+        // THE SIGNUP BRIDGE, IN COUNTS AND NEVER AN ADDRESS, the same rule the signin row follows.
+        // capped rides along because a read that ran out of room must never be read as a clean one.
+        signups: signupLinks === null ? 'unreadable' : {
+          proved: signupLinks.proved,
+          unlinked: signupLinks.unlinked,
+          oldestProvedAt: signupLinks.oldestProvedAt,
+          graceMinutes: signupLinks.graceMinutes,
+          lookbackDays: signupLinks.lookbackDays,
+          capped: signupLinks.capped,
+        },
         // Registered, never seen. Not an outage; a wiring question. Named here because this side
         // is behind the bearer and naming it is the entire use of the row.
         unseen: unseenAlarms(alarms),
@@ -275,6 +291,31 @@ export async function GET(req: NextRequest) {
   const authSends = await getAuthSendHealth();
   const signInOk = authSendsServing(authSends);
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND CAN THE MAN WHO ALREADY FINISHED SIGNING UP GET BACK IN TOMORROW. B65, 20 August 2026.
+  //
+  // The row above watches whether a code goes OUT. This one watches whether the code arriving and
+  // being typed back actually joined his address to his account. Both can be perfect and he is
+  // still locked out: findContactAccount resolves an email only through a signups row carrying a
+  // user_id, public.users has no email column to fall back on, and the patch that writes that link
+  // updates zero rows and succeeds silently when there is nothing to patch.
+  //
+  // ⚠️ THIS IS AN OUTAGE AND IT IS A 503, and the argument is the sign in door's own, one step
+  // further on. A man who cannot get a code has not given us anything yet. A man who proved his
+  // address, minted an account, and cannot reach it again has his BOOKS in here, and no amount of
+  // retrying gets him back without a human touching the database. The remedy is one patch, so a red
+  // that wakes somebody clears in minutes.
+  //
+  // ⚠️ AND IT IS NOT THE SIGN IN ROW'S "one success means the road is open" RULE. That rule is
+  // right for a mail provider, where the rest is a different problem. Here every stranded person is
+  // his own complete outage, so one is enough.
+  //
+  // ⚠️ AND THE COUNT IS NOT PUBLIC. How many of our customers are locked out of their own books is
+  // our business. One word here, the counts behind the bearer, the same rule as the rows above.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const signupLinks = await getSignupLinkHealth(SIGNUP_LINK_GRACE_MINUTES, SIGNUP_LINK_LOOKBACK_DAYS);
+  const signupsOk = signupLinksServing(signupLinks);
+
   // THE BRAIN (docs/105). Three ways this goes red, and the first one is why Khoji exists at all.
   //
   //   drift   a constant in lib/taxengine.ts DISAGREES WITH GOV.UK right now. Our tax engine is
@@ -298,7 +339,7 @@ export async function GET(req: NextRequest) {
   const brainAlarms = brain ? knowledgeAlarms(brain) : [];
   const brainOk = brain !== null && brainAlarms.length === 0;
 
-  const healthy = db && cronsOk && brainOk && remindersOk && signInOk;
+  const healthy = db && cronsOk && brainOk && remindersOk && signInOk && signupsOk;
   return NextResponse.json(
     {
       ok: healthy,
@@ -334,6 +375,8 @@ export async function GET(req: NextRequest) {
       reminders: backlog === null ? 'unknown' : remindersOk ? 'ok' : 'late',
       // One word, never a count. See the block above signInOk.
       signin: authSends === null ? 'unknown' : signInOk ? 'ok' : 'failing',
+      // One word, never a count. See the block above signupsOk.
+      signups: signupLinks === null ? 'unknown' : signupsOk ? 'ok' : 'stranded',
       // A count, never a name. Zero is omitted rather than printed, so this row appears only when
       // there is genuinely something not yet seen. See the block above.
       ...(unseen.length ? { cronsUnseen: unseen.length } : {}),

@@ -452,3 +452,142 @@ export function authSendAlarm(health: AuthSendHealth | null): CronAlarm | null {
 export function authSendsServing(health: AuthSendHealth | null): boolean {
   return authSendAlarm(health) === null;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B65. THE LAST STEP OF THE SIGNUP FUNNEL CAN LEAVE A PERSON UNLINKED AND NOTHING WATCHED FOR
+// IT. 20 August 2026.
+//
+// findContactAccount resolves an address to an account ONLY through a signups row carrying a
+// user_id, and public.users has no email column to fall back on. That link is written in exactly
+// one place, setSignupUserId, from one route, /api/signup/verify, and the patch is scoped
+// `&user_id=is.null`, so when it matches nothing it updates zero rows and SUCCEEDS SILENTLY.
+//
+// lib/supabase.ts already says it in its own comment, dated: "no row means no link... he is locked
+// out tomorrow morning with the same neutral screen a stranger gets. Found on a real signup,
+// 6 August 2026." He is not locked out that day. He is holding the session he just opened. He is
+// locked out the next morning, and no amount of retrying gets him back without a human touching
+// the database.
+//
+// ⚠️ THERE IS NO VICTIM TODAY AND THIS IS A MISSING WATCHER RATHER THAN A RUNNING INCIDENT.
+// The four unlinked signups rows in production predate the user_id column and are Jag's own or
+// named tests. Nobody was stranded by a bug that fired. What did not exist was anything that would
+// tell us the day one is.
+//
+// 🔴 AND THE TELL IS NOT "A SIGNUP WITH NO user_id", WHICH IS THE OBVIOUS CHECK AND IS THE WRONG
+// ONE. An abandoned signup is a row with no user_id for ever: he typed his email into /start, never
+// went to his inbox, and no account was ever meant to exist. That is a CONVERSION fact, not an
+// outage, and on a funnel with real traffic it is most of the rows. A watch built on it would be
+// red within an hour of the first pound Jag spends and would be muted by the end of the week,
+// which is this file's own header warning arriving for a second time.
+//
+// THE TELL IS A CONSUMED CODE. public.signup_codes.consumed_at is set inside /api/signup/verify,
+// on the far side of a code we emailed and he typed back, and the spend is conditional on it being
+// null. So a consumed code is PROOF that a person proved that address. If the address then has no
+// signups row carrying a user_id, the bridge did not land and he is locked out. An abandoned
+// signup has no consumed code and can never reach this check at all.
+//
+// 🟢 AND IT NEEDS NO CUT OFF DATE FOR THE FOUR LEGACY ROWS, WHICH THE OBVIOUS CHECK WOULD HAVE.
+// public.signup_codes was created by the SAME statement batch that added signups.user_id
+// (supabase/APPLY_2026-07-29_signup_codes.sql, the table at line 32 and the column at line 93).
+// No code row can predate the column. The four rows have no code row at all, so they are outside
+// this question by construction rather than by an excluded id list or a date somebody typed.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+// THE GRACE, AND THE ARGUMENT FOR THE NUMBER.
+//
+// The whole failure lives inside ONE HTTP request. /api/signup/verify consumes the code, mints the
+// auth user, writes the users row, and only then calls setSignupUserId and ensureSignupBridge. The
+// gap between "proved" and "linked" is those few statements, not a trip to an inbox: the human part
+// of the signup happens BEFORE the code is consumed, and this clock starts after it.
+//
+// So the grace only has to cover one function invocation, and both timestamps are written by our
+// own Node clock (consumeSignupCode uses new Date().toISOString(), not the database's now()), so
+// there is no clock skew between the two sides to absorb either.
+//
+// Ten minutes is two orders of magnitude more than that request can take and still short enough
+// that a locked out person is found in the same working session rather than the next morning. It is
+// deliberately not one minute: this file's header says a ceiling too tight cries wolf, an alarm
+// that cries wolf gets muted, and a muted alarm looks like cover. On 9 August a too eager alarm put
+// /api/health at 503 and paged the founder on launch eve over a job that was perfectly healthy.
+export const SIGNUP_LINK_GRACE_MINUTES = 10;
+
+// HOW FAR BACK IT LOOKS, AND WHY THERE IS A BACK AT ALL.
+//
+// A stranded person stays stranded until a human links the row, so the honest instinct is to look
+// for ever. The reason not to is the read: the set this walks is SUCCESSFUL signups, one row per
+// person who ever completed, and an unbounded read of it grows with the customer base while the
+// answer it produces almost never changes.
+//
+// Fourteen days is long enough that a red survives a weekend, a bank holiday and a week of nobody
+// looking, and short enough that the read stays a handful of rows for a product this size. When it
+// stops being a handful the read caps, and a capped read is reported as unreadable rather than as
+// clean, so this can never go quietly blind.
+export const SIGNUP_LINK_LOOKBACK_DAYS = 14;
+
+export interface SignupLinkHealth {
+  /** Addresses that PROVED themselves in the window: a signup_codes row with consumed_at set. */
+  proved: number;
+  /** Of those, how many have no signups row carrying a user_id. Each one is a person locked out. */
+  unlinked: number;
+  /** When the oldest of those proved, ISO, so a minute can be told from a day. null when none. */
+  oldestProvedAt: string | null;
+  /** The grace already applied at the young end, so no reader has to assume it. */
+  graceMinutes: number;
+  /** How far back it looked, for the same reason. */
+  lookbackDays: number;
+  /** True when the read hit its row limit. A partial answer must never read as a clean one. */
+  capped: boolean;
+}
+
+// 🔴 null IN, ALARM OUT, the same rule cronsServing, reminderAlarm and authSendAlarm all follow.
+// A link we cannot check is the one state most likely to be hiding somebody.
+export function signupLinkAlarm(
+  health: SignupLinkHealth | null,
+  now: Date = new Date(),
+): CronAlarm | null {
+  if (health === null) {
+    return {
+      job: 'signups',
+      reason: 'unreadable',
+      hoursQuiet: null,
+      detail: 'the signup link could not be checked, so nothing here can say whether anyone who '
+        + 'finished signing up can get back in',
+    };
+  }
+
+  // A READ THAT RAN OUT OF ROOM IS NOT A CLEAN READ. It is reported before the count, because a
+  // capped read with zero unlinked is exactly the answer that looks like good news and is not one.
+  if (health.capped) {
+    return {
+      job: 'signups',
+      reason: 'unreadable',
+      hoursQuiet: null,
+      detail: `the signup link check hit its row limit over ${health.lookbackDays} days, so it has `
+        + 'outgrown a two request read and is no longer looking at all of them',
+    };
+  }
+
+  if (health.unlinked === 0) return null;
+
+  const provedMs = health.oldestProvedAt ? Date.parse(health.oldestProvedAt) : NaN;
+  const hoursQuiet = Number.isFinite(provedMs)
+    ? Math.round(((now.getTime() - provedMs) / 3_600_000) * 10) / 10
+    : null;
+
+  return {
+    job: 'signups',
+    reason: 'failed',
+    hoursQuiet,
+    // ⚠️ COUNTS AND AGES, NEVER AN ADDRESS. The same rule the signin row follows: the operator
+    // needs the shape of the failure, not who it happened to.
+    detail: `${health.unlinked} of ${health.proved} people who proved their email address in the `
+      + `last ${health.lookbackDays} days ${health.unlinked === 1 ? 'has' : 'have'} no account link, `
+      + 'so the sign in door will not find them and they meet the same neutral screen a stranger '
+      + 'gets. Nothing they try fixes it.',
+  };
+}
+
+/** Can the people who finished signing up actually get back in? A check we cannot run is a no. */
+export function signupLinksServing(health: SignupLinkHealth | null, now: Date = new Date()): boolean {
+  return signupLinkAlarm(health, now) === null;
+}

@@ -111,9 +111,11 @@ const SABOTAGES = [
       'Put by ${formatGbp(leadFigure)} for tax', 'Hold back ${formatGbp(leadFigure)} for tax'),
   },
   {
+    // ⚠️ RE ANCHORED 19 AUGUST 2026 BY B57. asksTax gained a fourth clause, so the old anchor
+    // (which ended at the semicolon) went DEAD. Same sabotage, same intent: the lane turns greedy.
     name: 'the lane turns greedy and eats claim questions, which have their own answer',
     apply: ({ dir }) => edit(dir, 'lib/waintents.ts',
-      "&& !/\\bcan i\\b|\\bclaim\\b/.test(b);", ";"),
+      "&& !/\\bcan i\\b|\\bclaim\\b/.test(b)", ""),
   },
   {
     name: 'it starts answering when he is logging an amount rather than asking a question',

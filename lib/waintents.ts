@@ -974,7 +974,41 @@ export function matchTotalsQuestion(body: string, now: Date = new Date()): Total
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   const asksTax = /\b(taxman|tax man|tax|owe|set(?:ting|tin)? aside|put(?:ting|tin)? (?:by|aside|away))\b/.test(b)
     && /\b(how much|whats?|my|should i)\b/.test(b)
-    && !/\bcan i\b|\bclaim\b/.test(b);
+    && !/\bcan i\b|\bclaim\b/.test(b)
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 B57, 19 AUGUST 2026, AND IT WAS FOUND BY WALKING B42's OWN FIX ON PRODUCTION.
+    //
+    // B42 stopped the third party gate refusing "what are the main ways a sole trader can legally
+    // reduce their tax bill". Typed at /app/thread on the live build `24e8611c`, signed in, it came
+    // back: "Put by £10,368.00 for tax. That is what the year is heading for..." **HE ASKED HOW TO
+    // REDUCE A TAX BILL AND WAS TOLD WHAT HE OWES.**
+    //
+    // ⚠️ B42 DID NOT CAUSE THIS AND B42 IS WHY IT IS VISIBLE. Before B42 the gate refused the
+    // question first, so this lane never got to speak. Closing the gate did not remove the lane
+    // above the model, which is exactly the shape section 9c of test/laneparity.test.mjs is about:
+    // a phrase claimed by a lane sitting above the thing that would have answered it properly.
+    //
+    // ⚠️ AND IT IS WORSE THAN THE REFUSAL IT REPLACED. A refusal is honest. This is a confident,
+    // correct, completely irrelevant answer, and a man reading it concludes the product did not
+    // understand him.
+    //
+    // asksTax fired because the sentence carries `tax` (in "tax bill") and `what`, and its two
+    // existing escapes are `can i` and `claim`. "can LEGALLY" is not "can i". So a general question
+    // about tax matched a lane that exists to answer ONE question: what does HE owe.
+    //
+    // 🔴 A TOTALS QUESTION IS BY DEFINITION ABOUT HIS OWN TOTALS, so an INDEFINITE GENERIC
+    // ANTECEDENT rules it out, and it is the same constant B42 built rather than a second idea.
+    //
+    // MEASURED BEFORE IT WAS TAKEN, over every quoted phrasing in laneparity, run2fixes,
+    // b19savings and agent that mentions money: 167 scanned, 85 claimed by this lane today, and the
+    // candidate frees EIGHT. **All eight name "a sole trader", "a builder", "a business owner",
+    // "anybody" or "a newly self employed person", so every one of them is the same defect wearing
+    // a different sentence, and losing them is the fix rather than the cost.** Not one first person
+    // phrasing moves: "how much tax do i owe", "what do i owe", "how much should i put by for tax",
+    // "whats my tax bill", "how much should i be putting by for the taxman", "what tax do i owe
+    // this year" and "how much have i made this year" are all still claimed.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    && !GENERIC_SUBJECT_RE.test(b);
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 B34's OTHER TWO, AND THEY NEEDED A COMPANION RATHER THAN A WIDER CLAUSE. THE WIDER CLAUSE
   // WAS BUILT, MEASURED AND REJECTED, TWICE, AND THE NUMBERS ARE WHY.

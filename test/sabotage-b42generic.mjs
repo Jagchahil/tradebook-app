@@ -134,6 +134,16 @@ const SABOTAGES = [
     apply: (d) => edit(d, WA, '  return new RegExp(`\\\\b(?:owe|owes|owed|earn|earns|made|makes|pay|pays|${THIRD_PARTY_MONEY_NOUNS})\\\\b`, \'i\').test(b);',
       '  return /\\bowe|owes|owed|earn|earns|made|makes|turnover|profit|tax|takings|books|figures|pay|pays\\b/i.test(b);'),
   },
+  {
+    name: '🔴 B57: the totals lane claims a generic tax question again, so a man asking how to reduce'
+      + ' a tax bill is told what he owes. WALKED ON PRODUCTION on 24e8611c',
+    apply: (d) => edit(d, WA, '    && !GENERIC_SUBJECT_RE.test(b);', '    ;'),
+  },
+  {
+    name: '🔴 B57 THE OTHER DIRECTION: asksTax rules out EVERY generic word, so his own tax question'
+      + ' stops reaching his own figure, which is the expensive way to be wrong',
+    apply: (d) => edit(d, WA, '    && !GENERIC_SUBJECT_RE.test(b);', "    && !/\\b(a|an|any|every|most|some|all|my|i)\\b/i.test(b);"),
+  },
   // ── THE SUITE'S OWN DERIVATIONS. ──────────────────────────────────────────────────────
   {
     name: '🔴 THE WALKED CHECK GOES BLIND: it reads a hardcoded noun list instead of the real pattern',

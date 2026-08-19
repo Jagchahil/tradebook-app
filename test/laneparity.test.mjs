@@ -1959,6 +1959,69 @@ const B23_LONG_OBJECT = [
     talkedOut.length === 0);
   // ⚠️ "how much has jerome the plumber made this year" is NOT in this list, and the reason is
   // written above: it was already answered before B42 for a different reason entirely.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B57. THE GATE OPENED AND A LANE ABOVE THE MODEL ANSWERED INSTEAD. WALKED, NOT READ.
+  //
+  // Typed at /app/thread on the live build `24e8611c`, signed in, immediately after B42 shipped:
+  //
+  //   "what are the main ways a sole trader can legally reduce their tax bill"
+  //     -> "Put by £10,368.00 for tax. That is what the year is heading for, on everything you
+  //         have confirmed so far. It covers your business, plus your student loan..."
+  //
+  // HE ASKED HOW TO REDUCE A TAX BILL AND WAS TOLD WHAT HE OWES. ⚠️ B42 did not cause it and B42
+  // is why it is visible: before B42 the third party gate refused the question first, so this lane
+  // never got to speak. **Closing a gate does not remove the lane above the model.** And it is
+  // worse than the refusal it replaced, because a refusal is honest and this is a confident,
+  // correct, completely irrelevant answer.
+  //
+  // matchTotalsQuestion's asksTax carries `tax`, `what` and two escapes, `can i` and `claim`.
+  // "can LEGALLY" is not "can i". A totals question is BY DEFINITION about his own totals, so an
+  // indefinite generic antecedent now rules it out, using B42's own constant rather than a second
+  // idea. Measured over 167 quoted phrasings: 85 claimed today, EIGHT freed, and every one of the
+  // eight names a generic subject. Not one first person phrasing moves.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  {
+    const totals = W.matchTotalsQuestion;
+    ok('matchTotalsQuestion is exported and callable, without which the lines below are vacuous',
+      typeof totals === 'function');
+    // The walked sentence itself, verbatim from production.
+    ok('🔴 THE WALKED SENTENCE IS NO LONGER CLAIMED BY THE TOTALS LANE',
+      totals('what are the main ways a sole trader can legally reduce their tax bill') === null);
+    const GENERIC_TAX = [
+      'what are the main ways a sole trader can legally reduce their tax bill',
+      'how much tax does a sole trader pay',
+      'how much tax and national insurance does a sole trader pay',
+      'what should a new sole trader do about their income tax',
+      'what should a business owner do about their tax',
+      'what should anybody do about their tax',
+      'what should a newly self employed person do about their tax',
+      'what happens to a builder if they miss their tax return',
+    ];
+    const stillClaimed = GENERIC_TAX.filter((q) => totals(q));
+    ok(`🔴 ALL ${GENERIC_TAX.length} GENERIC TAX QUESTIONS ARE FREE OF THE TOTALS LANE${stillClaimed.length ? `, STILL CLAIMED: ${stillClaimed.map((q) => JSON.stringify(q)).join('; ')}` : ''}`,
+      stillClaimed.length === 0);
+    // 🔴 AND THE HALF THAT MATTERS MORE. His own question must still reach his own figure, or B57
+    // has broken the most consequential money question in the product to fix a phrasing.
+    const HIS_OWN = [
+      'how much tax do i owe',
+      'what do i owe',
+      'how much should i put by for tax',
+      'whats my tax bill',
+      'how much should i be putting by for the taxman',
+      'what tax do i owe this year',
+      'how much have i made this year',
+    ];
+    const lost = HIS_OWN.filter((q) => !totals(q));
+    ok(`🔴 ALL ${HIS_OWN.length} OF HIS OWN TOTALS QUESTIONS ARE STILL CLAIMED${lost.length ? `, LOST: ${lost.map((q) => JSON.stringify(q)).join('; ')}` : ''}`,
+      lost.length === 0);
+    ok('the two corpora are the size they were measured at, 8 and 7',
+      GENERIC_TAX.length === 8 && HIS_OWN.length === 7);
+    // ⚠️ AND B57 REUSES B42's CONSTANT RATHER THAN TYPING A SECOND ONE, which is the thing that
+    // stops the two drifting the way the money noun lists did.
+    ok('🔴 asksTax RULES OUT A GENERIC SUBJECT USING GENERIC_SUBJECT_RE, not a second pattern',
+      /&& !GENERIC_SUBJECT_RE\.test\(b\);/.test(read('lib/waintents.ts')));
+  }
+
   const wearingGeneric = [
     "whats a plumber like jerome's profit",
     "what is a sole trader called dave's turnover",

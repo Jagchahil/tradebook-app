@@ -168,5 +168,87 @@ ok(`🔴 every route that can redirect a form off site is one form-action names\
   && offsite.includes('app/api/bank/connect/route.ts')
   && offsite.includes('app/api/billing/checkout/route.ts'));
 
+// ═════════════════════════════════════════════════════════
+// 🔴 B48. A COMPONENT WHOSE CONTRACT IS ARBITRARY CODE EXECUTION, SAFE TODAY, GUARDED BY NOTHING.
+//
+// app/_shared/ClientScript.tsx takes a `js: string` prop and runs it: createElement('script'),
+// textContent = js, appendChild. It exists for a real and well argued reason, which its own header
+// gives: a <script> injected as MARKUP does not execute on a soft navigation, so the marketing
+// sliders, tabs, compare filter, pricing toggle and theme toggle were dead for anybody browsing
+// normally rather than pasting a URL. And it appends a real element rather than calling
+// new Function precisely BECAUSE the policy two hundred lines above forbids unsafe-eval, which is
+// why the check belongs in this file and not in a suite of its own.
+//
+// Every caller today passes a module level constant, so it is safe. NOTHING SAYS IT MUST STAY THAT
+// WAY. A future caller could pass a value that came off a request and no test in this repo would
+// notice, which is the same shape as the gbpShort guard: the only caller is that threshold, so a
+// figure of his cannot slip into it.
+//
+// ⚠️ AND THE COUNT IS FIVE, NOT ONE. The P4 injection trace said one caller, and it had scanned
+// 62 files out of about 250 and said so in its own coverage table one section earlier. A PARTIAL
+// SCAN CANNOT PRODUCE AN EXACT COUNT. That is the finding worth more than the component, and it is
+// why the count below is DERIVED by walking app/ rather than typed out: a guard that names one of
+// five is a guard about that one.
+// ═════════════════════════════════════════════════════════
+{
+  // ⚠️ THE COMMENT STRIP, AND IT EARNED ITS PLACE ON THE FIRST RUN OF THIS SECTION. The
+  // component's own header explains that it appends a real element rather than calling
+  // new Function BECAUSE the CSP forbids unsafe-eval, so the absence check below went red on the
+  // sentence that explains why the absence is there. Fifth time in this repo. The safe form
+  // `(^|[^:])//` is used rather than the naive one, which truncates every https:// in a string.
+  const codeOnly = (src) => src
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+  const clientScript = codeOnly(read('app/_shared/ClientScript.tsx'));
+  ok('🔴 B48: ClientScript runs a string as a real script element',
+    /document\.createElement\('script'\)/.test(clientScript)
+    && /\.textContent = js/.test(clientScript)
+    && /appendChild/.test(clientScript));
+  ok('🔴 ...and never through eval or new Function, which the policy above forbids',
+    !/new Function|\beval\s*\(/.test(clientScript));
+  ok('🔴 ...and the policy it is written against still has no unsafe-eval in script-src',
+    /"script-src [^"]*"/.test(cfg) && !/script-src[^"]*unsafe-eval/.test(cfg));
+
+  // Walk app/ and take every USE of the component, by the JSX tag rather than by the import, so a
+  // file that imports it and never renders it is not counted and a file that renders it cannot be
+  // missed. Dot directories are tooling: app/.node holds broken symlinks that kill a naive walk.
+  const uses = [];
+  const walk = (dir) => {
+    for (const e of readdirSync(path.join(root, dir), { withFileTypes: true })) {
+      if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+      const rel = `${dir}/${e.name}`;
+      if (e.isDirectory()) { walk(rel); continue; }
+      if (!e.isFile() || !/\.(ts|tsx)$/.test(e.name)) continue;
+      const src = read(rel);
+      for (const m of src.matchAll(/<ClientScript\s+js=\{([^}]*)\}/g)) uses.push({ rel, arg: m[1].trim(), src });
+    }
+  };
+  walk('app');
+
+  // 🔴 THE COUNT, ASSERTED, BECAUSE THAT IS THE WHOLE FIX. A sixth caller reddens this the
+  // minute it is written, and whoever wrote it has to satisfy the rule below rather than inherit a
+  // silence. Five is the derived figure at 9b23d259.
+  ok(`🔴 ClientScript has exactly FIVE callers, derived (${uses.length}: ${uses.map((u) => u.rel).join(', ')})`,
+    uses.length === 5);
+
+  // 🔴 AND EVERY ONE OF THEM PASSES A MODULE LEVEL CONST. Written as a pure test so the line
+  // below can prove it bites before it is believed: a request shaped value must fail it.
+  const isModuleConst = (arg, src) => /^[A-Z][A-Z0-9_]*$/.test(arg)
+    && new RegExp(`^(?:export )?const ${arg}\\s*=`, 'm').test(src);
+
+  ok('🔴 ...and the rule can SEE a bad argument, proved on planted ones before it is believed',
+    isModuleConst('props.js', 'const X = 1;') === false
+    && isModuleConst('req.query.js', 'const X = 1;') === false
+    && isModuleConst('MTD_JS', 'let MTD_JS = `x`;') === false
+    && isModuleConst('MTD_JS', '  const MTD_JS = `x`;') === false
+    && isModuleConst('MTD_JS', 'const MTD_JS = `x`;') === true);
+
+  const loose = uses.filter((u) => !isModuleConst(u.arg, u.src)).map((u) => `${u.rel} passes ${u.arg}`);
+  ok(`🔴 EVERY ClientScript argument is a module level const, so nothing off a request can reach it\n     ${loose.join('\n     ') || '(all five are constants)'}`,
+    loose.length === 0);
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

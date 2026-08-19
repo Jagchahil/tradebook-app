@@ -32,6 +32,14 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
+// 🔴 A REAL JPEG HEADER, NOT THREE ARBITRARY BYTES (S1, 19 August 2026). These fixtures used to
+// send [1, 2, 3] declared as image/jpeg, which no camera has ever produced, and the ingest walk
+// believed the declaration because nothing looked at the bytes. It looks now, so a fixture that is
+// not an image is refused exactly as a hostile upload would be. FFD8FFE0 then JFIF is the shortest
+// thing a real photograph starts with, and using it here means these suites exercise the path a
+// customer's phone actually takes.
+const JPEG_BYTES = [0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01];
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const read = (p) => readFileSync(path.join(root, p), 'utf8');
@@ -491,7 +499,7 @@ export async function readVatProfile() { return null; }
     IDB.state.calls.length = 0;
     IDB.state.insertFails = false;
     IAI.state.parsed = parsed;
-    return I.ingestReceiptImage({ userId: 'u-1', bytes: new Uint8Array([1, 2, 3]), mediaType: 'image/jpeg', sourceType: 'web_image' });
+    return I.ingestReceiptImage({ userId: 'u-1', bytes: new Uint8Array(JPEG_BYTES), mediaType: 'image/jpeg', sourceType: 'web_image' });
   };
   const writes = () => IDB.state.calls;
 
@@ -550,7 +558,7 @@ export async function readVatProfile() { return null; }
     IDB.state.calls.length = 0;
     IAI.state.parsed = screwfix;
     IDB.state.insertFails = true;
-    const r = await I.ingestReceiptImage({ userId: 'u-1', bytes: new Uint8Array([1]), mediaType: 'image/jpeg', sourceType: 'web_image' });
+    const r = await I.ingestReceiptImage({ userId: 'u-1', bytes: new Uint8Array(JPEG_BYTES), mediaType: 'image/jpeg', sourceType: 'web_image' });
     IDB.state.insertFails = false;
     ok('a failed write is admitted as failed, never reported as logged',
       r.outcome === 'failed');
@@ -628,7 +636,7 @@ export async function readVatProfile() { return null; }
       // returns an array here, empty when the paper was not itemised.
       line_items: [], transaction_date: '2026-08-05', vat: null,
   };
-  const jpeg = () => new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' });
+  const jpeg = () => new Blob([new Uint8Array(JPEG_BYTES)], { type: 'image/jpeg' });
   const post = async (fill) => {
     RDB.state.rows = [];
     RDB.state.writes.length = 0;

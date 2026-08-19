@@ -67,6 +67,49 @@ export const MAX_RECEIPT_BYTES = 4 * 1024 * 1024;
 // open a block comment, and every comment stripping guard in test/ would swallow half this file.)
 export const RECEIPT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// S1. WHAT THE BYTES SAY, WHICH IS THE ONLY THING THAT KNOWS (19 August 2026).
+//
+// Until today every door decided what a file WAS from what the sender CALLED it: File.type on the
+// four web doors, Meta's metadata on WhatsApp. storeReceiptImage then wrote that string as the
+// stored object's Content-Type, so a sender chose a header we later served back.
+//
+// 🔴 IT WAS NOT EXPLOITABLE END TO END AND THAT IS NOT THE POINT. The bucket is private, the read
+// back route re checks the image wildcard and sets nosniff, and CSP carries object-src none.
+// (The wildcard is spelled out in words here for the reason this file already gives above: written
+// literally it is the two characters that OPEN a block comment, and every comment stripping guard
+// in test/ would swallow half this file. It caught me within the hour of my writing it.) Every one of
+// those defences is DOWNSTREAM OF THE WRITE, so all three have to keep holding for ever for the
+// write to stay harmless. This checks it at the write instead, once, where the bytes are.
+//
+// The first twelve bytes are enough for all four types we accept, and WEBP is why it is twelve
+// rather than eight: RIFF at 0 and WEBP at 8.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export function imageTypeFromBytes(bytes: Uint8Array): string | null {
+  const b = bytes;
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47
+    && b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a) return 'image/png';
+  if (b.length >= 6 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38
+    && (b[4] === 0x37 || b[4] === 0x39) && b[5] === 0x61) return 'image/gif';
+  if (b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46
+    && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp';
+  return null;
+}
+
+// 🔴 THE DECLARED TYPE MUST MATCH THE BYTES, not merely be on the allowed list. A JPEG declared as
+// image/png is refused too: it is not an attack, but it is a file we would store under a
+// Content-Type its bytes contradict, and "close enough" is how the next hole gets argued in.
+export function bytesConfirmType(bytes: Uint8Array, declared: string): boolean {
+  const actual = imageTypeFromBytes(bytes);
+  return actual !== null && actual === (declared || '').toLowerCase().split(';')[0].trim();
+}
+
+// ⚠️ ONE SENTENCE, TWO CHAT CHANNELS. It lived as a literal in app/api/thread/route.ts and WhatsApp
+// had no wrong type answer at all. Both say this now, from here, for the same reason the Scotland
+// caveat lives in one file: two channels that word the same refusal separately drift apart.
+export const NOT_AN_IMAGE_REPLY = 'I cannot read that kind of file. A JPEG or PNG photograph works.';
+
 // Every answer carries what the caller needs to say the honest sentence for its own surface,
 // and nothing else. The routes own their words; this file owns what happened.
 export type ReceiptIngestResult =
@@ -79,7 +122,12 @@ export type ReceiptIngestResult =
   // One new row, waiting for his yes.
   | { outcome: 'logged'; merchant: string; amount: number; category: string; date: string }
   // The write itself failed. Nothing landed, and the caller must say so, never shrug.
-  | { outcome: 'failed' };
+  | { outcome: 'failed' }
+  // 🔴 S1. The bytes are not the picture the sender said they were. NOTHING was stored and no AI
+  // call was paid for. Deliberately NOT 'unread': every caller answers that one with "try a
+  // clearer photograph", which would be a lie here and would send him round in circles taking
+  // better photographs of a file that is not a photograph.
+  | { outcome: 'nottype' };
 
 export async function ingestReceiptImage(args: {
   userId: string;
@@ -94,6 +142,12 @@ export async function ingestReceiptImage(args: {
   whatsappMessageId?: string;
 }): Promise<ReceiptIngestResult> {
   const { userId, bytes, mediaType, sourceType, whatsappMessageId } = args;
+
+  // 🔴 S1, AND IT IS BEFORE THE STORE ON PURPOSE. storeReceiptImage writes mediaType as the
+  // object's Content-Type, so checking after the write would be checking after the thing the
+  // check exists to prevent. Every door reaches this walk, which is why the guard is here and not
+  // repeated four times: a fifth door gets it by arriving.
+  if (!bytesConfirmType(bytes, mediaType)) return { outcome: 'nottype' };
 
   // STORE FIRST, PARSE SECOND. See the header. The one cost of this order is an unread
   // photograph leaving an unreferenced object behind, which is pennies of storage against a

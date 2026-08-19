@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sessionUser } from '../../../../lib/webauth';
 import { userBurst } from '../../../../lib/ratelimit';
 import { gateForUser, refuseUnentitled } from '../../../../lib/gateserver';
-import { MAX_RECEIPT_BYTES, RECEIPT_IMAGE_TYPES } from '../../../../lib/receiptingest';
+import { MAX_RECEIPT_BYTES, RECEIPT_IMAGE_TYPES, bytesConfirmType } from '../../../../lib/receiptingest';
 import { addJobPhoto, readDiaryJob, storeJobPhotoImage } from '../../../../lib/supabase';
 import { captionOrNull } from '../../../../lib/jobphotos';
 
@@ -75,6 +75,11 @@ export async function POST(req: NextRequest) {
   if (!RECEIPT_IMAGE_TYPES.includes(mediaType)) return job(jobId, 'problem=type');
 
   const bytes = new Uint8Array(await part.arrayBuffer());
+  // 🔴 S1. THE FIFTH DOOR, AND THE ONLY ONE THAT DOES NOT GO THROUGH ingestReceiptImage. It shares
+  // this path's size and type lists with the receipt walk rather than copying them, and from today
+  // it shares the byte check too. Same answer as a declared type we do not take, three lines up:
+  // the file is not a picture, and how it came to be wrong is not his problem to distinguish.
+  if (!bytesConfirmType(bytes, mediaType)) return job(jobId, 'problem=type');
   const storagePath = await storeJobPhotoImage(user.id, bytes, mediaType);
   if (!storagePath) return job(jobId, 'problem=unavailable');
 

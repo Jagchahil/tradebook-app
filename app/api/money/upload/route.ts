@@ -121,6 +121,10 @@ async function walkOne(userId: string, file: File): Promise<FileVerdict> {
     case 'logged': return { kind: 'receipt', outcome: 'logged' };
     case 'merged': return { kind: 'receipt', outcome: 'merged' };
     case 'duplicate': return { kind: 'receipt', outcome: 'already' };
+    // 🔴 S1. Its bytes are not the picture it claimed to be, so it lands in the same bucket as a
+    // file that was never a receipt or a statement. That bucket is counted as typebad and already
+    // has its sentence: nothing new to say and nothing new to sign.
+    case 'nottype': return { kind: 'neither', outcome: 'type' };
     case 'unread': return { kind: 'receipt', outcome: 'unread' };
     case 'failed': return { kind: 'receipt', outcome: 'failed' };
   }

@@ -37,7 +37,7 @@ import {
   saveLekhioThreadMessage,
 } from '../../../lib/supabase';
 import {
-  ingestReceiptImage, duplicateReceiptLine, MAX_RECEIPT_BYTES, RECEIPT_IMAGE_TYPES,
+  ingestReceiptImage, duplicateReceiptLine, MAX_RECEIPT_BYTES, RECEIPT_IMAGE_TYPES, NOT_AN_IMAGE_REPLY,
 } from '../../../lib/receiptingest';
 import { verifyChatRef, chatRefBelongsTo } from '../../app/chatref';
 
@@ -539,7 +539,7 @@ async function receiptReply(userId: string, part: File): Promise<string> {
   }
   const mediaType = (part.type || '').toLowerCase();
   if (!RECEIPT_IMAGE_TYPES.includes(mediaType)) {
-    return 'I cannot read that kind of file. A JPEG or PNG photograph works.';
+    return NOT_AN_IMAGE_REPLY;
   }
   if (!hasClaudeConfig()) {
     return 'Receipt reading is not switched on yet. Hang tight, it is coming very soon.';
@@ -553,6 +553,9 @@ async function receiptReply(userId: string, part: File): Promise<string> {
   const result = await ingestReceiptImage({ userId, bytes, mediaType, sourceType: 'web_image' });
 
   switch (result.outcome) {
+    case 'nottype':
+      // 🔴 S1. The declared type passed and the bytes did not, which is the same thing to him.
+      return NOT_AN_IMAGE_REPLY;
     case 'unread':
       return 'I could not read that one. A clearer photograph with the total showing usually does it.';
     case 'failed':

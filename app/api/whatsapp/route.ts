@@ -25,7 +25,7 @@ import { sendInvoiceEmail, hasEmailConfig, looksLikeEmail } from '../../../lib/e
 import { hasBankFeedConfig } from '../../../lib/bankfeed';
 // The one receipt walk, shared with the web capture route and the chat composer, so the three
 // doors cannot drift apart. See the header of lib/receiptingest.ts.
-import { ingestReceiptImage, duplicateReceiptLine } from '../../../lib/receiptingest';
+import { ingestReceiptImage, duplicateReceiptLine, NOT_AN_IMAGE_REPLY } from '../../../lib/receiptingest';
 import {
   busyMessage,
   receiptMilestoneNudge,
@@ -1406,6 +1406,11 @@ async function receiptSentence(from: string, messageId: string, mediaId: string)
   });
 
   switch (result.outcome) {
+    case 'nottype':
+      // 🔴 S1, AND THIS DOOR HAD NO WRONG TYPE ANSWER AT ALL BEFORE TODAY: it took Meta's word for
+      // what the media was. It says exactly what the web chat says, because they are the same
+      // conversation to the man having it.
+      return NOT_AN_IMAGE_REPLY;
     case 'unread':
       return 'I could not read that receipt. Try a clearer photo with the total showing.';
     case 'failed':

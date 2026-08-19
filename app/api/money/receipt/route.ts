@@ -109,6 +109,11 @@ export async function POST(req: NextRequest) {
   });
 
   switch (result.outcome) {
+    case 'nottype':
+      // 🔴 S1. Identical to the refusal three screens up for a declared type we do not take,
+      // because it is the same fact: this is not a picture we can read. One answer, so a sender
+      // learns nothing from the difference between lying about the type and getting it wrong.
+      return isForm ? back('problem=type') : NextResponse.json({ error: 'bad_type' }, { status: 415 });
     case 'unread':
       // parseReceipt answers amount 0 when it could not read the total. An unreadable total is
       // an unreadable receipt, and he is asked for a clearer photograph.

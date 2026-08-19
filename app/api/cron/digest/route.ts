@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import {
   usersDueDigest,
   bankEntriesForDigestMany,
+  recordDigestShownMany,
   markDigestSentMany,
   addWaSend,
   countActiveSubscribers,
@@ -89,7 +90,10 @@ export async function GET(req: NextRequest) {
   // The decision is pure and free, so it is made for the whole page in memory. That
   // means the WhatsApp budget is spent in a single, honest pass rather than drifting as
   // sends race each other.
-  const plan: Array<{ id: string; phone: string; text: string; free: boolean }> = [];
+  // 🔴 askedIds TRAVELS WITH THE PLAN. B35, 19 August 2026. What the confirm has to know is what
+  // this message actually ASKED him about, and the only place that is known for certain is here,
+  // beside the text that was built from it.
+  const plan: Array<{ id: string; phone: string; text: string; free: boolean; askedIds: string[] }> = [];
   let skipped = 0;
   let budgetLeft = Math.max(0, dailyCap - sentToday);
 
@@ -112,7 +116,13 @@ export async function GET(req: NextRequest) {
       continue;
     }
     if (!decision.free) budgetLeft -= 1;
-    plan.push({ id: u.id, phone: u.phone_number as string, text, free: decision.free });
+    // ⚠️ THE ASKING LIST AND NOTHING ELSE. The filed list is already confirmed, so it is not what
+    // YES is about, and buildDigest prints the asking list WHOLE (B30), so these ids are exactly
+    // the bullets he reads.
+    plan.push({
+      id: u.id, phone: u.phone_number as string, text, free: decision.free,
+      askedIds: split.asking.map((e) => e.id),
+    });
   }
 
   const paid = plan.filter((p) => !p.free).length;
@@ -133,6 +143,8 @@ export async function GET(req: NextRequest) {
   let sentPaid = 0;
   let cursorIdx = 0;
   const done: string[] = [];
+  // What each message asked about, for the ones that actually went. B35.
+  const shown: Array<{ userId: string; transactionIds: string[] }> = [];
 
   async function lane(): Promise<void> {
     for (;;) {
@@ -142,6 +154,7 @@ export async function GET(req: NextRequest) {
       try {
         await sendText(job.phone, job.text);
         done.push(job.id);
+        if (job.askedIds.length > 0) shown.push({ userId: job.id, transactionIds: job.askedIds });
         if (job.free) sentFree += 1;
         else sentPaid += 1;
       } catch {
@@ -155,6 +168,12 @@ export async function GET(req: NextRequest) {
   // One write for everyone who actually got a message. Only the ones who got one, so a
   // send that failed is retried tomorrow instead of being marked as delivered.
   await markDigestSentMany(done);
+
+  // 🔴 AND WHAT EACH OF THEM WAS ASKED ABOUT, IN ONE BULK INSERT. B35. Same rule as the stamp above:
+  // only the ones who really got a message, so a send that failed leaves nothing claiming it asked
+  // him anything. Best effort by design, and the failure is a fall back to the window rather than a
+  // lost digest: see recordDigestShownMany.
+  await recordDigestShownMany(shown);
 
   // MORE USERS TO WALK? GO AND WALK THEM.
   //

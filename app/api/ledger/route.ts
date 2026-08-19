@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { userBurst } from '../../../lib/ratelimit';
-import { getOptimiserInput } from '../../../lib/supabase';
+import { readOptimiserOrNull } from '../../../lib/supabase';
 import { sessionUser } from '../../../lib/webauth';
 import { ledgerFor, headline } from '../../../lib/ledger';
 
@@ -35,7 +35,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'slow down' }, { status: 429 });
   }
 
-  const input = await getOptimiserInput(user.id);
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B50, D3. RECORDS UNREADABLE EXEMPT: this route is JSON to the phone app and has no customer
+  // sentence on it, so it answers with an explicit ERROR rather than with a body of zeros, and no
+  // new copy is written for a path nobody reads words on. A caller handed a ledger of zeros cannot
+  // tell "nothing confirmed yet" from "the read failed", and it would then draw a screen saying he
+  // has saved nothing, which is the same lie the eleven pages were telling. 503 is the shape
+  // app/api/elections/route.ts already uses for exactly this, so there is one of them and not two.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const input = await readOptimiserOrNull(user.id);
+  if (!input) return NextResponse.json({ error: 'unreadable' }, { status: 503 });
 
   // ⚠️ EVERY FIGURE BELOW IS ONE HE HAS CONFIRMED. Nothing "to review", nothing projected, nothing
   // conditional. lib/ledger.ts has no field you could put a "could" in, which is the strongest

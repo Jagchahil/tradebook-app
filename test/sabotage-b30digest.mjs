@@ -39,7 +39,11 @@ const root = path.resolve(here, '..');
 function scratch() {
   const base = mkdtempSync(path.join(tmpdir(), 'sab-b30d-'));
   const dir = path.join(base, 'tradebook');
-  for (const d of ['lib', 'test', 'app']) cpSync(path.join(root, d), path.join(dir, d), { recursive: true });
+  // 🔴 supabase/ IS COPIED SINCE 19 AUGUST 2026 AND IT IS NOT TIDINESS. B35 gave test/digest.test.mjs
+  // a section that reads supabase/APPLY_2026-08-19_digest_shown.sql off disk. A tree without that
+  // directory does not FAIL the suite, it CRASHES it, which scores every sabotage as caught and
+  // every control as broken. This repo has been bitten by exactly that before.
+  for (const d of ['lib', 'test', 'app', 'supabase']) cpSync(path.join(root, d), path.join(dir, d), { recursive: true });
   return { base, dir };
 }
 
@@ -86,6 +90,11 @@ const edit = (dir, rel, from, to) => {
 const DG = 'lib/digest.ts';
 const TH = 'app/api/thread/route.ts';
 const DT = 'test/digest.test.mjs';
+// B35, 19 August 2026. The approval gate's own files.
+const SUP = 'lib/supabase.ts';
+const CRON = 'app/api/cron/digest/route.ts';
+const WA = 'app/api/whatsapp/route.ts';
+const SQL = 'supabase/APPLY_2026-08-19_digest_shown.sql';
 
 // ── ANCHORS ON THE WORK. Nothing here quotes a heading, a bullet or the edge of a list. ─────────
 const ASK_MAP = "    parts.push(asking.map((e) => `• ${line(e)}`).join('\\n'));";
@@ -196,9 +205,77 @@ const SABOTAGES = [
     name: 'the digest suite\'s comment stripper is made a no op, blinding its own formatter guard',
     apply: ({ dir }) => edit(dir, DT, CODEONLY, '  const codeOnly = (x) => x;'),
   },
+  // ── B35, 19 AUGUST 2026. THE APPROVAL GATE THAT REACHED PAST WHAT IT SHOWED HIM. ──────────
+  //
+  // Section 6 of test/digest.test.mjs says the confirm is bounded by the ids that were PRINTED,
+  // that a null falls back to the window so either deploy order is safe, that the send path records
+  // the asking list and only for messages that went, and that the comment and the code agree.
+  {
+    name: '🔴 THE CONFIRM GOES BACK TO THE WINDOW ALONE, so a man told 20 and shown 20 has his YES'
+      + ' file 35 again',
+    apply: ({ dir }) => edit(dir, SUP, '      idFilter +\n', ''),
+  },
+  {
+    name: '🔴 THE IDS REPLACE THE WINDOW INSTEAD OF NARROWING IT, which is a widening wearing a'
+      + ' bound: a stale id list would reach outside the digest it came from',
+    apply: ({ dir }) => edit(dir, SUP, "      `&created_at=gte.${encodeURIComponent(sinceISO)}` +\n      idFilter +", '      idFilter +'),
+  },
+  {
+    name: '🔴 A NON UUID IS PASTED STRAIGHT INTO THE FILTER, which is the rule every other in list'
+      + ' in this file follows and the one place a caller controls the value',
+    apply: ({ dir }) => edit(dir, SUP, '  const only = Array.isArray(shownIds) ? shownIds.filter((i) => UUID.test(i)) : [];',
+      '  const only = Array.isArray(shownIds) ? shownIds : [];'),
+  },
+  {
+    name: '🔴 A MISSING TABLE COMES BACK AS AN EMPTY LIST RATHER THAN AS A NULL, so a migration that'
+      + ' has not been run reads as "he was shown nothing"',
+    apply: ({ dir }) => edit(dir, SUP, "      { headers: headers() },\n    );\n    if (!res.ok) return null;\n    const rows = (await res.json().catch(() => null)) as (Array<{ transaction_ids: string[] | null }>) | null;",
+      "      { headers: headers() },\n    );\n    if (!res.ok) return [];\n    const rows = (await res.json().catch(() => null)) as (Array<{ transaction_ids: string[] | null }>) | null;"),
+  },
+  {
+    name: '🔴 THE SEND PATH RECORDS THE FILED LIST INSTEAD OF THE ASKING LIST, so YES is bounded by'
+      + ' rows that were already confirmed and the ones he was actually asked about are unbounded',
+    apply: ({ dir }) => edit(dir, CRON, 'askedIds: split.asking.map((e) => e.id),', 'askedIds: split.filed.map((e) => e.id),'),
+  },
+  {
+    name: '🔴 THE RECORD IS WRITTEN FOR EVERY PLANNED MESSAGE RATHER THAN FOR THE ONES THAT WENT, so'
+      + ' a failed send leaves a row claiming we asked him something he never received',
+    apply: ({ dir }) => edit(dir, CRON, '        done.push(job.id);\n        if (job.askedIds.length > 0) shown.push({ userId: job.id, transactionIds: job.askedIds });',
+      '        done.push(job.id);'),
+  },
+  {
+    name: '🔴 handleAck STOPS READING WHAT HE WAS SHOWN AND KEEPS THE CLAIM IN ITS COMMENT, which is'
+      + ' the exact shape B35 was filed as: a comment claiming a property the code does not have',
+    apply: ({ dir }) => edit(dir, WA, '  const shownIds = await lastDigestShownIds(userId);\n  const filed = await confirmDigestEntries(userId, from24h, shownIds);',
+      '  const filed = await confirmDigestEntries(userId, from24h);'),
+  },
+  {
+    name: '🔴 THE MIGRATION LEAVES RLS OFF, so a record of what we texted somebody is readable by'
+      + ' anon and authenticated',
+    apply: ({ dir }) => edit(dir, SQL, 'alter table public.digest_shown enable row level security;', ''),
+  },
 ];
 
 const CONTROLS = [
+  {
+    name: 'CONTROL: a COMMENT INSIDE lastDigestShownIds IS REWORDED AND STILL CONTAINS THE WORD'
+      + ' "as". The lift strips comments before it strips casts, and this is the control that says'
+      + ' so: the first draft did not, and it swallowed the return statement under this very line',
+    apply: ({ dir }) => edit(dir, SUP, '    // An EMPTY array is not a bound of nothing, it is a row that recorded nothing, and treating it',
+      '    // Reworded. An empty array reads as unknown rather than as an instruction, and treating it'),
+  },
+  {
+    name: 'CONTROL: the id filter local is RENAMED consistently in the confirm, and a guard that'
+      + ' reds here is a guard about a name',
+    apply: ({ dir }) => {
+      edit(dir, SUP, '  const only = Array.isArray(shownIds) ? shownIds.filter((i) => UUID.test(i)) : [];',
+        '  const bounded = Array.isArray(shownIds) ? shownIds.filter((i) => UUID.test(i)) : [];');
+      edit(dir, SUP, "  const idFilter = only.length > 0\n    ? `&id=in.(${encodeURIComponent(only.map((i) => `\"${i}\"`).join(','))})`\n    : '';",
+        "  const inList = bounded.length > 0\n    ? `&id=in.(${encodeURIComponent(bounded.map((i) => `\"${i}\"`).join(','))})`\n    : '';");
+      edit(dir, SUP, '      idFilter +', '      inList +');
+    },
+  },
+
   {
     name: 'a comment is added inside line()',
     apply: ({ dir }) => edit(dir, DG, DIRECTION, `  // a comment, and comments are not sentences\n${DIRECTION}`),

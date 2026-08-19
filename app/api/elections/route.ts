@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { userBurst } from '../../../lib/ratelimit';
 import {
   readAllowanceElection, writeAllowanceElection, clearAllowanceElection, getBusinessProfile,
-  getOptimiserInput, type AllowanceElectionKey,
+  readOptimiserOrNull, type AllowanceElectionKey,
 } from '../../../lib/supabase';
 import { sessionUser } from '../../../lib/webauth';
 import { quarterForDate } from '../../../lib/quarterpack';
@@ -108,10 +108,17 @@ export async function GET(req: NextRequest) {
   // ⚠️ THE TRADING ALLOWANCE IS NEVER REPORTED WITHOUT BOTH TOTALS. Its whole shape is that it
   // REPLACES his costs rather than adding to them, so a caller handed only "you could claim
   // £1,000" would be able to build the screen that got us here. The comparison travels with it.
+  // 🔴 B50, D3. RECORDS UNREADABLE EXEMPT: this route answers in JSON and has no customer sentence
+  // on it, so a failed read gets the SAME explicit 503 this route already returns thirty lines up
+  // for the election read itself. One error shape in one file, not two. The reason is the comment
+  // above: without both totals this allowance must not be reported at all, and getOptimiserInput
+  // hands back zeros rather than throwing when the rows do not read, so a caller was being given a
+  // comparison worked out against a year of zeros he never lived.
   let choice = null;
   if (key === 'trading_allowance' && !refusal) {
-    const oi = await getOptimiserInput(user.id).catch(() => null);
-    if (oi) choice = tradingAllowanceChoice(oi.ytdTradeIncome, oi.ytdTradeExpenses, oi);
+    const oi = await readOptimiserOrNull(user.id);
+    if (!oi) return NextResponse.json({ error: 'unreadable' }, { status: 503 });
+    choice = tradingAllowanceChoice(oi.ytdTradeIncome, oi.ytdTradeExpenses, oi);
   }
 
   return NextResponse.json({
@@ -237,10 +244,16 @@ export async function POST(req: NextRequest) {
     // ⚠️ THE CONFIRMATION IS BUILT FROM HIS REAL FIGURES, INCLUDING WHEN THEY SAY HE HAS JUST
     // CHOSEN THE WORSE OF THE TWO. tradingAllowanceConfirmation() says so plainly rather than
     // congratulating him, because it is still his choice and he can take it off in one press.
-    const oi = await getOptimiserInput(user.id).catch(() => null);
-    const choice = // No optimiser input is no horizon, and no horizon must read as 'not enough year yet' rather
-    // than as a full one. Zeroes on both fields put projectionFactor on its canProject === false arm.
-    tradingAllowanceChoice(oi?.ytdTradeIncome ?? 0, oi?.ytdTradeExpenses ?? 0, oi ?? { monthsElapsed: 0, daysElapsed: 0 });
+    // 🔴 B50, D3. RECORDS UNREADABLE EXEMPT: the election has ALREADY BEEN WRITTEN by the line
+    // above, so this path cannot answer with an error and it cannot carry the signed chat line
+    // either, because that line promises nothing has happened to his books and something just has.
+    // What it does instead is withhold the COMPARISON and keep the two sentences that are true
+    // whatever the read did. Before today a failed read produced a confident "there is not enough
+    // of the tax year yet to say", which is a statement about HIS year built out of zeros.
+    const oi = await readOptimiserOrNull(user.id);
+    const choice = oi
+      ? tradingAllowanceChoice(oi.ytdTradeIncome, oi.ytdTradeExpenses, oi)
+      : null;
     return isForm
       ? back('done=elected&key=trading_allowance')
       : NextResponse.json({ ok: true, startYear, key, choice, message: tradingAllowanceConfirmation(choice) });

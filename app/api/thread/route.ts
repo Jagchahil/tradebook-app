@@ -10,7 +10,7 @@ import {
   matchTotalsQuestion, formatGbp, isDeadlineQuestion, asksAmount, deadlineAnswer, type TotalsQuestion,
   matchProductTruth, productTruthAnswer, isDataRightsRequest, DATA_RIGHTS_ANSWER,
   isAboutSomeoneElse, SOMEONE_ELSE_ANSWER,
-  isVehicleQuestion, vehicleAnswer, compoundAsk, compoundAskNote,
+  isVehicleQuestion, vehicleAnswer, compoundAsk, compoundAskNote, RECORDS_UNREADABLE_CHAT_LINE,
   isScottishRatesQuestion, isVatQuestion,
   isNiQuestion, isStudentLoanQuestion, isPropertyQuestion, isSavingsQuestion,
   isIdentity, identityAnswer,
@@ -32,6 +32,7 @@ import {
   totalsForUser,
   pendingSummaryForUser,
   getOptimiserInput,
+  readOptimiserOrNull,
   transactionSummaryForUser,
   getRelevantKnowledge,
   saveLekhioThreadMessage,
@@ -274,6 +275,13 @@ async function composeOneLane(userId: string, q: string): Promise<string> {
   //
   // ⚠️ A FAILED READ IS UNKNOWN, NEVER A NO. Both facts fall back to null, which asks him.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
+  //
+  // 🔴 B50, D3, AND IT IS THE ONE PLACE THE DOOR IS DELIBERATELY NOT USED. Re derived at head:
+  // businessType comes from the BUSINESS PROFILE, and rowsUnreadable is about his TRANSACTION
+  // ROWS, so a row read failure cannot touch the only field this branch reads. Putting
+  // readOptimiserOrNull here would throw away a structure we successfully read and ask him a
+  // question we already knew the answer to, which is weaker for no honesty gained. The failed
+  // read that CAN happen here is the thrown one, and the catch already lands it on null.
   if (isDeadlineQuestion(q) && !asksAmount(q)) {
     const optimiser = await getOptimiserInput(userId).catch(() => null);
     return deadlineAnswer(new Date(), {
@@ -389,10 +397,14 @@ async function composeOneLane(userId: string, q: string): Promise<string> {
   // which route wins: that turns on annual business miles, which no row in his books holds. See
   // lib/waintents.ts, vehicleAnswer.
   if (isVehicleQuestion(q)) {
-    const o = await getOptimiserInput(userId).catch(() => null);
+    // 🔴 B50, D3. A FAILED READ IS NOT "NO VEHICLE". readOptimiserOrNull folds the thrown read and
+    // the unreadable rows into one null, and vehicleAnswer then prints the signed records line
+    // where his own figures were and keeps the general half, which needs nothing of his.
+    const o = await readOptimiserOrNull(userId);
     return vehicleAnswer({
       boughtThroughBooks: o?.vehicleBoughtThroughBooks === true,
       allowanceThisYear: Math.max(0, o?.ytdCapitalAllowances ?? 0),
+      recordsUnreadable: o === null,
     });
   }
 
@@ -646,7 +658,21 @@ async function totalsAnswer(userId: string, q: TotalsQuestion): Promise<string> 
   // question, and a product that disagrees with itself about his tax loses both answers. So
   // this is now the same call the Tax hub and the Overview make, and only the sentence around
   // the figure lives here.
-  const optimiser = await getOptimiserInput(userId);
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B50, D3. "NOTHING YET" AND "I COULD NOT LOOK" ARE DIFFERENT ANSWERS AND THIS LANE GAVE ONE.
+  //
+  // getOptimiserInput does not throw when the ROW read fails. It returns the same object with every
+  // figure of his at zero and rowsUnreadable set, so taxPosition came back empty, hasTaxPosition
+  // came back false, and a man was told this tax year has no confirmed income on it when the truth
+  // was that we could not see it. That is the same lie the eleven pages were telling with a zero,
+  // in a sentence instead of a figure.
+  //
+  // readOptimiserOrNull is the ONE door: it folds the thrown read and the unreadable rows into a
+  // single null so this branch has one thing to ask. On a null it says so and stops, and it says it
+  // in the SAME words the other chat channel uses, because two wordings is drift.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const optimiser = await readOptimiserOrNull(userId);
+  if (!optimiser) return RECORDS_UNREADABLE_CHAT_LINE;
   const tax = taxPosition(optimiser);
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════

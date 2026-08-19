@@ -78,6 +78,29 @@ const edit = (dir, rel, from, to) => {
 const CL = 'lib/claude.ts';
 const SUITE = 'test/b43cutoff.test.mjs';
 
+// The cleaner, as it stands, and as a truncation rescue would make it. Written as joined lines
+// rather than as a template literal because the function it quotes contains code fences.
+const CLEAN_FROM = [
+  'function clean(raw: string): string {',
+  '  // Strip code fences if the model wrapped the JSON.',
+  '  return raw',
+  '    .replace(/^```(?:json)?/i, \'\')',
+  '    .replace(/```$/, \'\')',
+  '    .trim();',
+  '}',
+].join('\n');
+const CLEAN_TO = [
+  'function clean(raw: string): string {',
+  '  const t = raw',
+  '    .replace(/^```(?:json)?/i, \'\')',
+  '    .replace(/```$/, \'\')',
+  '    .trim();',
+  '  const quotes = (t.match(/"/g) || []).length;',
+  '  const opens = (t.match(/\\{/g) || []).length - (t.match(/\\}/g) || []).length;',
+  '  return t + (quotes % 2 ? \'"\' : \'\') + \'}\'.repeat(Math.max(0, opens));',
+  '}',
+].join('\n');
+
 const SABOTAGES = [
   // ── THE PARSE HALF. A CUT PARSE REACHES HIS BOOKS. ─────────────────────────────────────
   {
@@ -205,6 +228,47 @@ const SABOTAGES = [
     apply: (d) => edit(d, SUITE, '    const close = matchPair(source, open, \'{\', \'}\');\n    if (close < 0) continue;\n    out.push({ name: m[1], start: m.index, end: close + 1, bodyStart: open });',
       '    out.push({ name: m[1], start: m.index, end: source.length, bodyStart: open });'),
   },
+  // ── THE MEASUREMENT HALF. SECTION 4 IS A NUMBER THAT USED TO BE A COMMENT. ────────────
+  //
+  // Section 4 derives the worst reply each bounded parse path can produce, pins its length and its
+  // headroom, and proves no prefix of it parses. These six break it in the six ways it can go
+  // quietly wrong: the bound growing, a prefix becoming parseable, a new field nothing sizes, a
+  // faked exemption, an allowance shrunk until the bound flatters itself, and the loop going blind.
+  {
+    name: '🔴 A FIELD CAP IS RAISED UNTIL THE WORST SCHEDULE REPLY EXCEEDS THE 300 CEILING, which is'
+      + ' the exact rot the old prose comment could never have seen',
+    apply: (d) => edit(d, CL, "      title: (p.title || 'Reminder').toString().slice(0, 140),",
+      "      title: (p.title || 'Reminder').toString().slice(0, 400),"),
+  },
+  {
+    name: '🔴 THE CLEANER GAINS A TRUNCATION RESCUE, so cut prefixes start parsing again. This one is'
+      + ' not hypothetical: rescueTruncatedReceipt is the same idea forty lines up',
+    apply: (d) => edit(d, CL, CLEAN_FROM, CLEAN_TO),
+  },
+  {
+    name: '🔴 A NEW FIELD ARRIVES ON THE SCHEDULE REPLY AND NOTHING SIZES IT. It must go red BY NAME'
+      + ' rather than be left out of the total, which is the whole reason the fixture is derived',
+    apply: (d) => edit(d, CL, '      remind_at?: string | null;',
+      '      remind_at?: string | null;\n      customer_ref?: string;'),
+  },
+  {
+    name: '🔴 AN UNBOUNDED EXEMPTION IS WAVED THROUGH POINTING AT A FIELD THAT IS NOT AN ARRAY, which'
+      + ' is how a written reason becomes a rubber stamp',
+    apply: (d) => edit(d, CL, '  // WORST REPLY UNBOUNDED: line_items. The array grows with the job,',
+      '  // WORST REPLY UNBOUNDED: customer_name. The array grows with the job,'),
+  },
+  {
+    name: '🔴 THE ISO ALLOWANCE IS SHRUNK TO A BARE DATE, so the worst reply flatters itself and the'
+      + ' headroom reads bigger than it is',
+    apply: (d) => edit(d, SUITE, "const ISO_WORST = '2026-08-19T08:00:00.000+01:00';",
+      "const ISO_WORST = '2026-08-19';"),
+  },
+  {
+    name: '🔴 THE PREFIX LOOP GOES BLIND: it stops parsing anything at all, so it reports zero for'
+      + ' ever and only the vacuity probes can tell',
+    apply: (d) => edit(d, SUITE, '    try { JSON.parse(realClean(reply.slice(0, i))); parsed += 1; } catch { /* refused, which is the point */ }',
+      '    try { realClean(reply.slice(0, i)); } catch { /* refused, which is the point */ }'),
+  },
   // ── THE LOG. ──────────────────────────────────────────────────────────────────────────
   {
     name: '🔴 the refusal stops logging a cause, so a cut is indistinguishable from nonsense again',
@@ -231,6 +295,20 @@ const CONTROLS = [
   {
     name: 'CONTROL: the feature name in a REFUSAL LOG is reworded, which is prose, not a decision',
     apply: (d) => edit(d, CL, 'Refused rather than guessed.', 'Refused instead of guessing.'),
+  },
+  {
+    name: 'CONTROL: PROSE inside parseSchedule names the title field, a slice cap and ISO 8601 out'
+      + ' loud. Section 4 blanks comments, so not one word of it may size anything',
+    apply: (d) => edit(d, CL, "  const data = await readClaudeReply(res, 'schedule_parse');",
+      '  // Reworded note. The title field is a string, and this sentence says slice(0, 999) and ISO'
+      + ' 8601 out loud on purpose. None of it is code and none of it may size a field.\n'
+      + "  const data = await readClaudeReply(res, 'schedule_parse');"),
+  },
+  {
+    name: 'CONTROL: the REASON on an unbounded exemption is reworded while still naming its array'
+      + ' field, because the guard is about the field and not about the sentence',
+    apply: (d) => edit(d, CL, '  // WORST REPLY UNBOUNDED: line_items. The array grows with the job, so no set of field caps',
+      '  // WORST REPLY UNBOUNDED: line_items. Reworded reason that still names a real array field'),
   },
   {
     name: 'CONTROL: whitespace is added inside the finisher',

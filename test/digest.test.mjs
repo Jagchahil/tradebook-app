@@ -280,5 +280,175 @@ for (const n of [1, 8, 9, 20]) {
     !D.buildDigest({ filed: rows(3, 'Vendor'), asking: rows(1, 'Shop') }).includes('Nothing here needs you'));
 }
 
+
+// ─── 6. THE APPROVAL GATE CONFIRMS ONLY WHAT IT SHOWED HIM. B35, 19 August 2026 ────────────────
+//
+// 🔴 THE DEFECT, AND IT WAS A COMMENT CLAIMING A PROPERTY THE CODE DID NOT HAVE. handleAck said
+// "He can only approve what he was shown". confirmDigestEntries was bounded by the digest WINDOW
+// and by nothing else, with NO LIMIT AT ALL, while bankEntriesForDigestMany caps each list at 20 in
+// memory. So a man with 35 unrecognised rows in the window was told 20, shown 20, and YES filed 35.
+//
+// ⚠️ THE HARM IS BOUNDED AND THIS SUITE SAYS SO RATHER THAN OVERSTATING IT. Everything YES files is
+// REVERSIBLE: it says "that is really mine", it moves no money and it sends nothing to HMRC. The
+// filing still asks him every time. An approval gate that OVERREACHES, not an irreversible one.
+//
+// 🔴 AND THE FALLBACK IS ASSERTED IN BOTH DIRECTIONS, because it is what makes either deploy order
+// safe. A null id list is the WINDOW, which is exactly yesterday's behaviour, so a migration race
+// can never cost a customer anything and can never make the gate reach FURTHER than it does today.
+{
+  const supabaseSrc = readFileSync(path.join(lib, 'supabase.ts'), 'utf8');
+
+  // Bodies LIFTED out of the real file and RUN, with their dependencies injected. A comment cannot
+  // satisfy any of this and a rename cannot break it. Same shape as test/optimiserdoor.test.mjs
+  // section 2, which is where this technique is argued.
+  // 🔴 COMMENTS COME OUT FIRST, AND THE FIRST DRAFT OF THIS HELPER DID NOT DO THAT AND WAS BITTEN
+  // WITHIN THE MINUTE. The cast strip is ` as <type>` up to the next semicolon, and one of the
+  // comments inside lastDigestShownIds contains the word "as" in an ordinary English sentence, so
+  // the strip ran forward past the end of the comment and swallowed the return statement under it.
+  // The lifted function then returned undefined and two assertions went red. Sixth instance of this
+  // repo's oldest test trap, and the first one I caused rather than found. Safe form of the line
+  // comment strip, `(^|[^:])//`, so an https:// inside a string is not truncated.
+  const noComments = (x) => x
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  ok('🔴 the comment stripper strips, and does NOT eat an https:// URL (vacuity)',
+    !noComments('// treated as a bound; return null;').includes('bound')
+    && noComments("const u = 'https://lekhio.app';").includes('https://lekhio.app'));
+  const bodyOf = (decl) => {
+    const at = supabaseSrc.indexOf(decl);
+    if (at === -1) return null;
+    const open = supabaseSrc.indexOf('{', supabaseSrc.indexOf(')', at));
+    const end = supabaseSrc.indexOf('\n}', open);
+    // Comments out first, THEN the ` as <type>` casts, which is all the TypeScript these carry.
+    return noComments(supabaseSrc.slice(open + 1, end)).replace(/\s+as\s+[^;]+;/g, ';');
+  };
+
+  const confirmBody = bodyOf('export async function confirmDigestEntries(');
+  const shownBody = bodyOf('export async function lastDigestShownIds(');
+  ok('🔴 both bodies were lifted whole, without which every line below is vacuous',
+    confirmBody !== null && shownBody !== null
+    && confirmBody.includes('id=in.') && shownBody.includes('transaction_ids')
+    // 🔴 AND THE STRIP DID NOT EAT THE END OF EITHER BODY, which is exactly what it did on the
+    // first draft. Both must still carry the statement that decides their answer.
+    && /return Array\.isArray\(rows\)/.test(confirmBody)
+    && /ids\.filter\(/.test(shownBody));
+
+  const UUIDRE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const uid = (n) => `0000000${n}-0000-4000-8000-000000000000`;
+
+  // ── 6a. THE CONFIRM IS BOUNDED BY THE IDS, AND A NULL IS THE WINDOW. ─────────────────
+  let seen = [];
+  const stubFetch = async (u) => { seen.push(u); return { ok: true, json: async () => [{ id: 'x' }] }; };
+  const confirm = new Function('config', 'headers', 'fetch', 'UUID',
+    `return async function confirmDigestEntries(userId, sinceISO, shownIds = null) {${confirmBody}\n}`)(
+    () => ({ url: 'https://db.test' }), () => ({}), stubFetch, UUIDRE);
+
+  seen = [];
+  await confirm(uid(1), '2026-08-18T00:00:00.000Z', [uid(2), uid(3)]);
+  const withIds = seen[0] ?? '';
+  seen = [];
+  await confirm(uid(1), '2026-08-18T00:00:00.000Z', null);
+  const noIds = seen[0] ?? '';
+  seen = [];
+  await confirm(uid(1), '2026-08-18T00:00:00.000Z', []);
+  const emptyIds = seen[0] ?? '';
+
+  ok('🔴 the fetch stub really captured a URL, so the comparisons below are on something',
+    withIds.length > 40 && noIds.length > 40);
+  ok('🔴 WHEN THE SHOWN IDS ARE KNOWN THE CONFIRM IS BOUNDED BY THEM, so YES cannot file a row he'
+    + ' never read',
+    /[?&]id=in\./.test(withIds) && withIds.includes(encodeURIComponent(`"${uid(2)}","${uid(3)}"`)));
+  ok('🔴 ...AND THE WINDOW IS STILL APPLIED BESIDE THEM. Two bounds, and the ids can only ever'
+    + ' NARROW it, never widen it',
+    withIds.includes('created_at=gte.') && withIds.includes('confirmed=eq.false')
+    && withIds.includes('source_type=eq.bank_feed') && withIds.includes('is_personal=eq.false'));
+  ok('🔴 A NULL ID LIST FALLS BACK TO THE WINDOW ALONE, which is exactly yesterday\'s behaviour and'
+    + ' is what makes either deploy order safe',
+    !/[?&]id=in\./.test(noIds) && noIds.includes('created_at=gte.'));
+  ok('🔴 ...and an EMPTY list is the same as a null, because a row that recorded nothing is not an'
+    + ' instruction to approve nothing',
+    !/[?&]id=in\./.test(emptyIds) && emptyIds.includes('created_at=gte.'));
+  ok('🔴 ...and the two URLs really do differ, so the bound is doing something',
+    withIds !== noIds);
+
+  seen = [];
+  await confirm(uid(1), '2026-08-18T00:00:00.000Z', ['not-a-uuid', uid(4)]);
+  ok('🔴 ONLY REAL IDS TRAVEL. Anything that is not a uuid is dropped rather than pasted into a'
+    + ' filter, which is the same rule every other in list in this file follows',
+    /[?&]id=in\./.test(seen[0]) && seen[0].includes(encodeURIComponent(`"${uid(4)}"`))
+    && !seen[0].includes('not-a-uuid'));
+  seen = [];
+  await confirm(uid(1), '2026-08-18T00:00:00.000Z', ['not-a-uuid']);
+  ok('🔴 ...and a list with NOTHING usable in it falls back to the window rather than to a filter'
+    + ' that matches nothing, which would silently file none of his',
+    !/[?&]id=in\./.test(seen[0]));
+
+  // ── 6b. THE READ SAYS "I DO NOT KNOW" IN EVERY WAY IT CAN FAIL. ─────────────────────
+  const readIds = (res) => new Function('config', 'headers', 'fetch', 'UUID',
+    `return async function lastDigestShownIds(userId) {${shownBody}\n}`)(
+    () => ({ url: 'https://db.test' }), () => ({}), async () => res, UUIDRE);
+
+  const good = await readIds({ ok: true, json: async () => [{ transaction_ids: [uid(5), uid(6)] }] })(uid(1));
+  const missingTable = await readIds({ ok: false, json: async () => null })(uid(1));
+  const noRow = await readIds({ ok: true, json: async () => [] })(uid(1));
+  const emptyArr = await readIds({ ok: true, json: async () => [{ transaction_ids: [] }] })(uid(1));
+  const nullCol = await readIds({ ok: true, json: async () => [{ transaction_ids: null }] })(uid(1));
+
+  ok('🔴 A GOOD READ RETURNS THE IDS, without which every null below proves nothing',
+    Array.isArray(good) && good.length === 2 && good[0] === uid(5));
+  ok('🔴 A MISSING TABLE IS NULL, which is the migration not run yet and must not break a YES',
+    missingTable === null);
+  ok('🔴 NO ROW IS NULL, which is a digest sent before this shipped', noRow === null);
+  ok('🔴 AN EMPTY ARRAY IS NULL, and a NULL COLUMN IS NULL. B33\'s fallback shape: a missing or null'
+    + ' column falls back to today\'s window behaviour',
+    emptyArr === null && nullCol === null);
+  ok('and a userId that is not a uuid never reaches the database at all',
+    (await readIds({ ok: true, json: async () => [] })('nope')) === null);
+
+  // ── 6c. THE SEND PATH WRITES WHAT IT PRINTED, DERIVED OFF DISK. ─────────────────────
+  const cron = readFileSync(path.join(lib, '../app/api/cron/digest/route.ts'), 'utf8');
+  const cronCode = cron.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  ok('🔴 THE IDS RECORDED ARE THE ASKING LIST, not the filed one. The filed rows are already'
+    + ' confirmed, so YES was never about them',
+    /askedIds:\s*split\.asking\.map\(\(e\) => e\.id\)/.test(cronCode)
+    && !/askedIds[^\n]*split\.filed/.test(cronCode));
+  ok('🔴 ...and only for the messages that actually WENT, so a send that failed leaves nothing'
+    + ' claiming it asked him anything',
+    /done\.push\(job\.id\);\s*\n\s*if \(job\.askedIds\.length > 0\) shown\.push\(/.test(cronCode));
+  ok('🔴 ...and it is ONE bulk write, on the same path as the one stamp, rather than one per user',
+    (cronCode.match(/recordDigestShownMany\(/g) || []).length === 1
+    && cronCode.indexOf('markDigestSentMany(done)') < cronCode.indexOf('recordDigestShownMany(shown)'));
+
+  // ── 6d. THE CLAIM AND THE CODE AGREE. R5's OWN QUARRY, ASSERTED. ────────────────────
+  const wa = readFileSync(path.join(lib, '../app/api/whatsapp/route.ts'), 'utf8');
+  const ackAt = wa.indexOf('async function handleAck(');
+  const ack = wa.slice(ackAt, wa.indexOf('\n}', ackAt));
+  ok('🔴 handleAck was sliced to its own end, never open ended to the end of the file',
+    ackAt !== -1 && ack.length > 400 && ack.length < 6000 && ack.includes('confirmDigestEntries('));
+  // 🔴 THE CONDITIONAL GUARD, AND IT IS THE POINT OF THIS WHOLE ITEM. If this function CLAIMS he can
+  // only approve what he was shown, then it must READ what he was shown. A comment that claims a
+  // property the code does not have is the thing B35 was filed as.
+  const claims = /only approve what he was shown/i.test(ack);
+  ok('🔴 IF handleAck CLAIMS HE CAN ONLY APPROVE WHAT HE WAS SHOWN, IT MUST READ WHAT HE WAS SHOWN',
+    !claims || /lastDigestShownIds\(/.test(ack));
+  ok('🔴 ...and it does read them, before the confirm, and hands them straight through',
+    ack.indexOf('lastDigestShownIds(') !== -1
+    && ack.indexOf('lastDigestShownIds(') < ack.indexOf('confirmDigestEntries(')
+    && /confirmDigestEntries\(userId, \w+, \w+\)/.test(ack));
+
+  // ── 6e. THE MIGRATION EXISTS, AND THE CODE NAMES IT WHEN IT IS OUTSTANDING. ─────────
+  const sql = readFileSync(path.join(lib, '../supabase/APPLY_2026-08-19_digest_shown.sql'), 'utf8');
+  ok('🔴 the migration creates the table, indexes the one access pattern and enables RLS',
+    /create table if not exists public\.digest_shown/.test(sql)
+    && /create index if not exists digest_shown_user_sent_idx/.test(sql)
+    && /alter table public\.digest_shown enable row level security/.test(sql));
+  ok('🔴 ...and it creates NO POLICY, which is deny all to anon and authenticated and is this'
+    + ' database\'s own shape for a server only table',
+    !/create policy/i.test(sql));
+  ok('🔴 ...and the code names that file by its own name when the write fails, so a reader knows'
+    + ' what to run rather than what went wrong',
+    supabaseSrc.includes('supabase/APPLY_2026-08-19_digest_shown.sql'));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

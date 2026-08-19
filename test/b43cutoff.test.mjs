@@ -523,5 +523,274 @@ ok('🔴 THE REFUSAL LOGS A LINE NAMING THE CEILING AS THE CAUSE, which is the d
 ok('🔴 AND THE LOG CARRIES NO CUSTOMER CONTENT. Not his words, not the parsed merchant, not a figure',
   !logged.some((l) => /diesel|Okafor|BP|forty/i.test(l)));
 
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// SECTION 4. THE MEASUREMENT THAT DOWNGRADED A P1, AS A TEST RATHER THAN AS A COMMENT.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+//
+// B43's parse half was re ranked from P1 on a measurement: the worst reply either 300 token parse
+// prompt can produce is comfortably under 300 CHARACTERS, and cutting that reply at every one of
+// its characters yields ZERO prefixes JSON.parse accepts. The re ranking was right. The problem was
+// that the measurement lived in lib/claude.ts as PROSE. Nothing computed it and nothing asserted
+// it, so the day either prompt gains a field the headroom shrinks in silence and the comment goes
+// on stating a number that was true once.
+//
+// 🔴 EVERYTHING BELOW IS DERIVED OFF DISK, WHICH IS THE ONLY REASON IT CANNOT ROT. The parse paths
+// come from the source, their field lists come from the type each reader casts to, and their caps
+// come from the reader's own code. A NEW FIELD CHANGES THE FIXTURE BY ITSELF, and a new field
+// nothing here knows how to size goes RED BY NAME rather than being quietly left out of the total.
+//
+// 🔴 AND A PATH WHOSE REPLY CANNOT BE BOUNDED AT ALL IS NOT SKIPPED, IT IS DECLARED. parseReceipt
+// and draftInvoice both carry an ARRAY that grows with the thing being read, so no set of field
+// caps bounds their reply. Each must carry a written WORST REPLY UNBOUNDED line NAMING the array
+// field, and the suite checks that the named field really is an array on the type. An exemption
+// that cannot point at a real unbounded field is not an exemption.
+//
+// ⚠️ TWO ALLOWANCES ARE STATED RATHER THAN DERIVED, BECAUSE THE SOURCE DOES NOT CAP THEM, and both
+// are far larger than the prompt asks for. An ISO 8601 date time is allowed its longest well formed
+// shape: full date, full time, milliseconds and a numeric offset. A number is allowed the longest
+// decimal an IEEE 754 double needs to round trip. Neither is a derivation and both are pinned
+// below, so a later reader who disagrees can see the figure rather than guess at it.
+//
+// ⚠️ AND THE CHARACTER COUNT IS THE CONSERVATIVE PROXY FOR THE TOKEN COUNT THE CEILING ACTUALLY
+// COUNTS. A token is never shorter than one character, so a reply under 300 CHARACTERS is under 300
+// tokens whatever the tokeniser does. That is the whole argument, and it is why the assertion below
+// is on characters and not on an estimate.
+//
+// ⚠️ THE PINS ARE TRIPWIRES, NOT DECORATION. A field added anywhere here moves a total and reds a
+// pin ON PURPOSE, because the question "is there still headroom" has to be answered by a person the
+// day the shape changes, not inherited from the last person who asked it.
+
+// ── 4a. THE PARSE PATHS, THEIR FIELDS AND THEIR CAPS, ALL DERIVED. ────────────────────────
+//
+// Comments are BLANKED rather than deleted, so every index still points at the same character and
+// so prose about a field can never size it.
+const code4 = blankComments(claudeSrc);
+const spans4 = functionSpans(code4);
+const bodyOf4 = (span) => code4.slice(span.bodyStart, span.end);
+
+// A parse path is a function that hands the model's own reply to JSON.parse. That is the
+// definition, read off the source, so a fifth one added tomorrow is walked the day it lands.
+const PARSE_CALL = /JSON\.parse\(\s*([A-Za-z0-9_$]+)\(textBlock\)\s*\)\s*as\s*/;
+const parsePaths = spans4
+  .filter((s) => PARSE_CALL.test(bodyOf4(s)))
+  .map((s) => ({ span: s, name: s.name, body: bodyOf4(s) }));
+
+ok('🔴 THE PARSE PATH WALK FOUND PATHS AT ALL, without which every line in section 4 is vacuous',
+  parsePaths.length >= 2);
+ok('and it found the four this file has today, so the walk is not seeing one and calling it all',
+  parsePaths.length === 4
+  && ['parseReceipt', 'parseSpokenTransaction', 'draftInvoice', 'parseSchedule']
+    .every((n) => parsePaths.some((p) => p.name === n)));
+
+// Every path runs the SAME cleaner over the raw text before parsing. Derived, because that
+// function is what section 4c has to run for real and a typed name would rot on a rename.
+const cleanerNames = [...new Set(parsePaths.map((p) => PARSE_CALL.exec(p.body)[1]))];
+ok('🔴 ALL FOUR PARSE PATHS RUN ONE CLEANER, so there is one function to run for real below',
+  cleanerNames.length === 1);
+const CLEANER = cleanerNames[0];
+
+// The fields a path reads: from the type its reader casts to, resolving a named interface.
+function fieldsOfPath(body) {
+  const m = PARSE_CALL.exec(body);
+  const tail = body.slice(m.index + m[0].length);
+  const named = /^Partial<([A-Za-z0-9_]+)>/.exec(tail);
+  let decl;
+  if (named) {
+    const im = new RegExp(`(?:export\\s+)?interface\\s+${named[1]}\\s*\\{`).exec(code4);
+    if (!im) return null;
+    const open = code4.indexOf('{', im.index);
+    decl = code4.slice(open, matchPair(code4, open, '{', '}') + 1);
+  } else {
+    const open = tail.indexOf('{');
+    if (open < 0) return null;
+    decl = tail.slice(open, matchPair(tail, open, '{', '}') + 1);
+  }
+  const out = [];
+  for (const line of decl.split('\n')) {
+    const f = /^\s*([a-z_][a-z0-9_]*)\??\s*:\s*([^;]+);/i.exec(line);
+    if (f) out.push({ name: f[1], type: f[2].trim() });
+  }
+  return out;
+}
+
+const isArrayType = (t) => /\[\s*\]\s*$/.test(t) || /^Array</.test(t);
+
+// A named const array, resolved off disk, so ALLOWED_CATEGORIES sizes the category field without
+// the suite ever typing what is in it.
+function constArray4(name) {
+  const m = new RegExp(`const\\s+${name}\\s*=\\s*\\[`).exec(code4);
+  if (!m) return null;
+  const open = code4.indexOf('[', m.index);
+  const close = matchPair(code4, open, '[', ']');
+  if (close < 0) return null;
+  return [...code4.slice(open, close + 1).matchAll(/'([^']*)'/g)].map((x) => x[1]);
+}
+
+// The prompt builder a path uses, so a field described as ISO 8601 can be sized by what the model
+// was actually ASKED for rather than by what the suite would like it to be.
+function promptOfPath(body) {
+  const m = /content:\s*([A-Z][A-Z0-9_]*)\s*\(/.exec(body);
+  if (!m) return '';
+  const open = code4.indexOf('[', new RegExp(`const\\s+${m[1]}\\s*=`).exec(code4).index);
+  const close = matchPair(code4, open, '[', ']');
+  return close < 0 ? '' : code4.slice(open, close + 1);
+}
+
+// 🔴 THE ALLOWANCES. Stated, not derived, and deliberately generous. See the header.
+const ISO_WORST = '2026-08-19T08:00:00.000+01:00';
+const NUM_WORST = '-1.7976931348623157e+308';
+
+// Size one field. Returns the rule that fired and the worst value it allows, or a null rule, which
+// is what makes an unknown field a NAMED failure rather than a silent zero.
+function sizeField4(field, reader, prompt) {
+  const blob = reader.split('\n').filter((l) => l.includes(field.name)).join('\n');
+  const cap = /\.slice\(0,\s*(\d+)\)/.exec(blob);
+  if (cap) return { rule: 'slice cap', json: 'W'.repeat(Number(cap[1])) };
+
+  const lits = new Set();
+  for (const m of (field.type.match(/'([^']*)'/g) || [])) lits.add(m.slice(1, -1));
+  for (const m of blob.matchAll(/'([^']*)'/g)) if (/^[a-z0-9_]+$/i.test(m[1])) lits.add(m[1]);
+  for (const m of blob.matchAll(/\b([A-Z][A-Z0-9_]{2,})\b/g)) {
+    const arr = constArray4(m[1]);
+    if (arr) for (const v of arr) lits.add(v);
+  }
+  if (lits.size) {
+    const longest = [...lits].sort((a, b) => b.length - a.length || (a < b ? -1 : 1))[0];
+    return { rule: 'literal union', json: longest };
+  }
+
+  const line = prompt.split('\n').find((l) => l.includes(`"${field.name}"`)) || '';
+  if (/ISO 8601/.test(line)) return { rule: 'ISO 8601 allowance', json: ISO_WORST };
+  if (/\bboolean\b/.test(field.type)) return { rule: 'boolean', json: true, bare: 'true' };
+  if (/\bnumber\b/.test(field.type)) return { rule: 'number allowance', json: null, bare: NUM_WORST };
+  return { rule: null, json: null };
+}
+
+// ── 4b. THE WORST REPLY EACH BOUNDED PATH CAN PRODUCE, AND HOW MUCH ROOM IS LEFT. ─────────
+const measured = [];
+for (const p of parsePaths) {
+  const fields = fieldsOfPath(p.body);
+  ok(`🔴 the field list for ${p.name} was derived at all, so its worst reply is not built out of nothing`,
+    Array.isArray(fields) && fields.length > 0);
+  if (!fields || !fields.length) continue;
+
+  const arrayFields = fields.filter((f) => isArrayType(f.type));
+  if (arrayFields.length) {
+    // 🔴 UNBOUNDED, AND IT MUST SAY SO IN ITS OWN WORDS, NAMING THE FIELD.
+    const declared = /WORST REPLY UNBOUNDED:\s*([a-z_][a-z0-9_]*)\.\s*(\S[^\n]*)/
+      .exec(claudeSrc.slice(p.span.start, p.span.end));
+    ok(`🔴 ${p.name} CANNOT BE BOUNDED and carries a written reason naming its array field`,
+      declared !== null && arrayFields.some((f) => f.name === declared[1]) && declared[2].trim().length > 30);
+    continue;
+  }
+
+  const reader = p.body.slice(PARSE_CALL.exec(p.body).index);
+  const prompt = promptOfPath(p.body);
+  const sized = fields.map((f) => ({ ...f, ...sizeField4(f, reader, prompt) }));
+  const unsized = sized.filter((s) => s.rule === null).map((s) => `${s.name}: ${s.type}`);
+  ok(`🔴 EVERY FIELD ON ${p.name} IS SIZED BY A RULE. Unsized: ${unsized.join(', ') || 'none'}`,
+    unsized.length === 0);
+  if (unsized.length) continue;
+
+  // The two shapes a model actually sends: the compact one, and the indented one the prompt's own
+  // example is written in. The LONGER is the one the assertion runs on, because a bound you took
+  // the short reading of is not a bound.
+  const enc = (s) => (s.bare !== undefined && s.json === null ? s.bare : (s.rule === 'boolean' ? 'true' : JSON.stringify(s.json)));
+  const flat = `{${sized.map((s) => `${JSON.stringify(s.name)}:${enc(s)}`).join(',')}}`;
+  const pretty = `{\n${sized.map((s) => `  ${JSON.stringify(s.name)}: ${enc(s)}`).join(',\n')}\n}`;
+  const worst = pretty.length >= flat.length ? pretty : flat;
+
+  const signature = sized.map((s) => `${s.name}=${enc(s).length}`).join(',');
+  measured.push({ name: p.name, flat, pretty, worst, signature, ceiling: Number(/max_tokens:\s*(\d+)/.exec(p.body)[1]) });
+}
+
+ok('🔴 BOTH BOUNDED PARSE PATHS WERE ACTUALLY MEASURED, so a zero finding below is a finding',
+  measured.length === 2
+  && measured.some((m) => m.name === 'parseSpokenTransaction')
+  && measured.some((m) => m.name === 'parseSchedule'));
+
+const entryM = measured.find((m) => m.name === 'parseSpokenTransaction');
+const schedM = measured.find((m) => m.name === 'parseSchedule');
+
+ok('🔴 THE ENTRY PARSE CEILING IS STILL 300 TOKENS, which is the number every figure below is against',
+  entryM.ceiling === 300);
+ok('🔴 THE SCHEDULE PARSE CEILING IS STILL 300 TOKENS', schedM.ceiling === 300);
+
+ok(`🔴 THE ENTRY FIELD SIZES ARE EXACTLY WHAT THEY WERE MEASURED AT. Derived: ${entryM.signature}`,
+  entryM.signature === 'merchant_name=122,amount=24,category=11,direction=9');
+ok(`🔴 THE SCHEDULE FIELD SIZES ARE EXACTLY WHAT THEY WERE MEASURED AT. Derived: ${schedM.signature}`,
+  schedM.signature === 'is_event=4,title=142,kind=10,starts_at=31,remind_at=31');
+
+ok(`🔴 THE WORST ENTRY REPLY IS ${entryM.worst.length} CHARACTERS, pinned so a new field cannot move it in silence`,
+  entryM.worst.length === 236);
+ok(`🔴 THE WORST SCHEDULE REPLY IS ${schedM.worst.length} CHARACTERS, pinned for the same reason`,
+  schedM.worst.length === 295);
+
+// 🔴 THE ASSERTION THE RE RANKING RESTS ON, AND THE ONLY ONE THAT MATTERS IF A PIN IS EVER MOVED.
+ok(`🔴 THE WORST ENTRY REPLY FITS UNDER THE 300 CEILING EVEN COUNTED IN CHARACTERS, so it fits in`
+  + ` tokens whatever the tokeniser does. ${entryM.worst.length} of 300`,
+  entryM.worst.length < entryM.ceiling);
+ok(`🔴 THE WORST SCHEDULE REPLY FITS UNDER THE 300 CEILING COUNTED IN CHARACTERS.`
+  + ` ${schedM.worst.length} of 300`,
+  schedM.worst.length < schedM.ceiling);
+
+// ⚠️ AND THE HEADROOM IS PINNED SEPARATELY, BECAUSE IT IS THE FIGURE THAT ROTS. The schedule path
+// has five characters left. That is not the threefold headroom the old comment implied in
+// characters, and one more optional field on that reply spends it.
+ok(`⚠️ THE ENTRY PATH HAS ${300 - entryM.worst.length} CHARACTERS OF HEADROOM LEFT`,
+  300 - entryM.worst.length === 64);
+ok(`⚠️ THE SCHEDULE PATH HAS ONLY ${300 - schedM.worst.length} CHARACTERS OF HEADROOM LEFT, which is`
+  + ` the thing this section exists to keep visible`,
+  300 - schedM.worst.length === 5);
+
+// ── 4c. CUT AT EVERY CHARACTER, THROUGH THE REAL CLEANER, AND NOTHING PARSES. ─────────────
+//
+// The cleaner is LIFTED OUT OF THE REAL FILE rather than reimplemented: the staged copy is the
+// source with one keyword added to the function the readers themselves call, so a rename or a
+// rewrite of it arrives here rather than being quietly modelled.
+const probeSrc = claudeSrc.replace(
+  new RegExp(`^function ${CLEANER}\\(`, 'm'), `export function ${CLEANER}(`);
+ok('🔴 THE CLEANER WAS FOUND AND EXPORTED FOR THE PROBE, without which 4c would test a copy',
+  probeSrc !== claudeSrc);
+writeFileSync(path.join(stage, 'cleanprobe.ts'), fixImports(probeSrc));
+const P = await import(pathToFileURL(path.join(stage, 'cleanprobe.ts')).href);
+const realClean = P[CLEANER];
+ok('and it is a callable function that behaves like the source: fences stripped, whitespace trimmed',
+  typeof realClean === 'function' && realClean('```json\n{"a":1}\n```') === '{"a":1}');
+
+// Every PROPER prefix of a reply, through the real cleaner, then JSON.parse. Returns how many
+// PARSED, so the number can be checked in both directions rather than trusted in one.
+function prefixesThatParse(reply) {
+  let parsed = 0;
+  for (let i = 0; i < reply.length; i += 1) {
+    try { JSON.parse(realClean(reply.slice(0, i))); parsed += 1; } catch { /* refused, which is the point */ }
+  }
+  return parsed;
+}
+
+// 🔴 VACUITY FIRST. A loop that always finds zero is a loop that proves nothing, and this repo has
+// been bitten by exactly that shape four times. Two probes, because they fail in different ways.
+ok('🔴 THE PREFIX LOOP CAN SEE A PARSE AT ALL: a bare number has prefixes that parse',
+  prefixesThatParse('1234') === 3);
+ok('🔴 AND IT CAN SEE ONE IN THE SHAPE THAT WOULD ACTUALLY HURT: a complete object followed by'
+  + ' trailing prose parses at the brace, and the trailing space is trimmed away by the cleaner',
+  prefixesThatParse('{"is_event":true} and here is why') > 0);
+
+ok(`🔴 NOT ONE PREFIX OF THE WORST ENTRY REPLY PARSES. 0 of ${entryM.worst.length}`,
+  prefixesThatParse(entryM.worst) === 0);
+ok(`🔴 NOT ONE PREFIX OF THE WORST SCHEDULE REPLY PARSES. 0 of ${schedM.worst.length}`,
+  prefixesThatParse(schedM.worst) === 0);
+ok('and neither does any prefix of the COMPACT form of either, which is the other shape a model'
+  + ' sends and would be the cheaper one to forget',
+  prefixesThatParse(entryM.flat) === 0 && prefixesThatParse(schedM.flat) === 0);
+
+// ⚠️ WHY IT IS ZERO, ASSERTED RATHER THAN LEFT AS A COINCIDENCE. Both replies open a JSON OBJECT,
+// and an object is not a value until its closing brace, so no proper prefix can be one. A reply
+// that opened with a bare number or a bare string would not have this property at all, which is
+// what the first vacuity probe above is showing.
+ok('🔴 AND THE REASON IS A PROPERTY, NOT LUCK: every worst reply opens a JSON object',
+  measured.every((m) => m.worst.trimStart().startsWith('{') && m.flat.startsWith('{')));
+
 process.stdout.write(`\n  ${pass} passed, ${fail} failed\n`);
 if (fail > 0) process.exit(1);

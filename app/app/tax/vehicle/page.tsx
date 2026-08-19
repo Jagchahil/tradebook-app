@@ -104,10 +104,35 @@ export default async function Page({
     getBusinessProfile(user.id).catch(() => null),
   ]);
 
-  // 🔴 B24. A FAILED READ IS NOT A YEAR OF ZEROS, AND UNTIL TODAY THIS PAGE COULD NOT TELL THE
-  // TWO APART. readOptimiserOrNull folds the thrown read and the unreadable rows into ONE null, and
-  // the line goes up INSTEAD OF the figures rather than a confident zero he cannot argue with.
-  if (!optimiser) return <RecordsUnreadable current="/app/tax" title="Buying a vehicle" />;
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B24 GAVE THIS PAGE THE LINE. B51 GAVE IT BACK ITS OTHER HALF. 19 August 2026, decision D2.
+  //
+  // readOptimiserOrNull folds the thrown read and the unreadable rows into ONE null, and until
+  // today a null took the WHOLE SCREEN: the form, the two routes, the lock in, all of it. B24 chose
+  // that uniformly on purpose, because eleven bespoke partial degradations is eleven chances to
+  // leave a zero on a screen, and it wrote the cost of it down rather than hiding it.
+  //
+  // 🔴 THE COST WAS REAL AND IT IS THE ONE THIS PAGE EXISTS FOR. This screen is a CALCULATOR. Its
+  // comparison is the published 2026/27 rules against a price HE TYPED, and it needs nothing from
+  // his books at all. A man standing in a forecourt on a bad ten seconds was losing the only thing
+  // in the product that would have told him the fork is permanent, over a database read he never
+  // asked for.
+  //
+  // 🔴 SO THE HALVES ARE SPLIT AND ONLY THE RECOMMENDATION IS WITHHELD. What goes is the half built
+  // out of HIS position: the tax each route is worth at his marginal rate, and what he can afford.
+  // What stays is the question form, the two routes, the irreversible lock in and the footer. The
+  // signed line goes WHERE HIS FIGURES WERE, in the answer card, so the absence has a reason on it.
+  //
+  // ⚠️ AND THE LINE IS SHOWN ONLY WHEN HE ACTUALLY ASKED. A man who has not typed a budget has not
+  // been refused anything, and doc 103's empty test says a row that says "nothing to check" most of
+  // the time teaches him to stop looking. It appears when something was withheld, and not before.
+  //
+  // 🔴 marginalRate IS NEVER PASSED AS A ZERO OFF A FAILED READ, AND THAT IS THE WHOLE DANGER OF
+  // KEEPING THIS PAGE UP. A zero rate lights noTaxToSaveYet, which prints "On the figures you have
+  // confirmed you have no tax to pay this year": a claim about HIS tax, computed out of a database
+  // that did not answer. That is the exact disease B24 exists to kill, wearing this item's clothes.
+  // recommendVehicle is not called at all on a null read. See the gate below.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
 
   let mRate = 0;
   let confirmedSpare: number | null = null;
@@ -149,7 +174,10 @@ export default async function Page({
   const spendable = inBank !== null ? Math.max(0, inBank - setAside) : confirmedSpare;
   const spendableFromHim = inBank !== null;
 
-  const rec = answered
+  // 🔴 B51, D2. `optimiser !== null` IS LOAD BEARING AND IT IS NOT A TIDINESS CHECK. mRate is
+  // declared at 0 and is only ever set inside the `if (optimiser)` above, so calling this on a null
+  // read would pass marginalRate: 0 and light noTaxToSaveYet on a man whose tax we never saw.
+  const rec = answered && optimiser !== null
     ? recommendVehicle({
       want,
       budget: budget as number,
@@ -272,66 +300,75 @@ export default async function Page({
         </form>
       </section>
 
-      {/* ── THE ANSWER ────────────────────────────────────────────────────────────────────── */}
-      {rec ? (
-        <>
-          <section className="lek-card">
-            <h2 className="lek-h2">What each one is worth</h2>
-            {/* 🔴 THE HEADLINE IS A DEDUCTION TIMES HIS MARGINAL RATE, AND HIS RATE CAN BE NOUGHT.
-                Walking this screen on 2 August with a real account carrying a loss printed "£0",
-                "£0", "£0" and then picked a winner between them. The arithmetic was right and the
-                screen was unreadable, which on a screen whose job is to be believed is the same as
-                being wrong. So when there is no tax to save, it stops printing a tax figure and
-                shows the DEDUCTION instead, which is real, differs between the options, and is the
-                thing his decision actually turns on. */}
-            {rec.noTaxToSaveYet ? (
-              <p style={S.note}>
-                These are what each one takes off your profit, not what it saves you in tax. On the
-                figures you have confirmed you have no tax to pay this year, so none of them would
-                save you any yet. The relief is not lost: claimed against no profit it makes a loss,
-                and a loss carries forward to the years you do make money.
-              </p>
-            ) : (
-              <p style={S.quiet}>
-                First year, in tax, on {gbp0(budget as number)} and {Math.round(miles as number).toLocaleString('en-GB')} business
-                miles. The bigger of the two routes for each, so nothing is judged on its weaker half.
-              </p>
-            )}
-            <div style={S.opts}>
-              {rec.options.map((o) => (
-                <div key={o.kind} style={{ ...S.opt, ...(rec.best && rec.best.kind === o.kind ? S.optBest : null), ...(o.practical === 'no' ? S.optNo : null) }}>
-                  <div style={S.optTop}>
-                    <span style={S.optTitle}>{o.title}</span>
-                    {/* The deduction when the tax figure would be a meaningless nought. */}
-                    <span style={S.optMoney} className="lek-num">
-                      {gbp0(rec.noTaxToSaveYet ? Math.max(o.firstYear, o.mileageFirstYear) : o.worthPerYearOne)}
-                    </span>
+      {/* ── THE ANSWER, OR THE SIGNED REASON THERE IS NOT ONE. B51, D2, 19 August 2026. ─────
+           The card appears the moment he has asked, and its BODY is the fork: his own figures, or
+           the signed line where his figures were. The card itself is NOT conditional on the read,
+           so the answer he asked for never simply vanishes off the screen with nothing said. */}
+      {answered ? (
+        <section className="lek-card">
+          <h2 className="lek-h2">What each one is worth</h2>
+          {optimiser === null ? (
+            <RecordsUnreadable inline />
+          ) : rec ? (
+            <>
+              {/* 🔴 THE HEADLINE IS A DEDUCTION TIMES HIS MARGINAL RATE, AND HIS RATE CAN BE NOUGHT.
+                  Walking this screen on 2 August with a real account carrying a loss printed "£0",
+                  "£0", "£0" and then picked a winner between them. The arithmetic was right and the
+                  screen was unreadable, which on a screen whose job is to be believed is the same as
+                  being wrong. So when there is no tax to save, it stops printing a tax figure and
+                  shows the DEDUCTION instead, which is real, differs between the options, and is the
+                  thing his decision actually turns on. */}
+              {rec.noTaxToSaveYet ? (
+                <p style={S.note}>
+                  These are what each one takes off your profit, not what it saves you in tax. On the
+                  figures you have confirmed you have no tax to pay this year, so none of them would
+                  save you any yet. The relief is not lost: claimed against no profit it makes a loss,
+                  and a loss carries forward to the years you do make money.
+                </p>
+              ) : (
+                <p style={S.quiet}>
+                  First year, in tax, on {gbp0(budget as number)} and {Math.round(miles as number).toLocaleString('en-GB')} business
+                  miles. The bigger of the two routes for each, so nothing is judged on its weaker half.
+                </p>
+              )}
+              <div style={S.opts}>
+                {rec.options.map((o) => (
+                  <div key={o.kind} style={{ ...S.opt, ...(rec.best && rec.best.kind === o.kind ? S.optBest : null), ...(o.practical === 'no' ? S.optNo : null) }}>
+                    <div style={S.optTop}>
+                      <span style={S.optTitle}>{o.title}</span>
+                      {/* The deduction when the tax figure would be a meaningless nought. */}
+                      <span style={S.optMoney} className="lek-num">
+                        {gbp0(rec.noTaxToSaveYet ? Math.max(o.firstYear, o.mileageFirstYear) : o.worthPerYearOne)}
+                      </span>
+                    </div>
+                    <p style={S.optBody}>
+                      {o.bestRoute === 'mileage'
+                        ? `Best kept in your own name: ${gbp0(o.mileageFirstYear)} of mileage against ${gbp0(o.firstYear)} through the business.`
+                        : `Best through the business: ${gbp0(o.firstYear)} in year one, then about ${gbp0(o.laterYear)}. Mileage would be ${gbp0(o.mileageFirstYear)} every year.`}
+                    </p>
+                    {o.practical === 'no' ? <p style={S.optVeto}>Not one I would put first for you</p> : null}
                   </div>
-                  <p style={S.optBody}>
-                    {o.bestRoute === 'mileage'
-                      ? `Best kept in your own name: ${gbp0(o.mileageFirstYear)} of mileage against ${gbp0(o.firstYear)} through the business.`
-                      : `Best through the business: ${gbp0(o.firstYear)} in year one, then about ${gbp0(o.laterYear)}. Mileage would be ${gbp0(o.mileageFirstYear)} every year.`}
-                  </p>
-                  {o.practical === 'no' ? <p style={S.optVeto}>Not one I would put first for you</p> : null}
-                </div>
-              ))}
-            </div>
-          </section>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </section>
+      ) : null}
 
-          <section className="lek-card">
-            <h2 className="lek-h2">What I would do</h2>
-            {rec.lines.map((l, i) => (
-              <p key={i} style={l.startsWith('🔴') ? S.verdict : S.body}>{l}</p>
-            ))}
-            {spendable !== null ? (
-              <p style={S.hint}>
-                {spendableFromHim
-                  ? 'That is the figure you typed, less your tax set aside.'
-                  : 'That is what your business has generated on the figures you have confirmed, less your tax set aside. It is not your bank balance, and if it is wrong, type what you actually have in the box above.'}
-              </p>
-            ) : null}
-          </section>
-        </>
+      {rec ? (
+        <section className="lek-card">
+          <h2 className="lek-h2">What I would do</h2>
+          {rec.lines.map((l, i) => (
+            <p key={i} style={l.startsWith('🔴') ? S.verdict : S.body}>{l}</p>
+          ))}
+          {spendable !== null ? (
+            <p style={S.hint}>
+              {spendableFromHim
+                ? 'That is the figure you typed, less your tax set aside.'
+                : 'That is what your business has generated on the figures you have confirmed, less your tax set aside. It is not your bank balance, and if it is wrong, type what you actually have in the box above.'}
+            </p>
+          ) : null}
+        </section>
       ) : null}
 
       <p style={S.foot}>

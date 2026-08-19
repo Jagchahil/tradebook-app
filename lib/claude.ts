@@ -287,16 +287,28 @@ async function readClaudeReply(res: Response, feature: string): Promise<ClaudeRe
 //
 // ⚠️ WHAT THE MEASUREMENT ACTUALLY FOUND, WRITTEN DOWN BECAUSE IT CAME OUT AGAINST THE ITEM.
 // The item said a cut parse was already corrupting books. It is not, and it could not have been.
-// Both parse prompts specify their entire reply shape, and the WORST reply either can produce,
-// built to the readers' own field caps, is 284 characters for the schedule and 220 for the entry.
-// That is under 300 even at the impossible ratio of one token per character, and about 95 and 74
-// tokens at a real JSON ratio, so a 300 ceiling had roughly threefold headroom and could not cut
-// them. And cutting those worst replies at EVERY ONE of their characters produces ZERO prefixes
-// that JSON.parse accepts, so even a cut one already fell to null. The refusal below is therefore
-// not a rescue, it is the conversion of an ACCIDENTAL guard into a designed one: the accidental
-// one is a side effect of JSON.parse throwing, and it disappears the day somebody adds a rescue.
-// Somebody already has. rescueTruncatedReceipt, forty lines up, deliberately reads money out of a
-// truncated prefix. That is the precedent this guard exists in front of.
+// Both parse prompts specify their entire reply shape, so the worst reply either can produce is
+// bounded by the readers' own field caps, and that worst reply fits under the 300 ceiling even
+// counted in CHARACTERS. Characters is the conservative reading, because a token is never shorter
+// than one character. And cutting that worst reply at EVERY ONE of its characters produces ZERO
+// prefixes that JSON.parse accepts, so even a cut one already fell to null.
+//
+// 🔴 THE FIGURES ARE DELIBERATELY NOT REPEATED HERE, AND THAT IS A CORRECTION MADE ON 19 AUGUST.
+// Until today this block stated two character counts that NOTHING computed and NOTHING asserted,
+// so the day either prompt gained a field the numbers would have gone on being quoted after they
+// stopped being true. test/b43cutoff.test.mjs SECTION 4 now derives both worst replies from these
+// readers' own caps, pins their lengths AND the headroom left, and runs the real cleaner over
+// every prefix of each. Read the figure there, where it is recomputed on every run, and not here.
+//
+// ⚠️ AND IT IS TIGHTER THAN THE OLD PROSE READ. On the schedule path the headroom is single
+// figures, so the next field added to that reply spends it. Section 4 is the thing that will say
+// so, on the run it happens, instead of a comment nobody reruns.
+//
+// The refusal below is therefore not a rescue, it is the conversion of an ACCIDENTAL guard into a
+// designed one: the accidental one is a side effect of JSON.parse throwing, and it disappears the
+// day somebody adds a rescue. Somebody already has. rescueTruncatedReceipt, forty lines up,
+// deliberately reads money out of a truncated prefix. That is the precedent this guard exists in
+// front of.
 // ═════════════════════════════════════════════════════════════════════════════════════════════
 
 // The ceiling for the SHORT answering lanes. Deliberately not 4,000, which is the in app
@@ -451,6 +463,10 @@ export async function parseReceipt(base64: string, mediaType: string): Promise<P
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   if (!textBlock) return null;
 
+  // WORST REPLY UNBOUNDED: line_items. What was in the basket grows with the receipt, so no set
+  // of field caps bounds this reply and test/b43cutoff.test.mjs section 4 cannot measure a worst
+  // case for it. This is the path that already has RECEIPT_MAX_TOKENS and a deliberate rescue
+  // below, which is the honest shape for a reply nobody can bound.
   let parsed: Partial<ParsedReceipt>;
   try {
     parsed = JSON.parse(clean(textBlock)) as Partial<ParsedReceipt>;
@@ -687,6 +703,11 @@ export async function draftInvoice(description: string): Promise<DraftedInvoice 
   if (refuseIfCut(data, 'invoice_draft')) return null;
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   if (!textBlock) return null;
+
+  // WORST REPLY UNBOUNDED: line_items. The array grows with the job, so no set of field caps
+  // bounds this reply and test/b43cutoff.test.mjs section 4 cannot measure a worst case for it.
+  // That is exactly why this call sits at 500 rather than 300, and why the refusal above is the
+  // real guard here rather than an arithmetic argument about headroom.
 
   try {
     const parsed = JSON.parse(clean(textBlock)) as Partial<DraftedInvoice>;

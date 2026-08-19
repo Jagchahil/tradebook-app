@@ -533,8 +533,25 @@ export function tradeProfitAfterAllowance(
 // What we say the moment he elects. A statement of what has been applied and what it replaced,
 // never a congratulation: he may well have just chosen the worse of the two, and it is still his
 // choice to make. The sentence that matters most is the last one.
-export function tradingAllowanceConfirmation(choice: TradingAllowanceChoice): string {
+// ⚠️ A NULL CHOICE IS A READ THAT DID NOT ANSWER, AND IT IS NOT THE SAME AS A BAD DEAL. B50, 19
+// August 2026. This runs AFTER the election has been written, so the first sentence and the last
+// are true whatever happened to the read: the allowance is a statutory figure and the rule about
+// what it replaces is the law. What cannot be said is the middle sentence, which compares the
+// allowance against HIS costs, because on a failed read those costs are zeros he never lived.
+//
+// 🔴 AND THE SIGNED CHAT LINE DELIBERATELY DOES NOT GO HERE. It says "Nothing has happened to your
+// books", and on this path something just has: the election is saved. A sentence that is true on
+// every other failed read path is a lie on this one.
+export function tradingAllowanceConfirmation(choice: TradingAllowanceChoice | null): string {
   const money = gbp0;
+  if (!choice) {
+    return [
+      `Done. You are claiming the ${money(tradingAllowanceAmount())} trading allowance for this tax year.`,
+      'It replaces your expenses rather than adding to them. While it is on, none of your logged'
+      + ' costs, your mileage or the use of home flat rate is deducted, and it applies to this tax'
+      + ' year only.',
+    ].join(' ');
+  }
   return [
     `Done. You are claiming the ${money(choice.allowance)} trading allowance for this tax year.`,
     choice.better === 'costs'

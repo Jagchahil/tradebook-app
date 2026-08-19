@@ -1998,15 +1998,50 @@ export function isVehicleQuestion(body: string): boolean {
  * The answer, built from what his own books hold. Every figure is passed in by the caller from the
  * engine, never re-derived here, so this file states facts and never computes tax.
  */
+// ════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 SIGNED COPY. THE ONE THING BOTH CHAT CHANNELS SAY WHEN HIS RECORDS DID NOT READ. B50, D3.
+//
+// Jag, 19 August 2026, by delegation, in his own words: "yes go with your recommendation". NO
+// SESSION MAY SOFTEN, LENGTHEN, SHORTEN OR REWORD THIS LINE. It is typed once, here, so there is
+// exactly one of it in the estate and a guard can count it.
+//
+// 🔴 ONE WORDING FOR BOTH CHANNELS, ON PURPOSE. WhatsApp and the web chat are one product and
+// two wordings is the drift this corpus keeps deleting. It also deliberately mirrors the signed
+// PAGE line in app/app/RecordsUnreadable.tsx, so a man who meets both meets one product.
+//
+// ⚠️ "Nothing has happened to your books" IS LOAD BEARING AND IT MUST STAY TRUE WHEREVER THIS IS
+// SENT. A failed READ has changed nothing. Never put this line on a path that has just WRITTEN
+// something, because on that path the second sentence is a lie.
+// ════════════════════════════════════════════════════════════════════════════════════════
+export const RECORDS_UNREADABLE_CHAT_LINE = 'I could not read your records just now, so I cannot give you a figure. Nothing has happened to your books. Ask me again in a minute.';
+
 export function vehicleAnswer(input: {
   /** A vehicle bought through the books, if there is one. */
   boughtThroughBooks: boolean;
   /** The capital allowance already taken off his profit this year, if any. */
   allowanceThisYear: number;
+  /**
+   * True when his records could not be read AT ALL, which is not the same as having no vehicle.
+   * Optional so an unknown WhatsApp number, which is a different thing again, stays on the general
+   * half with nothing apologised for.
+   */
+  recordsUnreadable?: boolean;
 }): string {
   const parts: string[] = [];
 
-  if (input.boughtThroughBooks) {
+  // 🔴 B50, D3. THE SIGNED LINE GOES WHERE HIS FIGURES WERE, AND THE GENERAL HALF STAYS.
+  //
+  // The rest of this answer is the two routes and the irreversible lock in, worked out from
+  // published rules and true for everybody, so withholding it would cost a man a comparison we
+  // could still have given him for nothing. What is withheld is the ONE clause built from his own
+  // books, and the reason it is withheld is said out loud rather than left as an absence.
+  //
+  // ⚠️ AND THE ABSENCE WAS THE DEFECT. Before today a failed read produced this same answer with
+  // the personal clause simply missing, so a man who HAS already claimed a vehicle was not warned
+  // that his choice was made, and nothing on the screen said why. Silence is not honesty.
+  if (input.recordsUnreadable === true) {
+    parts.push(RECORDS_UNREADABLE_CHAT_LINE);
+  } else if (input.boughtThroughBooks) {
     parts.push(
       'You have a vehicle in your books already, so the choice below has probably been made: '
       + (input.allowanceThisYear > 0

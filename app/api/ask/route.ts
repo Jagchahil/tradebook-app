@@ -21,7 +21,7 @@ import { SCOTTISH_RATES_ANSWER } from '../../../lib/scotland';
 import { vatAnswerForUser } from '../../../lib/vatanswer';
 import { savingsAnswerForUser } from '../../../lib/savingsanswer';
 import { niAnswerForUser, studentLoanAnswerForUser, propertyAnswerForUser } from '../../../lib/laneanswers';
-import { getOptimiserInput } from '../../../lib/supabase';
+import { getOptimiserInput, readOptimiserOrNull } from '../../../lib/supabase';
 import { hmrcFilingLive } from '../../../lib/features';
 
 // The in-app accountant endpoint. The app posts a question with the user's
@@ -207,6 +207,25 @@ export async function POST(req: NextRequest) {
   //
   // ⚠️ A FAILED READ IS UNKNOWN, NEVER A NO. The catch lands on null, which asks him.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
+  //
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B50, D3. RECORDS UNREADABLE EXEMPT: this router does not TYPE the signed chat line and it
+  // does not need to, and the reason is worth reading because it is where B58 lives.
+  //
+  // This route has TWO optimiser reads. The VEHICLE one reaches the signed line through
+  // vehicleAnswer in lib/waintents.ts, which is where that sentence belongs, so importing a second
+  // reference to it here would be a name reaching for a sentence it never says. The DEADLINE one,
+  // below, reads only businessType, which comes from the business profile: a transaction row read
+  // failure cannot touch it, so readOptimiserOrNull would discard a fact we read successfully and
+  // ask him about it instead, which is weaker for no honesty gained. The thrown read is caught and
+  // lands on null, and deadlineAnswer words a null conditionally and asks him.
+  //
+  // ⚠️ AND THE THIRD LANE IS THE ONE THAT IS NOT HERE. matchTotalsQuestion, what he OWES, is called
+  // in app/api/whatsapp and app/api/thread and ZERO times in this file, so the failed read wording
+  // for that lane has nowhere to go on this router. THAT IS B58 AND IT IS NOT B50's TO CLOSE:
+  // wiring the most consequential answer in the product onto a third router is a behaviour change
+  // and needs its own measurement. When somebody takes it, this import comes back with it.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
   if (!truth && isDeadlineQuestion(question) && !asksAmount(question)) {
     const o = await getOptimiserInput(userId).catch(() => null);
     truth = deadlineAnswer(new Date(), {
@@ -236,10 +255,14 @@ export async function POST(req: NextRequest) {
   if (!truth && isIdentity(question)) truth = identityAnswer('web');
 
   if (!truth && isVehicleQuestion(question)) {
-    const o = await getOptimiserInput(userId).catch(() => null);
+    // 🔴 B50, D3. A FAILED READ IS NOT "NO VEHICLE". readOptimiserOrNull folds the thrown read and
+    // the unreadable rows into one null, and vehicleAnswer then prints the signed records line
+    // where his own figures were and keeps the general half, which needs nothing of his.
+    const o = await readOptimiserOrNull(userId);
     truth = vehicleAnswer({
       boughtThroughBooks: o?.vehicleBoughtThroughBooks === true,
       allowanceThisYear: Math.max(0, o?.ytdCapitalAllowances ?? 0),
+      recordsUnreadable: o === null,
     });
   }
 

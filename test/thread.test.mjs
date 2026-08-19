@@ -229,9 +229,39 @@ const taxHubCode = stripComments(read('app/app/tax/page.tsx'));
 // THIRD leg the old two could not say: that the wrapper really IS that read, so an impostor of the
 // same name cannot satisfy the first two.
 const OPTIMISER_READER = /(?:getOptimiserInput|readOptimiserOrNull)\(/;
+// 🔴 DERIVED 19 AUGUST 2026 BY B50, AND A NO OP CONTROL IS WHAT FOUND IT. This pin and the one on
+// setAsideBasisLine below both typed the local's NAME, `optimiser`, in both files. A control that
+// renamed that local CONSISTENTLY, which changes nothing a customer can see, turned both red, and
+// this repo's own rule says a guard a rename can break is a guard about a name. The property is
+// read off the source now: whatever the local is called, taxPosition is run on a local that CAME
+// FROM the one optimiser read. That is strictly stronger than the old form, which never checked
+// where the argument came from at all.
+// ⚠️ AND THE BINDING HAS TWO SHAPES, WHICH THE FIRST DRAFT OF THIS HELPER MISSED. The thread route
+// writes `const optimiser = await readOptimiserOrNull(...)` and the tax hub DESTRUCTURES its read
+// out of a Promise.all. A helper that only knew the first form called the hub a miss, which would
+// have been this repo's own "a guard about a name" lesson repeated one level up.
+const boundFromReader = (code, name) => {
+  const re = new RegExp(`const\\s+(?:${name}\\b|\\[[^\\]]*\\b${name}\\b[^\\]]*\\])\\s*=`, 'g');
+  let m;
+  while ((m = re.exec(code)) !== null) {
+    const end = code.indexOf(';', m.index);
+    const stmt = code.slice(m.index, end < 0 ? code.length : end);
+    if (/(?:getOptimiserInput|readOptimiserOrNull)\s*\(/.test(stmt)) return true;
+  }
+  return false;
+};
+const readArg = (code, fn) => {
+  const m = new RegExp(`(?<![A-Za-z])${fn}\\((\\w+)[,)]`).exec(code);
+  if (!m) return null;
+  return boundFromReader(code, m[1]) ? m[1] : null;
+};
 ok('🔴 the owe answer is taxPosition on the one optimiser read, the tax hub\'s own call, in both files',
-  /taxPosition\(optimiser\)/.test(routeCode) && /taxPosition\(optimiser\)/.test(taxHubCode)
+  readArg(routeCode, 'taxPosition') !== null && readArg(taxHubCode, 'taxPosition') !== null
   && OPTIMISER_READER.test(routeCode) && OPTIMISER_READER.test(taxHubCode));
+ok('🔴 ...and that derivation can SEE a miss, without which the line above passes on anything',
+  readArg('const x = 1; taxPosition(x);', 'taxPosition') === null
+  && readArg('const x = await readOptimiserOrNull(u); taxPosition(x);', 'taxPosition') === 'x'
+  && readArg('const [x, y] = await Promise.all([readOptimiserOrNull(u), other()]); taxPosition(x);', 'taxPosition') === 'x');
 
 // The third leg, on its own so it matches ONE thing: the door the tax hub goes through is the
 // very function the thread calls directly, not a second reader wearing a helpful name.
@@ -260,7 +290,8 @@ ok('🔴 AND NEITHER SURFACE KEEPS A HAND WRITTEN COPY OF THE RULE',
   !/tax\.cisSuffered > 0 \? tax\.setAsideAfterCis : tax\.setAside/.test(routeCode)
   && !/tax\.cisSuffered > 0 \? tax\.setAsideAfterCis : tax\.setAside/.test(taxHubCode));
 ok('what is inside the number is the shared sentence, lib/taxoptimiser\'s own words',
-  /setAsideBasisLine\(optimiser, tax\)/.test(routeCode) && /setAsideBasisLine\(optimiser, tax\)/.test(taxHubCode));
+  readArg(routeCode, 'setAsideBasisLine') !== null && readArg(taxHubCode, 'setAsideBasisLine') !== null
+  && /setAsideBasisLine\(\w+, tax\)/.test(routeCode) && /setAsideBasisLine\(\w+, tax\)/.test(taxHubCode));
 ok('🔴 the little January is gone: no engine arithmetic of the owe branch\'s own',
   !/soleTraderTax|corporationTax|studentLoanForSA|getStudentLoanSettings|getBusinessProfile/.test(routeCode));
 ok('and the answer says out loud whose figure it is',
@@ -607,7 +638,17 @@ export function isDataRightsRequest(q) { return /delete .*(data|account)/i.test(
 // The vehicle lane. Stubbed to its plainest clause; the real matcher, and the reason it refuses to
 // name a winner, are in lib/waintents.ts and pinned by test/datadoor.test.mjs.
 export function isVehicleQuestion(q) { return /\b(van|vehicle)\b[^.?!]{0,40}\b(claim|mileage)\b/i.test(q); }
-export function vehicleAnswer() { return 'Tax, then Vehicle.'; }
+export function vehicleAnswer(input) {
+  // B50. The stub keeps the ONE distinction the route is about: a failed read says so, a good read
+  // does not. The real sentence and the general half it sits beside are in lib/waintents.ts and are
+  // run for real by test/optimiserdoor.test.mjs section 5d.
+  return input && input.recordsUnreadable === true
+    ? RECORDS_UNREADABLE_CHAT_LINE
+    : 'Tax, then Vehicle.';
+}
+// The signed chat line, carried here as the real words so a stub cannot quietly answer with a
+// different sentence than production does. It is typed once in app/ and lib/, and this is test/.
+export const RECORDS_UNREADABLE_CHAT_LINE = 'I could not read your records just now, so I cannot give you a figure. Nothing has happened to your books. Ask me again in a minute.';
 export const DATA_RIGHTS_ANSWER = 'You, then Your data.';
 export function matchProductTruth() { return null; }
 export function productTruthAnswer() { return ''; }
@@ -714,6 +755,10 @@ export async function refreshFactsFromDb() {}
 export async function totalsForUser() { return null; }
 export async function pendingSummaryForUser() { return null; }
 export async function getOptimiserInput() { return {}; }
+// B50. The one door, stubbed to the SAME truthy empty object as the bare read above, so every
+// existing assertion in this suite keeps the behaviour it was written against: the real
+// hasTaxPosition rule answers false on it and the owed branch short circuits exactly as before.
+export async function readOptimiserOrNull() { return {}; }
 export async function transactionSummaryForUser() { return ''; }
 export async function getRelevantKnowledge() { return []; }
 export async function saveLekhioThreadMessage(userId, threadId, role, content) {

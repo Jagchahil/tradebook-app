@@ -119,6 +119,12 @@ function authorised(req: NextRequest): boolean {
 //
 // Fails towards the honest empty: if any read fails we say we have nothing to show him rather than
 // inventing a confident zero, which is the same rule the 30 July reveal settled on.
+// 🔴 B50, D3. RECORDS UNREADABLE EXEMPT: this is a cron, not a customer surface, and it was
+// re derived at head rather than trusted. The whole read sits in a try that falls to `empty` with
+// hasAnything false, and `saved` is null unless the ledger is confident, so a failed read here
+// already produces "we have nothing to show him" rather than a confident zero. The bare
+// getOptimiserInput stays because the honest empty is the SAME answer readOptimiserOrNull would
+// force, arrived at by the branch that was already written for it.
 async function weekFor(userId: string) {
   const empty = { income: 0, expenses: 0, profit: 0, saved: null as number | null, hasAnything: false };
   if (!userId) return empty;

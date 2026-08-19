@@ -61,6 +61,7 @@ import {
   listBankConnectionsForUser,
   touchLastInbound,
   confirmDigestEntries,
+  lastDigestShownIds,
   lastDigestAt,
   claimMessage,
   insertTransaction,
@@ -92,6 +93,7 @@ import {
   getOrCreateReferralCode,
   getRelevantKnowledge,
   getOptimiserInput,
+  readOptimiserOrNull,
   refreshFactsFromDb,
 } from '../../../lib/supabase';
 import { isReferRequest, referralInvite } from '../../../lib/referral';
@@ -149,6 +151,7 @@ import {
   compoundAsk,
   compoundAskNote,
   vehicleAnswer,
+  RECORDS_UNREADABLE_CHAT_LINE,
   // RUN 2, 12 August 2026. See the dispatch chain and the floor at the end of it.
   isVatQuestion,
   // B16 and the B2 intercept, 17 August 2026. See the dispatch chain, above isQuestion.
@@ -1834,10 +1837,25 @@ async function handleAck(from: string, kind: 'yes' | 'no' | 'ack'): Promise<void
     return;
   }
 
-  // YES files what the DIGEST ACTUALLY SHOWED HIM, and nothing else.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 YES FILES WHAT THE DIGEST ACTUALLY SHOWED HIM, AND UNTIL 19 AUGUST 2026 THIS COMMENT WAS A
+  // PROPERTY THE CODE DID NOT HAVE. B35.
   //
-  // Bounded to the digest window. Anything older, and anything he captured himself
-  // and has not reviewed, still waits for him. He can only approve what he was shown.
+  // It used to say "He can only approve what he was shown", full stop. What the code did was bound
+  // the confirm to the digest WINDOW, with no limit at all, while the reader that built the message
+  // capped each list at 20 in memory. So a man with 35 unrecognised rows in the window was told 20,
+  // shown 20, and his YES filed 35. The comment was the thing making that invisible.
+  //
+  // Now the ids that were PRINTED travel from the send path to here, and the confirm is bounded by
+  // the ids AND by the window together. A null read of those ids, which is what a missing migration
+  // or an old digest looks like, falls back to the window alone, which is exactly the old behaviour
+  // and can never reach further than it did.
+  //
+  // ⚠️ AND THE HARM IS BOUNDED, SAID PLAINLY RATHER THAN QUIETLY FIXED. Everything YES files is
+  // REVERSIBLE. It says "that is really mine", it moves no money, it sends nothing to HMRC, and he
+  // can press Not business on any of it. The filing still asks him every single time. This was an
+  // approval gate that OVERREACHED, not an irreversible one that fired.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
   const since = await lastDigestAt(userId);
   if (!since) {
     await sendText(from, 'Nothing waiting on me. Send me the next receipt whenever you like.');
@@ -1846,7 +1864,9 @@ async function handleAck(from: string, kind: 'yes' | 'no' | 'ack'): Promise<void
 
   // A day either side of the digest, so a late reply still lands on the right batch.
   const from24h = new Date(new Date(since).getTime() - 24 * 3600_000).toISOString();
-  const filed = await confirmDigestEntries(userId, from24h);
+  // The ids the last digest actually printed, or null when we cannot know. Null is the window.
+  const shownIds = await lastDigestShownIds(userId);
+  const filed = await confirmDigestEntries(userId, from24h, shownIds);
 
   if (filed === 0) {
     await sendText(from, 'Nothing waiting on me. Send me the next receipt whenever you like.');
@@ -1991,10 +2011,17 @@ async function handleVehicleQuestion(from: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
   // ⚠️ A FAILED LOOKUP IS NOT A REASON TO SAY NOTHING. The general half of the answer, the two
   // routes and the lock in, is true for everybody, and vehicleAnswer builds it from these defaults.
-  const o = userId ? await getOptimiserInput(userId).catch(() => null) : null;
+  //
+  // 🔴 B50, D3. AND AN UNKNOWN NUMBER IS NOT A FAILED READ, WHICH IS WHY THE TWO ARE SEPARATED.
+  // A number we do not recognise has no records to fail to read, so it gets the general half with
+  // nothing apologised for. A number we DO recognise whose read came back null gets the signed
+  // records line where his own figures were, because there the absence has a cause and he is
+  // entitled to it. Before today both landed on the same silent answer.
+  const o = userId ? await readOptimiserOrNull(userId) : null;
   await sendText(from, vehicleAnswer({
     boughtThroughBooks: o?.vehicleBoughtThroughBooks === true,
     allowanceThisYear: Math.max(0, o?.ytdCapitalAllowances ?? 0),
+    recordsUnreadable: userId !== null && o === null,
   }));
 }
 
@@ -2049,7 +2076,23 @@ async function handleDeadlineQuestion(from: string): Promise<void> {
       readCircumstances(userId).catch(() => null),
     ]);
     structure = optimiser?.businessType ?? null;
-    if (optimiser) {
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 B50, D3. THE STRUCTURE SURVIVES A FAILED ROW READ AND THE GROSS DOES NOT.
+    //
+    // businessType comes from the business profile, so a row read failure cannot touch it, and
+    // that is exactly why the thread and ask routers keep their own read on this lane. The MTD
+    // test is on GROSS QUALIFYING INCOME out of his ROWS, and rowsUnreadable means those rows came
+    // back as zeros. A gross of 0 decides "not in Making Tax Digital", which is a statement about
+    // his legal obligations made out of a database that did not answer.
+    //
+    // ⚠️ SO THE QUESTION ASKED HERE IS THE SAME ONE readOptimiserOrNull ASKS, asked of an object
+    // already in hand rather than by paying for a second read of the same rows. It is not a second
+    // helper and it is not a second rule: withhold on rowsUnreadable, exactly as the door does.
+    // A withheld position is null, and mtdStatedFrom's own comment says null means "we have not
+    // been told" and never "no", so the answer asks him instead of deciding for him.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    const rowsRead = optimiser !== null && optimiser.rowsUnreadable !== true;
+    if (optimiser && rowsRead) {
       // The Making Tax Digital test is on GROSS qualifying income, trade plus rent, before a
       // single expense comes off. mtdPosition() decides what that figure is worth, which for an
       // unstated man is "not much": see lib/taxengine.ts.
@@ -2273,7 +2316,24 @@ async function handleTotals(from: string, body: string): Promise<void> {
   // believing both. So this is the same call the Tax hub, the Overview and the thread make, and
   // the sentence around the figure is lib/waintents' oweAnswer, deterministic and pinned by test.
   // A figure off his own rows is exactly what WhatsApp is for, so it is answered here in full.
-  const optimiser = await getOptimiserInput(userId);
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B50, D3. "NOTHING YET" AND "I COULD NOT LOOK" ARE DIFFERENT ANSWERS AND THIS LANE GAVE ONE.
+  //
+  // getOptimiserInput does not throw when the ROW read fails. It returns the same object with every
+  // figure of his at zero and rowsUnreadable set, so taxPosition came back empty, hasTaxPosition
+  // came back false, and a man was told this tax year has no confirmed income on it when the truth
+  // was that we could not see it. That is the same lie the eleven pages were telling with a zero,
+  // in a sentence instead of a figure.
+  //
+  // readOptimiserOrNull is the ONE door: it folds the thrown read and the unreadable rows into a
+  // single null so this branch has one thing to ask. On a null it says so and stops, and it says it
+  // in the SAME words the other chat channel uses, because two wordings is drift.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const optimiser = await readOptimiserOrNull(userId);
+  if (!optimiser) {
+    await sendText(from, RECORDS_UNREADABLE_CHAT_LINE);
+    return;
+  }
   const tax = taxPosition(optimiser);
   // 🔴 A DIRECTOR MUST NOT GET THE SMALLER NUMBER WITHOUT THE SENTENCE THAT EXPLAINS IT.
   //

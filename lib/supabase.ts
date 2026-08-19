@@ -3647,6 +3647,13 @@ export const USER_DATA_TABLES: readonly UserDataTable[] = [
   { table: 'invoices', userKey: 'user_id', keyKind: 'user_id', select: '*' },
   { table: 'events', userKey: 'user_id', keyKind: 'user_id', select: '*' },
   { table: 'reminder_prefs', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  // ⚠️ WHAT WE ASKED HIM TO APPROVE, AND IT IS HIS RECORD RATHER THAN OURS. B35, 19 August 2026.
+  // A digest_shown row is the list of his own transactions one message put in front of him. It is
+  // keyed to him, it is about his money, and a man asking what we hold is entitled to see which of
+  // his rows we asked him to sign off and when. It cascades on the user row as well, so the
+  // erasure would have taken it either way: it is listed here so the EXPORT reaches it too, which
+  // a cascade cannot do. test/tablemanifest.test.mjs is what caught it on the run it was created.
+  { table: 'digest_shown', userKey: 'user_id', keyKind: 'user_id', select: '*' },
 
   // What he told us about his circumstances, in his own words in the case of circumstances.asked,
   // and the tax facts derived from them. All of it is a statement he made about his own life.
@@ -7798,6 +7805,103 @@ export async function markDigestSent(userId: string): Promise<void> {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHAT THE DIGEST ACTUALLY PUT IN FRONT OF HIM. B35, 19 August 2026.
+//
+// handleAck's own comment has claimed since 13 August that "He can only approve what he was shown".
+// The code did not have that property. confirmDigestEntries is bounded by the WINDOW and by nothing
+// else, and it has NO LIMIT AT ALL, while bankEntriesForDigestMany caps each list at 20 in memory.
+// So a man with 35 unrecognised rows in the window was told 20, shown 20, and his YES filed 35.
+//
+// ⚠️ THE HARM IS BOUNDED AND SAYING SO IS PART OF BEING RIGHT ABOUT IT. Everything YES files is
+// REVERSIBLE: confirming says "that is really mine", it sends nothing to HMRC and it moves no
+// money, and he can press Not business on any of it. The filing still asks, every single time.
+// This is an approval gate that OVERREACHES, not an irreversible one that fires.
+//
+// ═══ COLUMN VERSUS ITS OWN TABLE, AND THE SEND PATH DECIDED IT ═══
+//
+// A column on public.users is the smaller idea: it dies with the user, it needs no policy of its
+// own, and it holds exactly what the confirm needs, which is what the LAST digest showed him. What
+// kills it is the WRITE. markDigestSentMany stamps everybody we texted in ONE PATCH with ONE shared
+// body, and that is not an optimisation, it is the repair for a cron that used to die half way
+// through a page. Per user id lists cannot travel in one shared body, so a column means either two
+// hundred PATCHes on the path whose whole design note is "one write for everyone we texted", or a
+// PostgREST upsert on public.users, which forms the insert tuple BEFORE it detects the conflict and
+// would fail on the first NOT NULL column. A TABLE takes a single bulk INSERT of one row per user,
+// which is the same one round trip we already pay, and it carries the ids as an ARRAY so it is one
+// row per digest rather than one per transaction. RLS on with no policy, which is this database's
+// own shape for a server only table. TAKE THE TABLE.
+//
+// ⚠️ AND IT IS SAFE IN EITHER DEPLOY ORDER, WHICH IS B33's FALLBACK SHAPE. If this code ships before
+// supabase/APPLY_2026-08-19_digest_shown.sql is run, the insert fails, the read returns null, and
+// YES falls back to exactly today's window behaviour. If the SQL is run first, nothing is written
+// yet, the read returns null, and the same fallback holds. A migration race cannot cost a customer
+// anything, and it cannot make the gate reach FURTHER than it does today.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+// One bulk insert for the whole page. Best effort by design: the digest has already been SENT by
+// the time this runs, and losing the record of what it showed is worth strictly less than sending
+// it twice or not at all.
+export async function recordDigestShownMany(
+  rows: Array<{ userId: string; transactionIds: string[] }>,
+): Promise<boolean> {
+  const body = rows
+    .filter((r) => UUID.test(r.userId))
+    .map((r) => ({
+      user_id: r.userId,
+      transaction_ids: r.transactionIds.filter((i) => UUID.test(i)),
+      sent_at: new Date().toISOString(),
+    }))
+    // Nothing to approve is nothing to record. A digest that only TOLD him things asks no question.
+    .filter((r) => r.transaction_ids.length > 0);
+  if (body.length === 0) return true;
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/digest_shown`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      // ⚠️ NEVER THE IDS AND NEVER A FIGURE IN THE LOG. The file name and the consequence, so the
+      // one thing a reader needs to do about it is on the line.
+      console.error(
+        '[digest] could not record what the digest showed.'
+        + ' supabase/APPLY_2026-08-19_digest_shown.sql may be outstanding.'
+        + ' YES falls back to the window until it is run.',
+      );
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// What the MOST RECENT digest asked him about. Null means "we do not know", which is the only
+// honest answer when the table is missing, the read failed, or no digest has been recorded yet, and
+// null is what puts the confirm back on the window.
+export async function lastDigestShownIds(userId: string): Promise<string[] | null> {
+  if (!UUID.test(userId)) return null;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/digest_shown?user_id=eq.${encodeURIComponent(userId)}`
+        + '&select=transaction_ids&order=sent_at.desc&limit=1',
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as (Array<{ transaction_ids: string[] | null }>) | null;
+    if (rows === null || rows.length === 0) return null;
+    const ids = rows[0]?.transaction_ids;
+    // An EMPTY array is not a bound of nothing, it is a row that recorded nothing, and treating it
+    // as "approve none" would silently break a YES. It reads as unknown, same as a missing row.
+    return Array.isArray(ids) && ids.length > 0 ? ids.filter((i) => UUID.test(i)) : null;
+  } catch {
+    return null;
+  }
+}
+
 // "YES." His approval, given in the only place he actually is.
 //
 // BOUNDED, AND THE BOUND IS THE WHOLE POINT.
@@ -7811,15 +7915,34 @@ export async function markDigestSent(userId: string): Promise<void> {
 // unconfirmed, from the window the digest covered. Anything older, and anything he
 // captured himself and has not reviewed, still waits for him.
 //
+// 🔴 AND SINCE 19 AUGUST 2026 IT IS BOUNDED BY THE IDS THAT WERE SHOWN, NOT ONLY BY THE WINDOW.
+// B35. The window is a proxy for "what he was shown" and it is a LOOSE one: the reader caps each
+// list at 20 and this had no limit at all, so a busy day meant he approved rows he had never read.
+// `shownIds` is what the digest actually printed. Both bounds are applied together and the ids can
+// only ever NARROW the window, never widen it.
+//
+// ⚠️ A NULL OR EMPTY shownIds FALLS BACK TO THE WINDOW ALONE, WHICH IS TODAY'S BEHAVIOUR. That is
+// deliberate and it is what makes either deploy order safe: before the migration is run there is
+// nothing to read, and a YES must still do something rather than silently file nothing.
+//
 // Confirming is not irreversible: it says "that is really mine". It sends nothing to
 // HMRC and it moves no money. Those still ask, every single time.
-export async function confirmDigestEntries(userId: string, sinceISO: string): Promise<number> {
+export async function confirmDigestEntries(
+  userId: string,
+  sinceISO: string,
+  shownIds: string[] | null = null,
+): Promise<number> {
   const { url } = config();
+  const only = Array.isArray(shownIds) ? shownIds.filter((i) => UUID.test(i)) : [];
+  const idFilter = only.length > 0
+    ? `&id=in.(${encodeURIComponent(only.map((i) => `"${i}"`).join(','))})`
+    : '';
   const res = await fetch(
     `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
       `&confirmed=eq.false&is_personal=eq.false` +
       `&source_type=eq.bank_feed` +
       `&created_at=gte.${encodeURIComponent(sinceISO)}` +
+      idFilter +
       `&select=id`,
     {
       method: 'PATCH',

@@ -88,6 +88,14 @@ const HUB = 'app/app/tax/page.tsx';
 const HOME = 'app/app/page.tsx';
 const SETUP = 'app/app/setup/page.tsx';
 const LEDGER = 'app/api/ledger/route.ts';
+// B50, 19 August 2026. The routes that answer a man out of zeros, and the file the chat sentence
+// is typed in.
+const TRIAL = 'app/api/cron/trial/route.ts';
+const ELECT = 'app/api/elections/route.ts';
+const THREAD = 'app/api/thread/route.ts';
+const ASK = 'app/api/ask/route.ts';
+const WAI = 'lib/waintents.ts';
+const VEHICLE = 'app/app/tax/vehicle/page.tsx';
 const MONEY = 'app/app/money/page.tsx';
 
 const SESSION_LINE = '  const user = await userFromSessionCookie(jar.get(SESSION_COOKIE)?.value ?? null);';
@@ -197,18 +205,161 @@ const SABOTAGES = [
   },
   {
     name: '🔴 a FOURTEENTH route call arrives, and the count that forces the decision goes unwatched',
-    apply: (d) => edit(d, LEDGER, '  const input = await getOptimiserInput(user.id);',
-      '  const input = await getOptimiserInput(user.id);\n  const again = await getOptimiserInput(user.id);\n  void again;'),
+    // ⚠️ REPOINTED 19 AUGUST 2026 BY B50: this route reads through the door now, so the old anchor
+    // quoted a line that no longer exists and the sabotage could not be applied. Same intent, same
+    // count, on the line that is really there.
+    apply: (d) => edit(d, LEDGER, '  const input = await readOptimiserOrNull(user.id);',
+      '  const input = await readOptimiserOrNull(user.id);\n  const again = await readOptimiserOrNull(user.id);\n  void again;'),
   },
   {
     name: '🔴 the tax hub and the thread stop reading the same optimiser, which is the drift pin',
     apply: (d) => edit(d, HUB, 'readOptimiserOrNull(user.id),', 'Promise.resolve(null),'),
+  },
+  // ── B50, 19 AUGUST 2026. THE ROUTES. THE LINE, THE EXEMPTION, AND THE GENERAL HALF. ────────
+  //
+  // Section 5 says every route that reads the optimiser either says the signed line or says why
+  // not, that the line is typed once, that a failed read keeps the general half of the vehicle
+  // answer, and that the JSON routes answer with an error rather than with a body of zeros. These
+  // break each of those, plus the two shapes this corpus keeps paying for: a wording pasted a
+  // second time, and a lane wired on two routers out of three.
+  {
+    name: '🔴 A ROUTE DROPS THE SIGNED LINE AND CARRIES NO REASON, which is the silence B24 spent a'
+      + ' whole session removing from the pages',
+    apply: (d) => {
+      edit(d, LEDGER, "  if (!input) return NextResponse.json({ error: 'unreadable' }, { status: 503 });", '');
+      edit(d, LEDGER, '// 🔴 B50, D3. RECORDS UNREADABLE EXEMPT: this route is JSON to the phone app and has no customer',
+        '// This route is JSON to the phone app and has no customer');
+    },
+  },
+  {
+    name: '🔴 AN EXEMPTION IS LEFT AS A BARE MARKER WITH NO REASON AFTER IT, which is how a written'
+      + ' reason becomes a rubber stamp',
+    apply: (d) => edit(d, TRIAL, '// 🔴 B50, D3. RECORDS UNREADABLE EXEMPT: this is a cron, not a customer surface, and it was',
+      '// 🔴 B50, D3. RECORDS UNREADABLE EXEMPT:\n// this is a cron, not a customer surface, and it was'),
+  },
+  {
+    name: '🔴 THE SIGNED CHAT LINE IS REWORDED BY ONE WORD, which no session may do',
+    apply: (d) => edit(d, WAI, 'Nothing has happened to your books. Ask me again in a minute.',
+      'Nothing has happened to your books. Please ask me again in a minute.'),
+  },
+  {
+    name: '🔴 THE SIGNED CHAT LINE IS TYPED A SECOND TIME IN ANOTHER FILE, which is how one wording'
+      + ' becomes two and then nine',
+    apply: (d) => edit(d, THREAD, "import { NextRequest, NextResponse } from 'next/server';",
+      "import { NextRequest, NextResponse } from 'next/server';\nconst SECOND_COPY = 'I could not read your records just now, so I cannot give you a figure. Nothing has happened to your books. Ask me again in a minute.';\nvoid SECOND_COPY;"),
+  },
+  {
+    name: '🔴 THE VEHICLE ANSWER LOSES ITS GENERAL HALF ON A FAILED READ, which is B24 uniformity'
+      + ' applied where D2 decided it should not be',
+    apply: (d) => edit(d, WAI, `  if (input.recordsUnreadable === true) {
+    parts.push(RECORDS_UNREADABLE_CHAT_LINE);
+  } else if (input.boughtThroughBooks) {`,
+      `  if (input.recordsUnreadable === true) {
+    return RECORDS_UNREADABLE_CHAT_LINE;
+  }
+  if (input.boughtThroughBooks) {`),
+  },
+  {
+    name: '🔴 THE VEHICLE ANSWER APOLOGISES TO EVERYBODY, so a good read carries the failed read line'
+      + ' and the guard would be green on a product that refuses everyone',
+    apply: (d) => edit(d, WAI, '  if (input.recordsUnreadable === true) {\n    parts.push(RECORDS_UNREADABLE_CHAT_LINE);\n  } else if (input.boughtThroughBooks) {',
+      '  parts.push(RECORDS_UNREADABLE_CHAT_LINE);\n  if (input.boughtThroughBooks) {'),
+  },
+  {
+    name: '🔴 THE OWE LANE GOES BACK TO THE BARE READ ON THE WEB CHAT, so "nothing yet" is said over'
+      + ' a database that did not answer',
+    apply: (d) => edit(d, THREAD, '  const optimiser = await readOptimiserOrNull(userId);\n  if (!optimiser) return RECORDS_UNREADABLE_CHAT_LINE;',
+      '  const optimiser = await getOptimiserInput(userId);'),
+  },
+  {
+    name: '🔴 THE VEHICLE LANE IS WIRED ON TWO ROUTERS OUT OF THREE, which is the single most'
+      + ' expensive stale idea in this corpus',
+    apply: (d) => edit(d, ASK, '      recordsUnreadable: o === null,\n', ''),
+  },
+  {
+    name: '🔴 /api/ledger GOES BACK TO A BODY OF ZEROS, the JSON half of the same lie',
+    apply: (d) => edit(d, LEDGER, "  const input = await readOptimiserOrNull(user.id);\n  if (!input) return NextResponse.json({ error: 'unreadable' }, { status: 503 });",
+      '  const input = await getOptimiserInput(user.id);'),
+  },
+  {
+    name: '🔴 /api/elections GOES BACK TO WORKING OUT A TRADING ALLOWANCE COMPARISON OFF ZEROS',
+    apply: (d) => edit(d, ELECT, "    const oi = await readOptimiserOrNull(user.id);\n    if (!oi) return NextResponse.json({ error: 'unreadable' }, { status: 503 });\n    choice = tradingAllowanceChoice(oi.ytdTradeIncome, oi.ytdTradeExpenses, oi);",
+      '    const oi = await getOptimiserInput(user.id).catch(() => null);\n    if (oi) choice = tradingAllowanceChoice(oi.ytdTradeIncome, oi.ytdTradeExpenses, oi);'),
+  },
+  // ── B51, 19 AUGUST 2026, DECISION D2. THE VEHICLE PAGE'S GENERAL HALF. ─────────────────────
+  //
+  // Section 6 says the calculator survives a failed read, that the recommendation does not, and
+  // that a marginal rate of zero can never reach recommendVehicle. These break each of those, and
+  // the last two are the two directions the decision has a cost in.
+  {
+    name: '🔴 THE WHOLE VEHICLE PAGE GOES BACK TO VANISHING ON A FAILED READ, so a man in a'
+      + ' forecourt loses the only screen that would have told him the fork is permanent',
+    apply: (d) => edit(d, VEHICLE, '  // ═══════════════════════════════════════════════════════════════════════════════════════════\n  // 🔴 B24 GAVE THIS PAGE THE LINE. B51 GAVE IT BACK ITS OTHER HALF.',
+      '  if (!optimiser) return <RecordsUnreadable current="/app/tax" title="Buying a vehicle" />;\n  // ═══════════════════════════════════════════════════════════════════════════════════════════\n  // 🔴 B24 GAVE THIS PAGE THE LINE. B51 GAVE IT BACK ITS OTHER HALF.'),
+  },
+  {
+    name: '🔴 marginalRate: 0 IS PASSED INTO recommendVehicle OFF A FAILED READ, which lights'
+      + ' noTaxToSaveYet and prints a claim about his tax out of a database that did not answer',
+    apply: (d) => edit(d, VEHICLE, '  const rec = answered && optimiser !== null\n    ? recommendVehicle({',
+      '  const rec = answered\n    ? recommendVehicle({'),
+  },
+  {
+    name: '🔴 THE ANSWER JUST VANISHES: the card is dropped on a failed read, so he asks and nothing'
+      + ' comes back and nothing says why. Silence is not honesty',
+    apply: (d) => edit(d, VEHICLE, '          {optimiser === null ? (\n            <RecordsUnreadable inline />\n          ) : rec ? (',
+      '          {rec ? ('),
+  },
+  {
+    name: '🔴 THE WITHHELD CARD IS SHOWN TO A MAN WHO HAS TYPED NOTHING, which is doc 103\'s empty'
+      + ' test failed and teaches him to stop reading the screen',
+    apply: (d) => edit(d, VEHICLE, '      {answered ? (\n        <section className="lek-card">\n          <h2 className="lek-h2">What each one is worth</h2>',
+      '      {true ? (\n        <section className="lek-card">\n          <h2 className="lek-h2">What each one is worth</h2>'),
+  },
+  {
+    name: '🔴 THE FORM IS MOVED INSIDE THE READ, so the seven questions and the lock in sentence go'
+      + ' with his figures after all',
+    apply: (d) => edit(d, VEHICLE, '      {/* ── THE QUESTIONS. Seven, all things he knows off the top of his head. ─────────────── */}\n      <section className="lek-card">',
+      '      {/* ── THE QUESTIONS. Seven, all things he knows off the top of his head. ─────────────── */}\n      {optimiser ? <p>{optimiser.ytdTradeIncome}</p> : null}\n      <section className="lek-card">'),
   },
 ];
 
 // ── NO OP CONTROLS. Each changes the files and changes NOTHING these guards are about, and each
 // MUST stay green, or the guard above it is a guard about a name rather than about a shape. ─────
 const CONTROLS = [
+  {
+    name: 'CONTROL: the READ LOCAL is renamed on the vehicle page, and every line in section 6 that'
+      + ' reds on this is a guard about a name',
+    apply: (d) => {
+      edit(d, VEHICLE, 'const [optimiser, biz] = await Promise.all([', 'const [position, biz] = await Promise.all([');
+      edit(d, VEHICLE, '  if (optimiser) {\n    const pos = taxPosition(optimiser);', '  if (position) {\n    const pos = taxPosition(position);');
+      edit(d, VEHICLE, 'const generated = Math.max(0, optimiser.ytdTradeIncome - optimiser.ytdTradeExpenses);',
+        'const generated = Math.max(0, position.ytdTradeIncome - position.ytdTradeExpenses);');
+      edit(d, VEHICLE, "    confirmedSpare = optimiser.ytdTradeIncome === 0 && optimiser.ytdTradeExpenses === 0",
+        '    confirmedSpare = position.ytdTradeIncome === 0 && position.ytdTradeExpenses === 0');
+      edit(d, VEHICLE, '  const rec = answered && optimiser !== null', '  const rec = answered && position !== null');
+      edit(d, VEHICLE, '          {optimiser === null ? (', '          {position === null ? (');
+    },
+  },
+  {
+    name: 'CONTROL: the local is RENAMED on the owe lane in the web chat, and a guard that reds here'
+      + ' is a guard about a name rather than about the work',
+    apply: (d) => {
+      edit(d, THREAD, '  const optimiser = await readOptimiserOrNull(userId);\n  if (!optimiser) return RECORDS_UNREADABLE_CHAT_LINE;\n  const tax = taxPosition(optimiser);',
+        '  const position = await readOptimiserOrNull(userId);\n  if (!position) return RECORDS_UNREADABLE_CHAT_LINE;\n  const tax = taxPosition(position);');
+      edit(d, THREAD, 'if (!hasTaxPosition(optimiser, tax.setAside)) {', 'if (!hasTaxPosition(position, tax.setAside)) {');
+      edit(d, THREAD, 'const basis = setAsideBasisLine(optimiser, tax);', 'const basis = setAsideBasisLine(position, tax);');
+      // ⚠️ THE FOURTH READ IS EIGHTY LINES DOWN AND THE FIRST DRAFT OF THIS CONTROL MISSED IT, so
+      // the control went red on a DANGLING REFERENCE rather than on a name anchored guard. A
+      // control has to be a real no op or it proves nothing, and an incomplete rename is not one.
+      edit(d, THREAD, "if (optimiser.businessType === 'limited_company') {", "if (position.businessType === 'limited_company') {");
+    },
+  },
+  {
+    name: 'CONTROL: an EXEMPTION REASON is reworded while still being a reason, because the guard is'
+      + ' about there being one and not about the sentence',
+    apply: (d) => edit(d, TRIAL, 'RECORDS UNREADABLE EXEMPT: this is a cron, not a customer surface, and it was',
+      'RECORDS UNREADABLE EXEMPT: reworded reason. This is a cron and not a customer surface, and'),
+  },
   {
     name: 'CONTROL: the local is RENAMED on a page, and a guard that reds on this is about a name',
     apply: (d) => {

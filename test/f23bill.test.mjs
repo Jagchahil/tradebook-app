@@ -677,7 +677,7 @@ eq('18 August 2026 is day 134', dayOf(Date.UTC(2026, 7, 18)), 134);
   ok('DOOR 4, WhatsApp, still writes it to the penny',
     /Put by \$\{formatGbp\(setAside\)\} for tax/.test(intents));
   ok('DOOR 5, the 08:00 payments on account alert, writes it to the penny too',
-    /heading for about \$\{gbp2\(estBill\)\}/.test(agentSrc)
+    /heading for about \$\{his\(estBill\)\}/.test(agentSrc)
     && !/heading for about \$\{gbp\(estBill\)\}/.test(agentSrc));
 
   // ⚠️ THE STATUTORY THRESHOLD IS NOT HIS FIGURE AND KEEPS ITS WHOLE POUNDS. The law writes
@@ -688,7 +688,10 @@ eq('18 August 2026 is day 134', dayOf(Date.UTC(2026, 7, 18)), 134);
   //    is NOT printed to the penny.
   ok('and the payments on account threshold is still written as the law writes it',
     /\$\{gbp0?\(FACTS\.poaThreshold\)\}/.test(agentSrc)
+    // ⚠️ BOTH NAMES FOR PENCE, NOT ONE. B46 gave lib/agent.ts a second alias, his(), and a
+    // negative guard that knows only the OLD name for a mistake cannot see the new way of making it.
     && !/gbp2\(FACTS\.poaThreshold\)/.test(agentSrc)
+    && !/his\(FACTS\.poaThreshold\)/.test(agentSrc)
     && /\{gbp0\(FACTS\.poaThreshold\)\}/.test(taxPage));
 }
 

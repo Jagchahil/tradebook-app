@@ -16,6 +16,12 @@ for (const f of ['taxengine', 'money', 'nistudentloan', 'propertyengine', 'ltden
   writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
 }
 const A = await import(pathToFileURL(path.join(stage, 'agent.ts')).href);
+// 🔴 THE ENGINE'S OWN CONSTANTS AND THE ENGINE'S OWN FORMATTERS, LOADED FROM THE SAME STAGE
+// (B46, 19 August 2026). Added because an assertion in this file had typed out a figure the
+// engine derives, and typing it is how a test ends up defending a rounding artefact. Same
+// lesson as the Scotland sentence this file learned at 08:20 today: derive it or it rots.
+const ENG = await import(pathToFileURL(path.join(stage, 'taxengine.ts')).href);
+const MONEY = await import(pathToFileURL(path.join(stage, 'money.ts')).href);
 
 let pass = 0;
 let fail = 0;
@@ -198,7 +204,21 @@ eq('Q4 label', A.mtdQuarter(new Date('2027-02-01T00:00:00Z')).label, '2026-27Q4'
   const lowProfit = monthsFor(late, 10, { incomePerMonth: 500, expensesPerMonth: 100 }); // ytd well under 7,105
   const s = find(A.computeSignals(input(late, lowProfit)), 'class2_pension_year');
   ok('late year low profit fires ping', s && s.priority === 'ping');
-  ok('names the £190 cost', s.body.includes('£190'));
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THIS LINE USED TO READ `s.body.includes('£190')` AND IT WAS PINNING A ROUNDING ARTEFACT.
+  // Kept in this comment so the change cannot be silent. Voluntary Class 2 costs
+  // FACTS.class2WeeklyRate x 52 = £189.80, and gbp0 printed that as "£190" while /app/tax/ni
+  // printed the true figure to the penny. B46 moved every figure of the customer's own to pence,
+  // so the two surfaces now agree, and this assertion derives the figure from the weekly rate
+  // instead of quoting a number somebody typed once.
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  const c2Cost = Math.round(ENG.FACTS.class2WeeklyRate * 52 * 100) / 100;
+  ok('🔴 VACUITY: the voluntary Class 2 cost is NOT a round pound, so this pair can tell them apart',
+    c2Cost > 0 && Math.round(c2Cost * 100) % 100 !== 0);
+  ok('names the cost to the penny, derived from the weekly rate',
+    s.body.includes(`about ${MONEY.gbp2(c2Cost)} for the whole year`));
+  ok('🔴 and never the rounded pound it used to print',
+    !s.body.includes(`about ${MONEY.gbp0(c2Cost)} for the whole year`));
   ok('salary above LEL suppresses it', !find(A.computeSignals(input(late, lowProfit, { employmentIncome: 9000 })), 'class2_pension_year'));
   const early = new Date('2026-09-15T00:00:00Z');
   ok('early in the year stays quiet', !find(A.computeSignals(input(early, monthsFor(early, 5, { incomePerMonth: 500 }))), 'class2_pension_year'));

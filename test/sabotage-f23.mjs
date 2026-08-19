@@ -115,8 +115,8 @@ const SABOTAGES = [
   {
     name: 'the WhatsApp text quotes the blend while numbers{} keeps the real bill',
     apply: (d) => edit(d, 'lib/agent.ts',
-      'waText: `your Self Assessment bill is heading for about ${gbp2(estBill)}',
-      'waText: `your Self Assessment bill is heading for about ${gbp2(blendedBill)}'),
+      'waText: `your Self Assessment bill is heading for about ${his(estBill)}',
+      'waText: `your Self Assessment bill is heading for about ${his(blendedBill)}'),
   },
   {
     name: 'the set aside BUTTON carries the blend, which is the £537 of working capital',
@@ -127,8 +127,8 @@ const SABOTAGES = [
   {
     name: 'the body quotes the blend',
     apply: (d) => edit(d, 'lib/agent.ts',
-      'body: `Your Self Assessment bill is heading for about ${gbp2(estBill)}',
-      'body: `Your Self Assessment bill is heading for about ${gbp2(blendedBill)}'),
+      'body: `Your Self Assessment bill is heading for about ${his(estBill)}',
+      'body: `Your Self Assessment bill is heading for about ${his(blendedBill)}'),
   },
   // ── The one bill function ────────────────────────────────────────────────────────────────
   {
@@ -248,13 +248,13 @@ const SABOTAGES = [
   {
     name: 'B26: the 08:00 alert BODY goes back to whole pounds on the bill',
     apply: (d) => edit(d, 'lib/agent.ts',
-      'body: `Your Self Assessment bill is heading for about ${gbp2(estBill)}.',
+      'body: `Your Self Assessment bill is heading for about ${his(estBill)}.',
       'body: `Your Self Assessment bill is heading for about ${gbp(estBill)}.'),
   },
   {
     name: 'B26: only the alert WHATSAPP text goes back, which is the partial revert',
     apply: (d) => edit(d, 'lib/agent.ts',
-      'waText: `your Self Assessment bill is heading for about ${gbp2(estBill)},',
+      'waText: `your Self Assessment bill is heading for about ${his(estBill)},',
       'waText: `your Self Assessment bill is heading for about ${gbp(estBill)},'),
   },
   {

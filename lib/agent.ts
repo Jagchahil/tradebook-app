@@ -359,8 +359,31 @@ export function projectAnnual(ytd: number, d: Derived): number {
   return Math.round((ytd / d.daysElapsed) * d.daysInYear);
 }
 
-// One formatter, in lib/money.ts. This used to print "£-4,200" for a projected loss.
-const gbp = (n: number) => gbp0(n);
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// TWO ALIASES, AND THE NAME AT THE CALL SITE IS THE WHOLE POINT (B46, 19 August 2026).
+//
+// One formatter, in lib/money.ts. gbp used to print "£-4,200" for a projected loss.
+//
+// 🔴 WHY A SECOND NAME RATHER THAN ONE CORRECT DEFAULT. This file prints 111 money figures and
+// they are not one kind of thing. Twenty are written by statute: the VAT registration threshold,
+// the Making Tax Digital level, the higher rate boundary, the allowance taper floor, the small
+// profits threshold and the payments on account threshold. Parliament wrote those in whole pounds
+// and printing "£90,000.00" states a precision the law does not have. The other ninety one are
+// the CUSTOMER'S OWN MONEY, and B26's rule is that his money wears pence on every surface,
+// because a figure he can check against his own bank is a figure that must match it.
+//
+// Before this, both wore gbp, so ONE SENTENCE said "your income is on track for £62,710, into the
+// 40% band above £50,270" and only one of those two figures was right. Worse, /app/tax/ni said
+// "about £179.40 a year" for voluntary Class 2 while the agent's WhatsApp nudge said "About £179"
+// for the same figure, on the most proactive surface the product has.
+//
+// A default plus an exception list would put the decision somewhere other than the call site, and
+// this file's own history says the thing nobody can see at the call site is the thing that rots.
+// So the name says which kind it is, every time, and test/moneyone.test.mjs section 4 asserts it
+// in BOTH directions: the statutory twenty must stay gbp(, and gbp0 may not reach a figure of his.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+const gbp = (n: number) => gbp0(n);  // STATUTORY ONLY: a threshold, a band, a limit
+const his = (n: number) => gbp2(n);  // HIS OWN MONEY: pence, on every surface
 
 // --- The engine -------------------------------------------------------------------
 
@@ -413,8 +436,8 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
         periodKey: `${year}#g${fix.id.slice(0, 8)}`,
         priority: 'ping',
         title: 'Your goal could solve a tax problem',
-        body: `At your current pace your income lands about ${gbp(overshoot)} over ${gbp(hrBoundary)}, where 40% tax starts. Your goal "${fix.title}" (${gbp(fix.amount)}) is a deductible business purchase: made this tax year it brings you back under the line AND you get the thing you were saving for. Two birds, one van. A suggestion from your numbers, not advice. You decide.`,
-        waText: `your income is heading ${gbp(overshoot)} over the 40% line, and your goal "${fix.title}" would bring you back under if bought this tax year`,
+        body: `At your current pace your income lands about ${his(overshoot)} over ${gbp(hrBoundary)}, where 40% tax starts. Your goal "${fix.title}" (${his(fix.amount)}) is a deductible business purchase: made this tax year it brings you back under the line AND you get the thing you were saving for. Two birds, one van. A suggestion from your numbers, not advice. You decide.`,
+        waText: `your income is heading ${his(overshoot)} over the 40% line, and your goal "${fix.title}" would bring you back under if bought this tax year`,
         numbers: { overshoot, boundary: hrBoundary, goalAmount: fix.amount },
       });
     }
@@ -435,8 +458,8 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
           periodKey: `${year}#g${g.id.slice(0, 8)}`,
           priority: 'ping',
           title: `"${g.title}" costs less before 5 April`,
-          body: `Bought before 5 April, "${g.title}" comes off THIS year's profit under the Annual Investment Allowance. At your rate the ${gbp(g.amount)} really costs you about ${gbp(realCost)} after the tax saving. Buy it a week into April and the saving waits a year. Only for kit you genuinely need. A suggestion from your numbers, not advice. You decide.`,
-          waText: `your goal "${g.title}" saves more before 5 April: at your rate the ${gbp(g.amount)} really costs about ${gbp(realCost)} after tax`,
+          body: `Bought before 5 April, "${g.title}" comes off THIS year's profit under the Annual Investment Allowance. At your rate the ${his(g.amount)} really costs you about ${his(realCost)} after the tax saving. Buy it a week into April and the saving waits a year. Only for kit you genuinely need. A suggestion from your numbers, not advice. You decide.`,
+          waText: `your goal "${g.title}" saves more before 5 April: at your rate the ${his(g.amount)} really costs about ${his(realCost)} after tax`,
           numbers: { amount: g.amount, realCost, marginalRatePct: Math.round(marginalRate * 100), daysToEnd: daysToEndG },
         });
       }
@@ -451,8 +474,8 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
         periodKey: `${year}#g${g.id.slice(0, 8)}`,
         priority: 'card',
         title: `"${g.title}" is within reach`,
-        body: `What your business has cleared after tax this year (${gbp(potNow)}) now covers your goal "${g.title}" (${gbp(g.amount)}). Whether now is the moment is yours to call, but the money side is there.`,
-        waText: `your after tax earnings this year (${gbp(potNow)}) now cover your goal "${g.title}"`,
+        body: `What your business has cleared after tax this year (${his(potNow)}) now covers your goal "${g.title}" (${his(g.amount)}). Whether now is the moment is yours to call, but the money side is there.`,
+        waText: `your after tax earnings this year (${his(potNow)}) now cover your goal "${g.title}"`,
         numbers: { pot: potNow, goalAmount: g.amount },
       });
     }
@@ -473,13 +496,13 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
         signalKey: 'goal_progress',
         periodKey: `${monthKeyNow}#g${g.id.slice(0, 8)}`,
         priority: 'card',
-        title: `"${g.title}": ${gbp(potNow)} of ${gbp(g.amount)} covered`,
+        title: `"${g.title}": ${his(potNow)} of ${his(g.amount)} covered`,
         body: target
-          ? `Towards "${g.title}" by ${target.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}: your after tax earnings this year cover ${gbp(potNow)} of the ${gbp(g.amount)}. Clearing about ${gbp(perWeek)} a week from here gets you there on time.`
-          : `Towards "${g.title}": your after tax earnings this year cover ${gbp(potNow)} of the ${gbp(g.amount)}. ${gbp(gap)} to go. Give it a date in Money, Goals and I will pace it for you week by week.`,
+          ? `Towards "${g.title}" by ${target.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}: your after tax earnings this year cover ${his(potNow)} of the ${his(g.amount)}. Clearing about ${his(perWeek)} a week from here gets you there on time.`
+          : `Towards "${g.title}": your after tax earnings this year cover ${his(potNow)} of the ${his(g.amount)}. ${his(gap)} to go. Give it a date in Money, Goals and I will pace it for you week by week.`,
         waText: target
-          ? `"${g.title}": ${gbp(potNow)} of ${gbp(g.amount)} covered, about ${gbp(perWeek)} a week keeps you on track`
-          : `"${g.title}": ${gbp(potNow)} of ${gbp(g.amount)} covered, ${gbp(gap)} to go`,
+          ? `"${g.title}": ${his(potNow)} of ${his(g.amount)} covered, about ${his(perWeek)} a week keeps you on track`
+          : `"${g.title}": ${his(potNow)} of ${his(g.amount)} covered, ${his(gap)} to go`,
         numbers: target ? { pot: potNow, goalAmount: g.amount, perWeek, weeksLeft } : { pot: potNow, goalAmount: g.amount, gap },
       });
     }
@@ -506,12 +529,12 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
           : `You are at ${Math.floor(vatPct * 100)}% of the VAT threshold`,
       body:
         vatTier === 3
-          ? `Your rolling 12 month turnover is ${gbp(vatTurnover)}, over the ${gbp(vat)} VAT registration threshold. You normally have 30 days from the end of the month you crossed in to register. Worth acting on now.`
-          : `Your rolling 12 month turnover is ${gbp(vatTurnover)}. VAT registration becomes required at ${gbp(vat)}. Knowing early gives you choices: timing of invoices, the flat rate scheme, or planning for the price change.`,
+          ? `Your rolling 12 month turnover is ${his(vatTurnover)}, over the ${gbp(vat)} VAT registration threshold. You normally have 30 days from the end of the month you crossed in to register. Worth acting on now.`
+          : `Your rolling 12 month turnover is ${his(vatTurnover)}. VAT registration becomes required at ${gbp(vat)}. Knowing early gives you choices: timing of invoices, the flat rate scheme, or planning for the price change.`,
       waText:
         vatTier === 3
-          ? `your rolling 12 month turnover (${gbp(vatTurnover)}) has crossed the ${gbp(vat)} VAT threshold`
-          : `your rolling 12 month turnover (${gbp(vatTurnover)}) is ${Math.floor(vatPct * 100)}% of the ${gbp(vat)} VAT threshold`,
+          ? `your rolling 12 month turnover (${his(vatTurnover)}) has crossed the ${gbp(vat)} VAT threshold`
+          : `your rolling 12 month turnover (${his(vatTurnover)}) is ${Math.floor(vatPct * 100)}% of the ${gbp(vat)} VAT threshold`,
       numbers: { rolling12: vatTurnover, threshold: vat, pct: Math.floor(vatPct * 100) },
     });
   }
@@ -570,11 +593,11 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
       // it survives whole. What went is "so it applies to you", which is HMRC's call off a return
       // already filed. The last sentence asks him the one question that settles it.
       body: hasTrade
-        ? `Making Tax Digital counts trade and property income TOGETHER. Your trade alone (${gbp(tradeGrossYtd)}) sits under the ${gbp(mtdThreshold)} level, but with ${gbp(rentsYtd)} of rent the combined ${gbp(d.ytdIncome)} crosses it. It is the adding up that people miss, because each stream on its own looks safe. HMRC decides who is actually in it from a tax return you have already filed, not this year, and writes to you. Has that letter come?`
-        : `Making Tax Digital counts property income, not just self employment. Your rent of ${gbp(rentsYtd)} is over the ${gbp(mtdThreshold)} level on its own. Plenty of landlords take it for granted that it is a thing for the self employed. HMRC decides who is actually in it from a tax return you have already filed, not this year, and writes to you. Has that letter come?`,
+        ? `Making Tax Digital counts trade and property income TOGETHER. Your trade alone (${his(tradeGrossYtd)}) sits under the ${gbp(mtdThreshold)} level, but with ${his(rentsYtd)} of rent the combined ${his(d.ytdIncome)} crosses it. It is the adding up that people miss, because each stream on its own looks safe. HMRC decides who is actually in it from a tax return you have already filed, not this year, and writes to you. Has that letter come?`
+        : `Making Tax Digital counts property income, not just self employment. Your rent of ${his(rentsYtd)} is over the ${gbp(mtdThreshold)} level on its own. Plenty of landlords take it for granted that it is a thing for the self employed. HMRC decides who is actually in it from a tax return you have already filed, not this year, and writes to you. Has that letter come?`,
       waText: hasTrade
-        ? `trade (${gbp(tradeGrossYtd)}) plus rent (${gbp(rentsYtd)}) crosses the ${gbp(mtdThreshold)} Making Tax Digital level combined, which most people miss. HMRC decides it from a return already filed and writes to you: has that letter come?`
-        : `your rent (${gbp(rentsYtd)}) is over the ${gbp(mtdThreshold)} Making Tax Digital level on its own, and it counts property income just as it counts self employment. HMRC decides it from a return already filed and writes to you: has that letter come?`,
+        ? `trade (${his(tradeGrossYtd)}) plus rent (${his(rentsYtd)}) crosses the ${gbp(mtdThreshold)} Making Tax Digital level combined, which most people miss. HMRC decides it from a return already filed and writes to you: has that letter come?`
+        : `your rent (${his(rentsYtd)}) is over the ${gbp(mtdThreshold)} Making Tax Digital level on its own, and it counts property income just as it counts self employment. HMRC decides it from a return already filed and writes to you: has that letter come?`,
       numbers: { tradeGross: tradeGrossYtd, rents: rentsYtd, combined: d.ytdIncome, threshold: mtdThreshold },
     });
   }
@@ -591,11 +614,11 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
       // now says what it can see, names the test, and asks the one question that settles it.
       title: 'One question about Making Tax Digital',
       body: crossedNow
-        ? `Your gross income this tax year is ${gbp(d.ytdIncome)}, over the ${gbp(mtdThreshold)} Making Tax Digital level. That is this year though, and HMRC decides who is in it from a tax return you have already filed, then writes to you to say so. Has that letter come? Tell me and I will keep the right things ready. Either way your records build themselves.`
-        : `At your current pace your gross income lands around ${gbp(projIncome)} this year, past the ${gbp(mtdThreshold)} Making Tax Digital level. HMRC decides who is actually in it from a tax return you have already filed rather than this one, and writes to you. Has that letter come? Nothing to panic about either way: your Lekhio records already fit the quarterly rhythm.`,
+        ? `Your gross income this tax year is ${his(d.ytdIncome)}, over the ${gbp(mtdThreshold)} Making Tax Digital level. That is this year though, and HMRC decides who is in it from a tax return you have already filed, then writes to you to say so. Has that letter come? Tell me and I will keep the right things ready. Either way your records build themselves.`
+        : `At your current pace your gross income lands around ${his(projIncome)} this year, past the ${gbp(mtdThreshold)} Making Tax Digital level. HMRC decides who is actually in it from a tax return you have already filed rather than this one, and writes to you. Has that letter come? Nothing to panic about either way: your Lekhio records already fit the quarterly rhythm.`,
       waText: crossedNow
-        ? `your gross income (${gbp(d.ytdIncome)}) has passed the ${gbp(mtdThreshold)} Making Tax Digital level. HMRC decides it from a return already filed and writes to you: has that letter come?`
-        : `your income is on track for ${gbp(projIncome)}, past the ${gbp(mtdThreshold)} Making Tax Digital level. HMRC decides it from a return already filed and writes to you: has that letter come?`,
+        ? `your gross income (${his(d.ytdIncome)}) has passed the ${gbp(mtdThreshold)} Making Tax Digital level. HMRC decides it from a return already filed and writes to you: has that letter come?`
+        : `your income is on track for ${his(projIncome)}, past the ${gbp(mtdThreshold)} Making Tax Digital level. HMRC decides it from a return already filed and writes to you: has that letter come?`,
       numbers: { ytdIncome: d.ytdIncome, projected: projIncome, threshold: mtdThreshold },
     });
   }
@@ -608,8 +631,8 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
       periodKey: year,
       priority: 'card',
       title: 'Heading into the 40% band',
-      body: `At your current pace your income lands around ${gbp(projProfit + salary)} this year, past ${gbp(hrBoundary)} where 40% tax starts on the top slice. Options people use, all standard: pension contributions, bringing planned kit purchases forward, or simply knowing the set aside number is higher this year. Your set aside figure already accounts for it.`,
-      waText: `your income is on track for ${gbp(projProfit + salary)}, into the 40% band above ${gbp(hrBoundary)}`,
+      body: `At your current pace your income lands around ${his(projProfit + salary)} this year, past ${gbp(hrBoundary)} where 40% tax starts on the top slice. Options people use, all standard: pension contributions, bringing planned kit purchases forward, or simply knowing the set aside number is higher this year. Your set aside figure already accounts for it.`,
+      waText: `your income is on track for ${his(projProfit + salary)}, into the 40% band above ${gbp(hrBoundary)}`,
       numbers: { projected: projProfit + salary, boundary: hrBoundary },
     });
   }
@@ -622,8 +645,8 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
       periodKey: year,
       priority: 'ping',
       title: 'The £100k allowance trap is in sight',
-      body: `At your current pace your income lands around ${gbp(projProfit + salary)}. Above ${gbp(taper)} you lose £1 of personal allowance for every £2 of income, an effective 60% rate on that slice. Pension contributions are the standard, fully legitimate way to bring income back under it. Worth planning before year end, not after.`,
-      waText: `your income is on track for ${gbp(projProfit + salary)}, above the ${gbp(taper)} allowance taper where the effective rate hits 60%`,
+      body: `At your current pace your income lands around ${his(projProfit + salary)}. Above ${gbp(taper)} you lose £1 of personal allowance for every £2 of income, an effective 60% rate on that slice. Pension contributions are the standard, fully legitimate way to bring income back under it. Worth planning before year end, not after.`,
+      waText: `your income is on track for ${his(projProfit + salary)}, above the ${gbp(taper)} allowance taper where the effective rate hits 60%`,
       numbers: { projected: projProfit + salary, taper },
     });
   }
@@ -637,8 +660,8 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
       periodKey: year,
       priority: 'ping',
       title: 'Your State Pension year is at risk',
-      body: `Your profit this tax year is ${gbp(d.ytdProfit)}, under the ${gbp(spt)} mark, and no job is covering you. As it stands this year may not count towards your State Pension. Voluntary Class 2, about ${gbp(cost)} for the whole year, protects it. You need 35 qualifying years for the full pension, and missed years are expensive to fix later.`,
-      waText: `profit so far is ${gbp(d.ytdProfit)}, under ${gbp(spt)}, so this year may not count for your State Pension. About ${gbp(cost)} of voluntary Class 2 protects it`,
+      body: `Your profit this tax year is ${his(d.ytdProfit)}, under the ${gbp(spt)} mark, and no job is covering you. As it stands this year may not count towards your State Pension. Voluntary Class 2, about ${his(cost)} for the whole year, protects it. You need 35 qualifying years for the full pension, and missed years are expensive to fix later.`,
+      waText: `profit so far is ${his(d.ytdProfit)}, under ${gbp(spt)}, so this year may not count for your State Pension. About ${his(cost)} of voluntary Class 2 protects it`,
       numbers: { ytdProfit: d.ytdProfit, threshold: spt, cost },
     });
   }
@@ -653,8 +676,8 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
         periodKey: year,
         priority: 'card',
         title: 'Your student loan has started building',
-        body: `Your income has passed your ${label} threshold, so ${gbp(slDue)} of repayment has started building towards the January bill. It is already inside your set aside number, so nothing to do, just know it is there.`,
-        waText: `your income passed the ${label} threshold, ${gbp(slDue)} of loan repayment is building and is already in your set aside number`,
+        body: `Your income has passed your ${label} threshold, so ${his(slDue)} of repayment has started building towards the January bill. It is already inside your set aside number, so nothing to do, just know it is there.`,
+        waText: `your income passed the ${label} threshold, ${his(slDue)} of loan repayment is building and is already in your set aside number`,
         numbers: { due: slDue },
       });
     }
@@ -735,8 +758,8 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
         // It is only true of a man with no student loan and no tax deducted at source. For anybody
         // else it is a claim he can check against the two figures in the same sentence and find
         // wrong, which is the worst kind of copy: confident, checkable and false.
-        body: `Your Self Assessment bill is heading for about ${gbp2(estBill)}. Over ${gbp(FACTS.poaThreshold)}, HMRC also asks for half of next year's tax up front, so January is bigger than the bill itself: ${gbp2(estBill)} for the year plus about ${gbp2(poa)} on account.${loanClause} Brutal if it surprises you, boring if you set aside for it, and your set aside number can carry it from here.`,
-        waText: `your Self Assessment bill is heading for about ${gbp2(estBill)}, which switches on payments on account: January asks for roughly ${gbp2(estBill + poa)} in total`,
+        body: `Your Self Assessment bill is heading for about ${his(estBill)}. Over ${gbp(FACTS.poaThreshold)}, HMRC also asks for half of next year's tax up front, so January is bigger than the bill itself: ${his(estBill)} for the year plus about ${his(poa)} on account.${loanClause} Brutal if it surprises you, boring if you set aside for it, and your set aside number can carry it from here.`,
+        waText: `your Self Assessment bill is heading for about ${his(estBill)}, which switches on payments on account: January asks for roughly ${his(estBill + poa)} in total`,
         numbers: { estBill, poa, threshold: FACTS.poaThreshold },
         action: { kind: 'set_aside', amount: estBill, label: 'Tax set aside' },
       });
@@ -772,9 +795,9 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
       signalKey: 'cis_refund_milestone',
       periodKey: `${year}#m${milestone}`,
       priority: 'card',
-      title: `Your CIS refund passed ${gbp(milestone)}`,
-      body: `The refund building from your CIS deductions is now about ${gbp(refund)}: tax already taken off your pay (${gbp(d.ytdCis)}) less the tax actually due on your profit so far. Every expense you log grows it. Settled when you file, and you approve first.`,
-      waText: `the CIS refund building on your numbers just passed ${gbp(milestone)}, now about ${gbp(refund)}`,
+      title: `Your CIS refund passed ${his(milestone)}`,
+      body: `The refund building from your CIS deductions is now about ${his(refund)}: tax already taken off your pay (${his(d.ytdCis)}) less the tax actually due on your profit so far. Every expense you log grows it. Settled when you file, and you approve first.`,
+      waText: `the CIS refund building on your numbers just passed ${his(milestone)}, now about ${his(refund)}`,
       numbers: { refund, milestone, cis: d.ytdCis },
     });
   }
@@ -800,8 +823,8 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
       periodKey: lastClosedKey,
       priority: 'card',
       title: 'Last month looks light on expenses',
-      body: `You logged ${gbp(lastClosed)} of expenses last month against a recent average of ${gbp(priorAvg)}. If it was a quiet month, ignore this. If receipts went unlogged, they are tax savings sitting in a jacket pocket: snap them on WhatsApp whenever, even weeks later.`,
-      waText: `last month's expenses (${gbp(lastClosed)}) were well under your usual ${gbp(priorAvg)}. Missed receipts are missed tax savings, snap them any time`,
+      body: `You logged ${his(lastClosed)} of expenses last month against a recent average of ${his(priorAvg)}. If it was a quiet month, ignore this. If receipts went unlogged, they are tax savings sitting in a jacket pocket: snap them on WhatsApp whenever, even weeks later.`,
+      waText: `last month's expenses (${his(lastClosed)}) were well under your usual ${his(priorAvg)}. Missed receipts are missed tax savings, snap them any time`,
       numbers: { lastMonth: lastClosed, average: Math.round(priorAvg) },
     });
   }
@@ -817,8 +840,8 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
       periodKey: year,
       priority: 'ping',
       title: 'Buying kit before 5 April cuts this year’s bill',
-      body: `Strong year: your profit is heading for about ${gbp(projProfit)}. If you were planning a van, big tools or other kit anyway, buying before 5 April means the whole cost comes off THIS year's profit under the Annual Investment Allowance, at your highest rate. Buy it a week into April and the saving waits a year. Only worth it for things you actually need, spending £1 to save 40p is not a plan. A suggestion from your numbers, not advice. You decide.`,
-      waText: `your profit is heading for ${gbp(projProfit)}. Kit you were buying anyway saves more before 5 April than after, under the Annual Investment Allowance`,
+      body: `Strong year: your profit is heading for about ${his(projProfit)}. If you were planning a van, big tools or other kit anyway, buying before 5 April means the whole cost comes off THIS year's profit under the Annual Investment Allowance, at your highest rate. Buy it a week into April and the saving waits a year. Only worth it for things you actually need, spending £1 to save 40p is not a plan. A suggestion from your numbers, not advice. You decide.`,
+      waText: `your profit is heading for ${his(projProfit)}. Kit you were buying anyway saves more before 5 April than after, under the Annual Investment Allowance`,
       numbers: { projected: projProfit, daysToEnd },
     });
   }
@@ -851,8 +874,8 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
       periodKey: year,
       priority: 'card',
       title: 'Your mortgage interest relief is capped',
-      body: `Your rent is taxed at ${topPct}% on the top slice, but mortgage interest on a residential let only earns a ${creditPct}% credit (Section 24). On the ${gbp(input.property.finance)} of interest so far, that is relief of about ${gbp(Math.round(input.property.finance * pf.s24CreditRate))}, not ${gbp(Math.round((input.property.finance * topPct) / 100))}. Companies still deduct interest in full, which is why some landlords compare incorporating. Information, not advice: the comparison lives in the app under Pay yourself.`,
-      waText: `your ${gbp(input.property.finance)} of mortgage interest earns ${creditPct}% relief while the rent is taxed at ${topPct}%, the Section 24 gap`,
+      body: `Your rent is taxed at ${topPct}% on the top slice, but mortgage interest on a residential let only earns a ${creditPct}% credit (Section 24). On the ${his(input.property.finance)} of interest so far, that is relief of about ${his(Math.round(input.property.finance * pf.s24CreditRate))}, not ${his(Math.round((input.property.finance * topPct) / 100))}. Companies still deduct interest in full, which is why some landlords compare incorporating. Information, not advice: the comparison lives in the app under Pay yourself.`,
+      waText: `your ${his(input.property.finance)} of mortgage interest earns ${creditPct}% relief while the rent is taxed at ${topPct}%, the Section 24 gap`,
       numbers: { finance: input.property.finance, creditPct, topPct },
     });
   }
@@ -874,8 +897,8 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
         periodKey: year,
         priority: 'card',
         title: 'April 2027, priced on your numbers',
-        body: `From 6 April 2027 property income gets its own rates (22%, 42%, 47%) and the mortgage interest credit moves to 22%. On your year so far, that is about ${gbp(delta.extraPerYear)} more per year. Nobody else will tell you this early. Nothing to do today, but pricing rent reviews and planning with the real number beats finding out in 2028.`,
-        waText: `the April 2027 property rates would add about ${gbp(delta.extraPerYear)} a year on your current numbers`,
+        body: `From 6 April 2027 property income gets its own rates (22%, 42%, 47%) and the mortgage interest credit moves to 22%. On your year so far, that is about ${his(delta.extraPerYear)} more per year. Nobody else will tell you this early. Nothing to do today, but pricing rent reviews and planning with the real number beats finding out in 2028.`,
+        waText: `the April 2027 property rates would add about ${his(delta.extraPerYear)} a year on your current numbers`,
         numbers: { extraPerYear: delta.extraPerYear, billNow: delta.now.incomeTax, billThen: delta.then.incomeTax },
       });
     }
@@ -922,8 +945,8 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
         periodKey: `${year}#hom`,
         priority: 'card',
         title: 'A claim most trades miss: use of home',
-        body: `Do your quotes, invoices or admin from home? You can claim a flat ${gbp(monthly)} a month for it, no receipts to keep. Over a year that is about ${gbp(saving)} off your tax at your rate. Say "claim use of home" and Lekhio adds it. A suggestion from your numbers, not advice. You decide.`,
-        waText: `you can claim a flat ${gbp(monthly)} a month for working from home, about ${gbp(saving)} off your tax a year, just say "claim use of home"`,
+        body: `Do your quotes, invoices or admin from home? You can claim a flat ${his(monthly)} a month for it, no receipts to keep. Over a year that is about ${his(saving)} off your tax at your rate. Say "claim use of home" and Lekhio adds it. A suggestion from your numbers, not advice. You decide.`,
+        waText: `you can claim a flat ${his(monthly)} a month for working from home, about ${his(saving)} off your tax a year, just say "claim use of home"`,
         numbers: { monthly, saving, marginalRatePct: Math.round(marginalRate * 100) },
       });
     }
@@ -973,8 +996,8 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
           // has to be true of him in November as well as tonight.
           // ═══════════════════════════════════════════════════════════════════════════════════
           title: 'The £1,000 trading allowance would beat your costs',
-          body: `Your business costs this year are running under £1,000 (about ${gbp(projTradeExpenses)} at this pace). The flat £1,000 trading allowance is claimed instead of your real costs rather than as well as them, so on today's figures it would take roughly ${gbp(benefit)} more off your tax than your logged costs do. It is your election to make on your own return, so we have not made it for you: it is under You, then Allowances, and it comes off again in one tap. Keep sending receipts either way, because the day your real costs pass £1,000 you are better off without it. A suggestion from your numbers, not advice. You decide.`,
-          waText: `your costs are running under £1,000, so the flat £1,000 trading allowance would beat them by about ${gbp(benefit)} of tax. It is claimed INSTEAD of your costs, not as well, and it is your election to make: open your Lekhio under You, then Allowances`,
+          body: `Your business costs this year are running under £1,000 (about ${his(projTradeExpenses)} at this pace). The flat £1,000 trading allowance is claimed instead of your real costs rather than as well as them, so on today's figures it would take roughly ${his(benefit)} more off your tax than your logged costs do. It is your election to make on your own return, so we have not made it for you: it is under You, then Allowances, and it comes off again in one tap. Keep sending receipts either way, because the day your real costs pass £1,000 you are better off without it. A suggestion from your numbers, not advice. You decide.`,
+          waText: `your costs are running under £1,000, so the flat £1,000 trading allowance would beat them by about ${his(benefit)} of tax. It is claimed INSTEAD of your costs, not as well, and it is your election to make: open your Lekhio under You, then Allowances`,
           numbers: { benefit, projExpenses: projTradeExpenses, marginalRatePct: Math.round(marginalRate * 100) },
         });
       }
@@ -994,12 +1017,12 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
         periodKey: `inv-${inv.id.slice(0, 8)}#${tier}`,
         priority: tier === 30 ? 'ping' : 'card',
         title: `Invoice ${inv.number} is ${inv.daysOver} days unpaid`,
-        body: `${gbp(inv.total)} from ${inv.customer || 'your customer'} is still outstanding. Here is a chase written in your voice, ready to forward:
+        body: `${his(inv.total)} from ${inv.customer || 'your customer'} is still outstanding. Here is a chase written in your voice, ready to forward:
 
 "${draft}"
 
 Send it as it is or tweak it first. You send, never me. Most invoices get paid within days of a polite nudge.`,
-        waText: `invoice ${inv.number} (${gbp(inv.total)}, ${inv.customer || 'customer'}) is ${inv.daysOver} days unpaid, and I have a polite chase drafted for you, just say "chase invoice ${inv.number}"`,
+        waText: `invoice ${inv.number} (${his(inv.total)}, ${inv.customer || 'customer'}) is ${inv.daysOver} days unpaid, and I have a polite chase drafted for you, just say "chase invoice ${inv.number}"`,
         numbers: { total: inv.total, daysOver: inv.daysOver, tier },
         action: {
           kind: 'invoice_chase',
@@ -1026,7 +1049,7 @@ Send it as it is or tweak it first. You send, never me. Most invoices get paid w
         ? `This week's watchpoint: ${input.unconfirmedCount} entries are waiting for your yes. Two minutes in the app squares the books.`
         : daysToQuarterEnd <= 21
           ? `This week's watchpoint: the quarter closes in ${daysToQuarterEnd} ${daysToQuarterEnd === 1 ? 'day' : 'days'}. Your figures are ready when you are.`
-          : `The year so far is carrying about ${gbp(taxDueYtd)} of tax. Your set aside number has it covered.`;
+          : `The year so far is carrying about ${his(taxDueYtd)} of tax. Your set aside number has it covered.`;
     out.push({
       signalKey: 'monday_brief',
       periodKey: `wk-${today.toISOString().slice(0, 10)}`,
@@ -1034,10 +1057,10 @@ Send it as it is or tweak it first. You send, never me. Most invoices get paid w
       title: 'Your Monday brief',
       body: quiet
         ? `Nothing logged last week. No judgement, some weeks are like that. ${watch}`
-        : `Last week: ${gbp(w.income)} in, ${gbp(w.expenses)} out, ${gbp(kept)} kept. ${watch}`,
+        : `Last week: ${his(w.income)} in, ${his(w.expenses)} out, ${his(kept)} kept. ${watch}`,
       waText: quiet
         ? `Monday brief: nothing logged last week, fresh start today`
-        : `Monday brief: ${gbp(w.income)} in, ${gbp(w.expenses)} out last week, ${gbp(kept)} kept`,
+        : `Monday brief: ${his(w.income)} in, ${his(w.expenses)} out last week, ${his(kept)} kept`,
       numbers: { weekIncome: w.income, weekExpenses: w.expenses, kept, activeDays: w.activeDays },
     });
   }
@@ -1067,8 +1090,8 @@ Send it as it is or tweak it first. You send, never me. Most invoices get paid w
         periodKey: q.label,
         priority: 'card',
         title: 'January, rehearsed early',
-        body: `If the year stopped today, the Self Assessment bill on it would be about ${gbp(bill)}${slShareYtd > 0 ? ' including your student loan' : ''}. About ${gbp(perWeek)} a week set aside from here has that covered by 31 January. The real bill grows as you earn and your set aside number tracks it, so January never gets to surprise you.`,
-        waText: `if the year stopped today the bill is about ${gbp(bill)}, and ${gbp(perWeek)} a week from here covers it by 31 January`,
+        body: `If the year stopped today, the Self Assessment bill on it would be about ${his(bill)}${slShareYtd > 0 ? ' including your student loan' : ''}. About ${his(perWeek)} a week set aside from here has that covered by 31 January. The real bill grows as you earn and your set aside number tracks it, so January never gets to surprise you.`,
+        waText: `if the year stopped today the bill is about ${his(bill)}, and ${his(perWeek)} a week from here covers it by 31 January`,
         numbers: { bill, perWeek, weeksTo31Jan },
       });
     }
@@ -1101,7 +1124,7 @@ Send it as it is or tweak it first. You send, never me. Most invoices get paid w
       if (firstPurchase && marginalRate > 0) {
         const saving = Math.round(firstPurchase.amount * marginalRate);
         moves.push(
-          `Buying ${firstPurchase.title} before 5 April puts the whole cost against this year under the Annual Investment Allowance. At your rate that is about ${gbp(saving)} off the tax on ${gbp(firstPurchase.amount)} spent. You decide.`,
+          `Buying ${firstPurchase.title} before 5 April puts the whole cost against this year under the Annual Investment Allowance. At your rate that is about ${his(saving)} off the tax on ${his(firstPurchase.amount)} spent. You decide.`,
         );
       }
       // Higher rate profit: a pension contribution is the classic year end lever.
@@ -1377,7 +1400,7 @@ function slugName(s: string): string {
 // Turn a rakhamoves Move into an AgentSignal the walk can store and render, same shape as every other.
 function moveToSignal(m: Move, year: string): AgentSignal {
   const linkLines = m.links.length ? '\n\n' + m.links.map((l) => `${l.label}:\n${l.url}`).join('\n\n') : '';
-  const saved = m.estSaving > 0 ? `${m.isEstimate ? 'about ' : ''}${gbp(m.estSaving)}` : '';
+  const saved = m.estSaving > 0 ? `${m.isEstimate ? 'about ' : ''}${his(m.estSaving)}` : '';
   return {
     signalKey: m.ownerName ? `${m.key}_${slugName(m.ownerName)}` : m.key,
     periodKey: `${year}#mv`,
@@ -1419,14 +1442,14 @@ function soloOwners(structure: BusinessType, input: AgentInput): OwnerInput[] {
 // than the sole-trader line quietly leaking back to directors.
 function ltdMondayBrief(sig: AgentSignal, input: AgentInput): AgentSignal {
   const d = derive(input);
-  const soleLine = `The year so far is carrying about ${gbp(soleTraderTax(d.ytdProfit).total)} of tax. Your set aside number has it covered.`;
+  const soleLine = `The year so far is carrying about ${his(soleTraderTax(d.ytdProfit).total)} of tax. Your set aside number has it covered.`;
   if (!sig.body.includes(soleLine)) return sig;
   const pos = computePosition({
     type: 'limited_company',
     profit: Math.max(0, d.ytdProfit),
     owners: soloOwners('limited_company', input),
   });
-  const ctLine = `The company's year so far is carrying about ${gbp(pos.business.corporationTax)} of Corporation Tax. Setting it aside as you go keeps the CT600 boring.`;
+  const ctLine = `The company's year so far is carrying about ${his(pos.business.corporationTax)} of Corporation Tax. Setting it aside as you go keeps the CT600 boring.`;
   return { ...sig, body: sig.body.replace(soleLine, ctLine) };
 }
 

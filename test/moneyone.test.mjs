@@ -323,5 +323,106 @@ console.log('\n=== 4. one figure, one costume, on every door ===\n');
     && /\$\{gbp\(threshold\)\}/.test(read('lib/weeklyupdate.ts')));
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 4b. lib/agent.ts, THE PROACTIVE SURFACE. BOTH DIRECTIONS, AND THE SPLIT IS DERIVED (B46).
+//
+// 19 August 2026. This file prints more money than any other in the estate and it is the only one
+// a customer reads without opening the app, so it is the surface where a wrong costume is worn in
+// front of the most people. Before B46 every figure here wore gbp0, so ONE SENTENCE said "your
+// income is on track for £62,710, into the 40% band above £50,270" with only one of those right,
+// and voluntary Class 2 cost "about £190" here while /app/tax/ni said £189.80.
+//
+// 🔴 WHY THIS BLOCK DERIVES INSTEAD OF LISTING SITES, UNLIKE SECTION 4 ABOVE. Section 4 names its
+// call sites because there are a dozen. There are 111 here. A hand written list of 111 is the
+// staged import list and the hand written anchor list wearing a third hat, and this corpus has now
+// paid for that shape twice. So the rule is derived from the source and the source must satisfy it.
+//
+// 🔴 THE RULE, AND THE ONE SUBTLETY IN IT. A BARE alias of a FACTS constant is the law's own
+// figure and stays whole pounds. Anything COMPUTED from one is a PRICE, and a price is his:
+// `const cost = Math.round(FACTS.class2WeeklyRate * 52 * 100) / 100` is £189.80 that HE pays, not
+// a threshold he is measured against, and it wears pence like the rest of his money.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+{
+  const codeOnly = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  const agentSrc = codeOnly(read('lib/agent.ts'));
+
+  // Every local name that is a BARE alias of a FACTS constant. Derived, never listed.
+  const statutory = new Set();
+  for (const m of agentSrc.matchAll(/const\s+([A-Za-z_$][\w$]*)\s*=\s*FACTS\.[A-Za-z0-9_$]+\s*;/g)) {
+    statutory.add(m[1]);
+  }
+
+  // Every call of a one argument formatter alias, with its argument, read to the balanced paren.
+  const sitesOf = (fnName) => {
+    const out = [];
+    for (const line of agentSrc.split('\n')) {
+      let pos = 0;
+      for (;;) {
+        const idx = line.indexOf(fnName + '(', pos);
+        if (idx === -1) break;
+        const before = line[idx - 1];
+        if (before && /[A-Za-z0-9_$]/.test(before)) { pos = idx + fnName.length + 1; continue; }
+        let depth = 0, j = idx + fnName.length, arg = '';
+        for (; j < line.length; j++) {
+          const c = line[j];
+          if (c === '(') { depth++; if (depth === 1) continue; }
+          if (c === ')') { depth--; if (depth === 0) break; }
+          if (depth >= 1) arg += c;
+        }
+        out.push(arg.trim());
+        pos = idx + fnName.length + 1;
+      }
+    }
+    return out;
+  };
+
+  const isStatutory = (arg) => statutory.has(arg) || /^FACTS\.[A-Za-z0-9_$]+$/.test(arg);
+  const lawSites = sitesOf('gbp').filter((a) => a !== 'n');   // drop the alias declaration itself
+  const hisSites = sitesOf('his').filter((a) => a !== 'n');
+
+  // ⚠️ VACUITY FIRST, THREE WAYS. Every assertion below is an "every" over a derived list, and an
+  // empty list satisfies all of them. This block proved nothing at all if the parser stopped
+  // matching, which is precisely how the Scotland guard nearly went green against an empty string.
+  ok('🔴 VACUITY: the FACTS alias scan found statutory names at all',
+    statutory.size >= 5);
+  ok('🔴 VACUITY: the call site parser found figures on BOTH aliases',
+    lawSites.length >= 15 && hisSites.length >= 80);
+
+  const hisOnLaw = lawSites.filter((a) => !isStatutory(a));
+  ok('🔴 EVERY FIGURE ON gbp( IS THE LAW\'S OWN'
+    + (hisOnLaw.length ? ` [a figure of his in whole pounds: ${[...new Set(hisOnLaw)].join(', ')}]` : ''),
+    hisOnLaw.length === 0);
+
+  const lawOnHis = hisSites.filter((a) => isStatutory(a));
+  ok('🔴 AND NO STATUTORY FIGURE HAS DRIFTED ONTO his('
+    + (lawOnHis.length ? ` [the law in pence: ${[...new Set(lawOnHis)].join(', ')}]` : ''),
+    lawOnHis.length === 0);
+
+  // 🔴 THE INVARIANT THAT MAKES THE TWO ABOVE WORTH HAVING. If a raw formatter can be called
+  // directly, a figure can be printed without ever saying whose it is, and neither scan would see
+  // it. gbp0 and gbp2 may each appear exactly ONCE in this file: inside their own alias.
+  ok('🔴 gbp0 is reachable ONLY through gbp(, so nothing can print whole pounds anonymously',
+    (agentSrc.match(/\bgbp0\s*\(/g) || []).length === 1);
+  ok('🔴 gbp2 is reachable ONLY through his(, so nothing can print pence anonymously',
+    (agentSrc.match(/\bgbp2\s*\(/g) || []).length === 1);
+  ok('and the two aliases are wired to the two formatters, not to each other',
+    /const gbp = \(n: number\) => gbp0\(n\);/.test(agentSrc)
+    && /const his = \(n: number\) => gbp2\(n\);/.test(agentSrc));
+
+  // 🔴 THE FOUNDING CASE, KEPT AS A NAMED SPECIMEN. B46 was found because /app/tax/ni and the
+  // agent's own nudge disagreed about one figure. Assert the agent's half of that agreement from
+  // the constant, so the day the weekly rate changes this still means something.
+  // ⚠️ ANCHORED ON THE WORK, NOT ON THE VARIABLE NAME. A first draft of these two pinned
+  // `const cost =` and `${his(cost)}`, which is an identifier a rename would move, and this file's
+  // own rules say that is how an anchor dies. They read the ARITHMETIC and the SENTENCE instead,
+  // and control 2 in test/sabotage-b37money.mjs renames the variable to prove it.
+  ok('🔴 the voluntary Class 2 cost is COMPUTED from the weekly rate, so it is a price of his',
+    /Math\.round\(FACTS\.class2WeeklyRate \* 52 \* 100\) \/ 100/.test(agentSrc));
+  ok('🔴 and that price is printed through his(, to the penny',
+    /about \$\{his\([A-Za-z_$][\w$]*\)\} for the whole year/.test(agentSrc));
+  ok('🔴 while the small profits threshold in the SAME sentence stays whole pounds on gbp(',
+    /under the \$\{gbp\([A-Za-z_$][\w$]*\)\} mark/.test(agentSrc));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

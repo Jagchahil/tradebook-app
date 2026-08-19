@@ -46,6 +46,9 @@ const SUITES = [
   'test/moneyweb.test.mjs',
   'test/taxweb.test.mjs',
   'test/invoicesweb.test.mjs',
+  // B46 brought lib/agent.ts into this pass, so its own two suites join the catchers.
+  'test/agent.test.mjs',
+  'test/agentstructure.test.mjs',
 ];
 
 // ⚠️ A CRASHING SUITE COUNTS AS RED, and the tally line is not identical in every suite: some end
@@ -191,6 +194,43 @@ const SABOTAGES = [
     name: '\u{1F534} B38: the third screen the item never named goes back to whole pounds',
     apply: (d) => edit(d, 'app/app/money/page.tsx', '{gbp2(e.amount)}', '{gbp0(e.amount)}'),
   },
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // B46, 19 AUGUST 2026. THE PROACTIVE SURFACE. Seven, because section 4b of moneyone is not one
+  // assertion but a derivation, and a derivation can fail in more ways than a string match can.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  {
+    name: 'B46: a figure of his goes back to whole pounds on the WhatsApp nudge',
+    apply: (d) => edit(d, 'lib/agent.ts', '${his(d.ytdIncome)}', '${gbp(d.ytdIncome)}'),
+  },
+  {
+    name: '🔴 B46 THE OTHER WAY: the Making Tax Digital level is dressed in pence',
+    apply: (d) => edit(d, 'lib/agent.ts', '${gbp(mtdThreshold)}', '${his(mtdThreshold)}'),
+  },
+  {
+    name: '🔴 B46 THE OTHER WAY: the VAT registration threshold is dressed in pence',
+    apply: (d) => edit(d, 'lib/agent.ts', '${gbp(vat)}', '${his(vat)}'),
+  },
+  {
+    name: '🔴 B46: pence printed ANONYMOUSLY, straight through gbp2, saying nothing about whose money it is',
+    apply: (d) => edit(d, 'lib/agent.ts', '${his(poa)}', '${gbp2(poa)}'),
+  },
+  {
+    name: '🔴 B46: whole pounds printed ANONYMOUSLY, straight through gbp0',
+    apply: (d) => edit(d, 'lib/agent.ts', '${gbp(spt)}', '${gbp0(spt)}'),
+  },
+  {
+    name: '🔴 B46: the two aliases are wired to the same formatter, so the file says two things and means one',
+    apply: (d) => edit(d, 'lib/agent.ts', 'const his = (n: number) => gbp2(n);', 'const his = (n: number) => gbp0(n);'),
+  },
+  {
+    name: '🔴 B46 THE FOUNDING CASE: voluntary Class 2 rounds to "about £190" again while /app/tax/ni says £189.80',
+    apply: (d) => edit(d, 'lib/agent.ts', 'about ${his(cost)} for the whole year', 'about ${gbp(cost)} for the whole year'),
+  },
+  {
+    name: '🔴 B46 THE DERIVATION ITSELF: a statutory alias stops being a BARE alias, so the scan can no longer see it is the law',
+    apply: (d) => edit(d, 'lib/agent.ts', 'const spt = FACTS.class2SmallProfitsThreshold;',
+      'const spt = Number(FACTS.class2SmallProfitsThreshold);'),
+  },
 ];
 
 // ═══ NO-OP CONTROLS. Each changes the files without changing behaviour, and must stay GREEN. Three
@@ -210,6 +250,21 @@ const CONTROLS = [
     name: 'control: an unrelated NI page word changes',
     apply: (d) => edit(d, 'app/app/tax/ni/page.tsx', 'taken by your employer on the payslip.',
       'taken by your employer on the payslip today.'),
+  },
+  {
+    name: 'B46 control: rewording a COMMENT in lib/agent.ts changes nothing',
+    apply: (d) => edit(d, 'lib/agent.ts', '// HIS OWN MONEY: pence, on every surface',
+      '// his own money. pence. every surface. reworded on purpose.'),
+  },
+  {
+    name: 'B46 control: RENAMING the Class 2 cost variable changes nothing, because the guards read the work',
+    apply: (d) => {
+      edit(d, 'lib/agent.ts', 'const cost = Math.round(FACTS.class2WeeklyRate * 52 * 100) / 100;',
+        'const class2Cost = Math.round(FACTS.class2WeeklyRate * 52 * 100) / 100;');
+      edit(d, 'lib/agent.ts', 'about ${his(cost)} for the whole year', 'about ${his(class2Cost)} for the whole year');
+      edit(d, 'lib/agent.ts', 'About ${his(cost)} of voluntary Class 2', 'About ${his(class2Cost)} of voluntary Class 2');
+      edit(d, 'lib/agent.ts', 'threshold: spt, cost }', 'threshold: spt, cost: class2Cost }');
+    },
   },
 ];
 

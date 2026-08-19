@@ -31,7 +31,16 @@ const ENG = await import(pathToFileURL(path.join(stage, 'taxengine.ts')).href);
 const LTD = await import(pathToFileURL(path.join(stage, 'ltdengine.ts')).href);
 const MONEY = await import(pathToFileURL(path.join(stage, 'money.ts')).href);
 const { computeSignals, computeSignalsForStructure } = A;
-const gbp = MONEY.gbp0;
+// 🔴 TWO NAMES, MIRRORING lib/agent.ts's OWN TWO (B46, 19 August 2026). This file held only
+// `gbp = MONEY.gbp0` and used it to BUILD the expected string for the customer's own tax figures,
+// so it was asserting whole pounds on money that wears pence. A test that picks the formatter by
+// hand is making the engine's decision somewhere the engine cannot see it.
+// ⚠️ ONLY his HERE, AND THE ABSENCE OF gbp IS THE POINT. Every money figure this file checks is
+// the customer's own: his whole books tax, his half share as a partner, his company's CT600 line.
+// Not one statutory threshold is asserted in this suite, so a gbp0 binding would sit unused and
+// invite somebody to reach for it. The statutory direction is guarded, derived rather than listed,
+// in test/moneyone.test.mjs section 4b.
+const his = MONEY.gbp2;   // HIS OWN MONEY: pence, exactly as the engine prints it
 
 let pass = 0, fail = 0;
 function ok(desc, cond) {
@@ -155,12 +164,12 @@ const baseInput = input(marchToday, monthsFor(marchToday, 12, { incomePerMonth: 
   const partnerTax = ENG.soleTraderTax(ytdProfit / 2).total;    // his half, through the same engine
   const ctProfit = ytdProfit - 12570 - LTD.employerNIC(12570);  // company profit after salary and employer NI
   const corpTax = LTD.corporationTax(ctProfit);                 // the CT600 figure, through the company engine
-  ok('same books: the sole trader\'s Monday tax line carries the whole-books figure', soleMB.body.includes(`${gbp(soleTax)} of tax`));
-  ok('same books: the partner\'s Monday tax line carries HIS HALF, to the pound', partMB.body.includes(`${gbp(partnerTax)} of tax`));
-  ok('same books: the partner\'s figure differs from the sole trader\'s', gbp(partnerTax) !== gbp(soleTax));
+  ok('same books: the sole trader\'s Monday tax line carries the whole-books figure', soleMB.body.includes(`${his(soleTax)} of tax`));
+  ok('same books: the partner\'s Monday tax line carries HIS HALF, to the pound', partMB.body.includes(`${his(partnerTax)} of tax`));
+  ok('same books: the partner\'s figure differs from the sole trader\'s', his(partnerTax) !== his(soleTax));
   ok('same books: the director\'s Monday tax line names Corporation Tax', ltdMB.body.includes('Corporation Tax'));
-  ok('same books: the director\'s figure is the CT600 figure from the spine', ltdMB.body.includes(gbp(corpTax)));
-  ok('same books: the sole-trader tax line is GONE from the director\'s brief', !ltdMB.body.includes(`${gbp(soleTax)} of tax`));
+  ok('same books: the director\'s figure is the CT600 figure from the spine', ltdMB.body.includes(his(corpTax)));
+  ok('same books: the sole-trader tax line is GONE from the director\'s brief', !ltdMB.body.includes(`${his(soleTax)} of tax`));
   ok('same books: the corrected briefs carry no forbidden dashes', ![partMB, ltdMB].some((b) => /[–—−]/.test(b.title + b.body + b.waText)));
 
   // THE INVOICE CHASER. An £850 invoice is an £850 invoice: the share scales tax, never the money a
@@ -199,7 +208,13 @@ const baseInput = input(marchToday, monthsFor(marchToday, 12, { incomePerMonth: 
   const c2 = find(partner, 'class2_pension_year');
   ok('class 2: the half-share partner\'s £6,000 fires the pension year rescue', !!c2);
   ok('class 2: the rescue quotes HIS profit, £6,000, not the firm\'s', c2 && c2.numbers.ytdProfit === 6000);
-  ok('class 2: the £190 voluntary cost is unchanged (a constant, never rescaled)', c2 && c2.body.includes('£190'));
+  // 🔴 THE POINT OF THIS LINE IS THE WORD "unchanged": the share scales his PROFIT, it must never
+  // scale a statutory price. It used to say `includes('£190')`, which was the gbp0 rounding of
+  // £189.80 rather than the price itself. Derived from the weekly rate now, so it still asserts
+  // "not rescaled" and no longer asserts "rounded". B46, 19 August 2026.
+  const c2Cost = Math.round(ENG.FACTS.class2WeeklyRate * 52 * 100) / 100;
+  ok('class 2: the voluntary cost is unchanged (a statutory price, never rescaled by the share)',
+    c2 && c2.body.includes(`about ${his(c2Cost)} for the whole year`));
 }
 
 // 6. CIS FLOWS AT THE SHARE. CIS deducted from the partnership's payments is credited to partners by

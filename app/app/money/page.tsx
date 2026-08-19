@@ -15,7 +15,7 @@ import { categoriseBankLine } from '../../../lib/categories';
 import {
   isMonthKey, logFor, monthKeyOf, monthTitle, stepMonth, dayLabel,
 } from '../../../lib/moneylog';
-import { gbp0, gbp2 } from '../../../lib/money';
+import { gbp2 } from '../../../lib/money';
 import { entryRef } from '../entryref';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
@@ -249,7 +249,7 @@ export default async function MoneyPage({
                   ) : (
                     <span style={e.personal ? S.labelOff : S.label}>{e.label}</span>
                   )}
-                  {/* ⚠️ gbp0 AND NOTHING ELSE. The first draft of this line built the negative
+                  {/* ⚠️ THE SHARED FORMATTER AND NOTHING ELSE. The first draft of this line built the negative
                       itself, which is the eighteenth money formatter and exactly what the 28 July
                       sweep existed to stop. lib/money.ts puts the sign outside the pound, "-£42"
                       rather than "£-42", because that is how a person writes one. */}

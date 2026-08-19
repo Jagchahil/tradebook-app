@@ -14,7 +14,7 @@ import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
 // exactly as the "It was rent" button below already is. See lib/propertylanes.ts.
 import { categoriesFor } from '../../../lib/propertylanes';
 import { capitalOptions, capitalQuestion, capitalWhy, shouldAskCapital } from '../../../lib/capital';
-import { gbp0, gbp2 } from '../../../lib/money';
+import { gbp2 } from '../../../lib/money';
 import { bankFeedOffered } from '../../../lib/bankfeed';
 import { gateForUser } from '../../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../../lib/gate';

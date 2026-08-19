@@ -147,8 +147,23 @@ ok('🔴 AND IT IS GATED: drawn only for an account with the rental stream (doc 
 ok('money out is still the default and plain money in is untouched',
   /name="direction" value="out" defaultChecked/.test(addPage) && /name="direction" value="in"/.test(addPage));
 ok('the route accepts exactly three directions', /direction !== 'in' && direction !== 'out' && direction !== 'rent'/.test(codeOnly(route)));
-ok('🔴 RENT LANDS IN THE PROPERTY STREAM AND ONLY RENT DOES: plain money in gets no income_type',
-  /income_type: direction === 'rent' \? 'property' : undefined/.test(codeOnly(route)));
+// 🔴 THIS ASSERTION USED TO PIN THE DEFECT, BYTE FOR BYTE. B62, 20 August 2026.
+//
+// It read: /income_type: direction === 'rent' \? 'property' : undefined/, and it was GREEN for the
+// whole time a landlord's typed mortgage interest was being deducted against a trade she did not
+// have. The words above it, "AND ONLY RENT DOES", were written as a promise and were being kept.
+// The promise was the bug. A guard that asserts an expression character by character does not
+// protect a behaviour, it FREEZES a line, and the next person to read a green suite concluded the
+// stream was handled.
+//
+// ⚠️ SO IT IS NOW ABOUT THE SHAPE AND THE BEHAVIOUR LIVES IN ITS OWN SUITE:
+// test/b62propertyroute.test.mjs stages this route, posts every category lib/propertylanes.ts names,
+// and reads the split back out of the real propertyYtdTotals.
+ok('🔴 RENT LANDS IN THE PROPERTY STREAM AND SO DOES A PROPERTY COST, and which categories those'
+  + ' are is lib/propertylanes.ts to say',
+  /income_type:[^;]*direction === 'rent'/.test(codeOnly(route))
+  && /streamFor\(/.test(codeOnly(route))
+  && /from '(\.\.\/)+lib\/propertylanes'/.test(codeOnly(route)));
 ok('rent is filed under the same literal the WhatsApp rent capture writes',
   /direction === 'rent' \? 'rent'/.test(codeOnly(route)));
 ok('plain money in is still income, decided by the server, whatever the form claimed',

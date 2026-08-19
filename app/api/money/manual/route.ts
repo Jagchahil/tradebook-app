@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sessionUser } from '../../../../lib/webauth';
 import { insertTransaction, readVatProfile } from '../../../../lib/supabase';
 import { isCategory } from '../../../../lib/categories';
+import { streamFor } from '../../../../lib/propertylanes';
 import { clampReceiptDate } from '../../../../lib/waintents';
 import { rateLimitedShared } from '../../../../lib/ratelimit';
 import { gateForUser, refuseUnentitled } from '../../../../lib/gateserver';
@@ -197,9 +198,45 @@ export async function POST(req: NextRequest) {
       // His own typing, approved by his own press. See the header for why this is the one
       // capture that does not wait.
       confirmed: true,
-      // The stream. ONLY the rent choice marks a row 'property'; plain money in stays trade
-      // income exactly as it always was, and nothing here ever rewrites an existing row.
-      income_type: direction === 'rent' ? 'property' : undefined,
+      // ════════════════════════════════════════════════════════════════════════════════════
+      // 🔴 THE STREAM. B62, 20 August 2026. MONEY IN HAD A PROPERTY LANE AND MONEY OUT HAD
+      // NONE, ON THE ONE DOOR IN THIS PRODUCT WHERE A ROW LANDS CONFIRMED.
+      //
+      // This line read `direction === 'rent' ? 'property' : undefined`. The four property
+      // categories in the picker on /app/money/add are real categories in lib/categories.ts, every
+      // customer is offered them, and every one of them was a DEAD END: chosen, filed, and
+      // deducted against a TRADE.
+      //
+      // Norah Whitby, two flats and no trade at all, typed 62,000 of rent in and 22,000 of costs
+      // out: 14,000 of mortgage interest, 6,200 of letting agent, 1,800 of property repairs. The
+      // product asked her for 11,832.00 where the correct Self Assessment figure is 6,232.00. That
+      // is 5,600.00 too much on the bill, 2,800.00 too much on each payment on account, and
+      // 8,400.00 too much on what January 2028 asks, and the quarterly update reported a 22,000
+      // TRADE LOSS on a woman with no trade.
+      //
+      // ⚠️ WHICH CATEGORIES THOSE ARE IS lib/propertylanes.ts's TO SAY AND NEVER THIS
+      // ROUTE'S TO LIST. A list typed here rots the day a fifth category is added, and that is
+      // exactly how this defect came to exist: the rule lived in one route while lib/voiceflow.ts
+      // and app/api/pile/route.ts both asked the module. This is the third caller of streamFor,
+      // not a third copy of the rule.
+      //
+      // ⚠️ AND THE FINANCE HALF IS NOT SET HERE, DELIBERATELY. Mortgage interest is
+      // relieved as a Section 24 basic rate reducer rather than deducted, and every reader in the
+      // product already makes that split at READ time from the category, through
+      // isResidentialFinanceCost: propertyYtdTotals, lib/yeartodate.ts and lib/incomeproof.ts all
+      // do it the same way. ONE FIELD ON THE WAY IN IS THE WHOLE FIX. A second field here would be
+      // a second answer to a question that already has one, and the two would drift.
+      //
+      // 🔴 AND ROUTING ALL FOUR AS ORDINARY PROPERTY EXPENSES WOULD HAVE BEEN WORSE THAN
+      // THE BUG IT FIXED. It moves Norah from 5,600.00 too high to 2,800.00 too LOW, which is the
+      // direction that earns a customer a penalty. test/b62propertyroute.test.mjs proves the split
+      // end to end, on the row this route actually writes, through the real reader.
+      //
+      // ⚠️ THE RENT BRANCH STAYS FIRST AND STAYS EXPLICIT. 'rent' is money IN and is not
+      // one of the four cost categories, so streamFor has no opinion about it. Nothing here ever
+      // rewrites an existing row.
+      // ════════════════════════════════════════════════════════════════════════════════════
+      income_type: direction === 'rent' || streamFor(filedAs) === 'property' ? 'property' : undefined,
     });
   } catch {
     // A failed write must not look like a successful one. Nothing landed, and the page says so.

@@ -80,13 +80,52 @@ export default async function VatPage() {
   if (!user) redirect('/in?next=%2Fapp%2Ftax%2Fvat');
 
   const now = new Date();
-  const from = quarterStartISO(now);
+  const quarterFrom = quarterStartISO(now);
   const to = isoDay(now);
 
   // NULL MEANS THE READ FAILED. It does not mean he is not registered. Everything below branches on
   // that difference before it branches on anything else.
   const profile = await readVatProfile(user.id);
   const isRegistered = profile !== null && profile.registered;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B81. THE WINDOW CANNOT OPEN BEFORE THE DAY HE WAS REGISTERED, AND UNTIL 20 AUGUST 2026
+  // IT DID. THIS IS THE FIRST THING IN THIS PRODUCT THAT KNOWS AN ACCOUNT CAN CHANGE STATE
+  // MID LIFE.
+  //
+  // Every engine here was written for a steady state. `registeredOn` has been stored since
+  // 1 August and, until this line, it was referenced in exactly SIX places in the whole estate
+  // and every one of them was a SENTENCE: two display lines on this page, two on /app/you/vat,
+  // one on /app/you, and the echo in /api/vat. `inReg111Window` in lib/vat.ts, the predicate
+  // written to decide precisely this question, had ZERO callers anywhere. The date was
+  // collected, printed, and never once used to bound an arithmetic.
+  //
+  // 🔴 WALKED ON PRODUCTION, 20 August 2026, ON `+callum`. Registered with an effective date of
+  // 1 August 2026, then a £600 cost dated 15 JULY stating £100 of VAT was typed and accepted
+  // with no warning. This screen then read "HMRC owes you so far £100", on VAT from a purchase
+  // made SEVENTEEN DAYS BEFORE HE WAS REGISTERED, four paragraphs above its own correct
+  // sentence saying that money "belongs on your first return after registering".
+  //
+  // ⚠️ AND THE DIRECTION IS THE ONE THAT EARNS A PENALTY. Overstating input tax UNDERSTATES the
+  // VAT due. VAT Notice 700 section 10.5, read live on 20 August 2026: input tax is claimed on
+  // the return "for the period during which the supplier's tax point occurred". On 15 July he
+  // was not registered, so he has no ordinary input tax for that day at all. What he has is a
+  // Reg 111 pre registration claim, goods four years back if still on hand and services six
+  // months back, on the FIRST return, which is the block this page already draws below.
+  //
+  // ⚠️ IT CLAMPS BOTH READERS, NOT JUST THE COSTS, AND THAT IS THE OTHER HALF OF THE SAME BUG.
+  // getOutputVat sums `grossTurnover` over this same window, and on the FLAT RATE scheme
+  // vatPosition computes the sum due as a percentage of it. So the identical missing clamp
+  // charged a flat rate trader on turnover from before he was registered, which is the OPPOSITE
+  // error on the same line. One clamp closes both.
+  //
+  // ⚠️ A NULL `registeredOn` DOES NOT CLAMP, DELIBERATELY. We do not know when he registered,
+  // and inventing a date is worse than the calendar quarter. /app/you and /app/you/vat both
+  // already ask him for it in words, and this is the arithmetic that makes that ask matter.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const registeredOn = isRegistered && profile !== null ? profile.registeredOn : null;
+  const clamped = registeredOn !== null && registeredOn > quarterFrom && registeredOn <= to;
+  const from = clamped && registeredOn !== null ? registeredOn : quarterFrom;
 
   // Only the branch that will be drawn is read for. A man who is not registered gets his rolling
   // twelve months instead, because the one thing worth telling him here is whether he has crossed
@@ -445,9 +484,20 @@ export default async function VatPage() {
           <section className="lek-card">
             <h1 className="lek-h2">VAT this quarter</h1>
             <p style={S.window}>
-              Your figures from {pretty(from)} to today. That is the calendar quarter. HMRC gives
-              some businesses quarters that end in a different month, so if yours do, read this as
-              three months of figures rather than as your own return period.
+              {clamped ? (
+                <>
+                  Your figures from {pretty(from)}, the day you registered, to today. The calendar
+                  quarter started on {pretty(quarterFrom)}, and VAT only runs from the day you
+                  registered. What you spent before that is not lost: it is below, under what you
+                  could reclaim from before you registered.
+                </>
+              ) : (
+                <>
+                  Your figures from {pretty(from)} to today. That is the calendar quarter. HMRC
+                  gives some businesses quarters that end in a different month, so if yours do,
+                  read this as three months of figures rather than as your own return period.
+                </>
+              )}
             </p>
 
             {nothingYet ? (

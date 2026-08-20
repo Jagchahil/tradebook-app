@@ -177,10 +177,44 @@ export const FLOOR_NOTE =
 // The two statutory tests, in the order a customer meets them. GOV.UK, "Register for VAT: when to
 // register": the backward look is the rolling twelve months, the forward look is 30 days, and the
 // forward look registers you from the START of that period rather than after it.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B80. THIS SENTENCE GAVE THE EFFECTIVE DATE OF REGISTRATION ONE MONTH EARLY, ON FOUR
+// SURFACES, FROM ONE CONSTANT, FROM 12 AUGUST TO 20 AUGUST 2026.
+//
+// It read "you are registered from the first day of the month after that". Read by a customer
+// who went over in April, that is 1 May. HMRC's own VAT Registration Manual VATREG25100 gives
+// the worked example and the answer is 1 JUNE: "the date of registration is the first day of
+// the second month after his taxable supplies rose above the threshold", with the timeline
+// exceeded 22 April, liability 30 April, notification deadline 30 May, EDR 1 June. GOV.UK says
+// the same in plain words on the page this file already cites: "Your effective date of
+// registration is the first day of the second month after you go over the threshold." Both read
+// live on 20 August 2026, before the sentence was touched.
+//
+// ⚠️ THE DEADLINE HALF WAS ALWAYS RIGHT AND IS UNTOUCHED. Thirty days from the end of the month
+// he went over is exactly HMRC's 30 May. One clause of two was wrong, which is why reading the
+// sentence quickly does not catch it.
+//
+// 🔴 AND WHY IT SURVIVED IS WORTH MORE THAN THE FIX. NINE FILES REFERENCE THIS CONSTANT AND
+// EVERY ONE OF THEM GUARDS ITS PLUMBING. run6fixes checks it is imported and rendered;
+// run2fixes checks it comes after his figure; laneparity checks no router keeps a private copy;
+// sabotage-b18vatlane and sabotage-run6 check it cannot be deleted. The ONLY assertion on its
+// CONTENT was that it contains the words "rolling twelve months". A wall of guards proving a
+// sentence is PRESENT and POSITIONED, and not one asking whether it is TRUE.
+//
+// ⚠️ SO THE GUARD THAT COMES WITH THIS FIX DERIVES THE DATE RATHER THAN QUOTING IT.
+// test/vatedr.test.mjs computes the effective date from the rule for TWO breach months, one of
+// which crosses a year end, and requires the worked example below to agree with what it
+// computed. A guard that quoted the new words would be the same guard that kept the old ones
+// alive for eight days.
+//
+// THE WORKED EXAMPLE IS HMRC'S OWN AND IT IS DELIBERATE. People restate this rule to themselves
+// wrongly; a date rule with no example is a date rule they will get wrong anyway.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 export const BACKWARD_TEST =
   'You must register once your taxable turnover goes over the threshold in any rolling twelve '
   + 'months. You then have 30 days from the end of that month to register, and you are registered '
-  + 'from the first day of the month after that.';
+  + 'from the first day of the second month after the one you went over in. So if you go over in '
+  + 'April, you register by 30 May and you are VAT registered from 1 June.';
 
 export const FORWARD_TEST =
   'There is a second test people miss: if you expect to go over the threshold in the next 30 days '

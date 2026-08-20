@@ -173,7 +173,22 @@ ok('and the other two guesses a stranger makes go the same way',
     outv !== null && outv.outputVat === 400 && outv.grossTurnover === 2400 && outv.reverseChargeVat === 0);
   ok('🔴 but it now REPORTS them: the count of what it held back',
     outv !== null && outv.unsentCount === 2);
-  ok('...the net of what it held back', outv !== null && outv.unsentNet === 5900);
+  // 🔴 5,750, NOT 5,900. CORRECTED IN PLACE 20 AUGUST 2026 BY B79, AND THE REASON IS RECORDED
+  // BECAUSE THIS FILE'S OWN RULE SAYS TO WORK OUT WHETHER THE ASSERTION IS STALE OR YOU ARE WRONG.
+  //
+  // THE ASSERTION WAS WRONG, AND IT HAD BEEN GREEN ON THE DEFECT SINCE RUN 4. It is named "the
+  // net" and it pinned the GROSS. The fixture above already held both specimens: the reverse
+  // charge draft (tax 0, total 5000), where the total IS the net because the customer's VAT was
+  // never added to it, and the ordinary charged draft (tax 150, total 900), whose net is 750.
+  // Only the second can tell the two apart, and the number beside it was computed from what the
+  // code did rather than from what the label meant.
+  //
+  // ⚠️ IT IS DERIVED FROM THE FIXTURE NOW RATHER THAN TYPED, so changing the fixture cannot
+  // quietly re arm it. test/b81vattransition.test.mjs section 2 holds the same property with the
+  // gross and the net asserted to DIFFER first, which is the vacuity check this one lacked.
+  const draftNet = rows.filter((r) => r.status === 'draft').reduce((s, r) => s + r.total - r.tax, 0);
+  ok('...the net of what it held back, which is the total LESS the VAT charged',
+    outv !== null && outv.unsentNet === draftNet && draftNet === 5750);
   ok('...and the VAT inside it, reverse charge included, because both are money he must account for',
     outv !== null && outv.unsentVat === 1150);
 }

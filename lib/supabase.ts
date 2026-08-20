@@ -1001,7 +1001,25 @@ export async function getOutputVat(
       if (String(r.status ?? '') === 'draft') {
         // a draft is not a supply, so it stays out of the figure. It does NOT stay out of sight.
         unsentCount += 1;
-        unsentNet += Number(r.total) || 0;
+        // 🔴 B79. THE NET, AND THIS LINE USED TO READ `Number(r.total)`, WHICH IS THE GROSS.
+        // /app/tax/vat prints "That is {unsentNet} of work carrying {unsentVat} of VAT", so a
+        // gross figure here states that the VAT sits ON TOP of a number that already contains
+        // it. WALKED ON PRODUCTION, 20 August 2026, single variable: two reverse charge drafts
+        // read £8,000 of work carrying £1,200 of VAT, and adding ONE ordinary charged invoice of
+        // £1,000 net plus £200 of VAT moved it to £9,200, not £9,000. The invoice LIST carries
+        // the same £9,200 and is RIGHT, because there it is labelled "owed to you", which the
+        // gross genuinely is. One number, correct under one label and wrong under the other.
+        //
+        // ⚠️ IT SURVIVED BECAUSE THE ONLY ACCOUNT WITH DRAFTS HAD ONLY REVERSE CHARGE DRAFTS,
+        // where `total` EQUALS the net by construction: the customer's VAT is deliberately not
+        // in the total (VATREVCON37100, and the invoice page says so in its own words). B5, the
+        // plain registered case that had never been walked, is what exposed it.
+        //
+        // ⚠️ AND IT IS `total` LESS `tax` RATHER THAN `subtotal` ON PURPOSE. A row can carry a
+        // `tax` with no `subtotal` written, which is the shape run4fixes' own fixture uses, and
+        // on a legacy row `tax` is 0 so the total IS the net. `reverse_charge_vat` is NOT
+        // subtracted here: it was never added.
+        unsentNet += (Number(r.total) || 0) - (Number(r.tax) || 0);
         unsentVat += (Number(r.tax) || 0) + (Number(r.reverse_charge_vat) || 0);
         continue;
       }

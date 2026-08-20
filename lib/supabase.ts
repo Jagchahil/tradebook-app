@@ -2979,6 +2979,15 @@ export interface SignupCodeRow {
   attempts: number;
   expires_at: string;
   consumed_at: string | null;
+  /**
+   * 🔴 B71. THE ADDRESS THE CODE WAS ACTUALLY EMAILED TO. Added 20 August 2026.
+   *
+   * The lookup below keys on email_norm, which strips plus tags and gmail dots, so the row found is
+   * not always the row for the exact string he typed back. That is deliberate and it is why the
+   * caller must prove the address WE EMAILED rather than the one he retyped. See the block above
+   * the verdict in app/api/signup/verify.
+   */
+  email: string;
 }
 
 export async function createSignupCode(
@@ -3007,7 +3016,7 @@ export async function readLatestSignupCode(emailNorm: string): Promise<SignupCod
   try {
     const res = await fetch(
       `${url}/rest/v1/signup_codes?email_norm=eq.${encodeURIComponent(emailNorm)}` +
-        `&select=id,code_hash,attempts,expires_at,consumed_at&order=created_at.desc&limit=1`,
+        `&select=id,email,code_hash,attempts,expires_at,consumed_at&order=created_at.desc&limit=1`,
       { headers: headers() },
     );
     if (!res.ok) return null;

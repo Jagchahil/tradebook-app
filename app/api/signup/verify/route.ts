@@ -99,7 +99,6 @@ export async function POST(req: NextRequest) {
   if (!signupCodesConfigured()) return NextResponse.json({ error: 'unavailable' }, { status: 503 });
   if (!isCodeShape(code)) return NextResponse.json({ error: 'code' }, { status: 400 });
 
-  const verifiedEmail = email;
   const emailNorm = normaliseEmail(email) || email;
 
   const row = await readLatestSignupCode(emailNorm);
@@ -127,6 +126,35 @@ export async function POST(req: NextRequest) {
   // session on one proof.
   const spent = await consumeSignupCode(row!.id);
   if (!spent) return NextResponse.json({ error: 'code', message: codeMessage('spent') }, { status: 400 });
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B71. THE ADDRESS HE PROVED IS THE ONE WE EMAILED, NOT THE ONE HE RETYPED.
+  // 20 August 2026.
+  //
+  // Everything below this line used the string he typed into the form. readLatestSignupCode keys on
+  // email_norm, and normaliseEmail STRIPS PLUS TAGS AND GMAIL DOTS on purpose, so the row it hands
+  // back is not always the row for that exact string. Two spellings of one address, and two plus
+  // tagged addresses on one base, share a queue.
+  //
+  // THE COMMON CASE IS ONE PERSON WITH TWO SPELLINGS. He asks for a code at john.smith@gmail.com
+  // and types johnsmith@gmail.com back. Until today that minted his account under the second
+  // spelling and laid a signups row down at an address he had never given us, while the row he
+  // actually created sat there unlinked. Now it mints under the address the code went to.
+  //
+  // THE RARE CASE IS TWO ADDRESSES ON ONE BASE, which is the persona estate rather than a customer,
+  // because only one mailbox can read either code. Until today, typing the other one's code minted
+  // an account for the address TYPED while consuming the row for the address SENT, which left a
+  // consumed code with no link: the one known false positive in B65's watcher. Now the two agree.
+  //
+  // 🔴 THE CODE PROVES THE MAILBOX IT WAS DELIVERED TO. It cannot prove anything about a string
+  // somebody typed afterwards, and until now this route treated the second as evidence of the
+  // first. `row.email` is what createSignupCode was handed and what sendSignupCodeEmail sent to.
+  //
+  // ⚠️ AND IT IS SETTLED THE SAME WAY THE DOOR SETTLES EVERY ADDRESS: trimmed and lower cased,
+  // because setSignupUserId patches on exactly that and findContactAccount reads on exactly that.
+  // The typed string remains the rate limit key above, which is right: that is about the request.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const verifiedEmail = String(row!.email ?? '').trim().toLowerCase() || email;
 
   // 🔴 THE AUTH USER IS CREATED ONLY NOW, ON THE FAR SIDE OF THE PROOF.
   //

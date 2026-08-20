@@ -5142,6 +5142,7 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   const {
     ytdTradeIncome, ytdTradeExpenses, ytdCisSuffered, ytdPropertyIncome, ytdPropertyExpenses,
     ytdPropertyFinance, ytdMileage, ytdHomeOfficeLogged, ytdCapitalAllowances,
+    ytdCapitalCost, ytdCapitalCount,
     categoriesLogged, vehicleBoughtThroughBooks,
   } = aggregateRowsYtd(rows, assets, startYear, partnerFactor);
 
@@ -5262,6 +5263,10 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     ytdTradeIncome: Math.round(ytdTradeIncome * 100) / 100,
     ytdTradeExpenses: Math.round(ytdTradeExpenses * 100) / 100,
     ytdCapitalAllowances: Math.round(ytdCapitalAllowances * 100) / 100,
+    // B72. What the car COST, beside what it is WORTH this year. Rounded exactly like every other
+    // money field here; the count is passed through untouched because it is not money.
+    ytdCapitalCost: Math.round(ytdCapitalCost * 100) / 100,
+    ytdCapitalCount,
     vehicleBoughtThroughBooks,
     ytdCisSuffered: Math.round(ytdCisSuffered * 100) / 100,
     employmentIncome: sl?.employmentIncome ?? 0,

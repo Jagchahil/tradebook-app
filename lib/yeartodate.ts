@@ -56,6 +56,21 @@ export interface YearToDate {
   ytdMileage: number;
   ytdHomeOfficeLogged: number;
   ytdCapitalAllowances: number;
+  // 🔴 WHAT THE VEHICLE COST, WHICH IS NOT WHAT IT IS WORTH. B72, 20 August 2026.
+  //
+  // ytdCapitalAllowances above is the slice of the car this tax year earns. THIS is the money that
+  // actually left his bank and was taken out of ytdTradeExpenses by the branch in the loop, so it
+  // is in no total on any screen. Home's Out tile is trade expenses plus property expenses, which
+  // means a man who bought a 60,000 car through his books watched 60,000 leave his account and
+  // land on nothing, under a caption promising everything he has confirmed. That is B67's fault
+  // one category over, and the product had already said so out loud in app/app/tax/summary.
+  //
+  // ⚠️ NOTHING MAY DEDUCT THIS. It is for naming money, never for arithmetic. The cost was
+  // removed on purpose and the allowance replaces it; a caller that took both would give him the
+  // car twice.
+  ytdCapitalCost: number;
+  /** How many payments make up ytdCapitalCost. Zero whenever ytdCapitalCost is zero. */
+  ytdCapitalCount: number;
   categoriesLogged: string[];
   vehicleBoughtThroughBooks: boolean;
 }
@@ -157,6 +172,13 @@ export function aggregateConfirmedRows(
   // The vehicle allowance. ⚠️ NOT a slice of ytdTradeExpenses like the two above it: the cost it
   // replaces has been taken OUT of that figure. See the branch in the loop below.
   let ytdCapitalAllowances = 0;
+  // ⚠️ THIS TAX YEAR'S PURCHASES ONLY, AND THAT IS THE ANSWER RATHER THAN A LIMIT. `rows` is
+  // this year, so a car bought last year contributes nothing here: its cash left last year and the
+  // screen that reads this says "since 6 April". The ALLOWANCE on that same older car IS still
+  // counted, by sumCapitalAllowances below, which reads every year. Two different questions, and
+  // they are answered by two fields rather than by one field that has to mean both.
+  let ytdCapitalCost = 0;
+  let ytdCapitalCount = 0;
   for (const r of rows) {
     const amt = Number(r.amount) || 0;
     if ((r.income_type ?? '').toLowerCase() === 'property') {
@@ -227,7 +249,15 @@ export function aggregateConfirmedRows(
       // ⚠️ THE TEST IS isWrittenDown() IN lib/capital.ts AND IT USED TO BE SPELLED OUT HERE.
       // Written out by hand it was invisible to every screen that prints a profit, and three of
       // them printed one that disagreed with this line by £61,284. See the header on that function.
-      if (isWrittenDown(r.capital_kind)) continue;
+      // 🔴 AND IT IS NAMED ON THE WAY PAST. B72. The `continue` is correct and is not what
+      // changed: the cost still leaves his running costs. What was missing is that nothing
+      // downstream could say HOW MUCH had been taken out, so no screen could name it and Home
+      // named nothing. Two counters, no arithmetic: see the note on ytdCapitalCost above.
+      if (isWrittenDown(r.capital_kind)) {
+        ytdCapitalCost += -amt;
+        ytdCapitalCount += 1;
+        continue;
+      }
 
       ytdTradeExpenses += -amt;
       if (isMileageRow(r)) ytdMileage += -amt;
@@ -273,6 +303,12 @@ export function aggregateConfirmedRows(
   // A partnership's van is the partnership's, and so is its allowance. Scaled with everything else
   // for the same reason: this man is taxed on his share, not on the whole book he can see.
   ytdCapitalAllowances *= partnerFactor;
+  // The partnership's car was bought with the partnership's money, so he sees his share of the cost
+  // exactly as he sees his share of the allowance on the line above.
+  // ⚠️ THE COUNT IS NOT SCALED, AND THAT IS DELIBERATE. Half of one car is not half a car on a
+  // screen. The count exists to choose between "a car" and "two cars" in a sentence, and a payment
+  // he can point at on a bank statement happened once whatever his share of it is.
+  ytdCapitalCost *= partnerFactor;
 
   return {
     ytdTradeIncome,
@@ -284,6 +320,8 @@ export function aggregateConfirmedRows(
     ytdMileage,
     ytdHomeOfficeLogged,
     ytdCapitalAllowances,
+    ytdCapitalCost,
+    ytdCapitalCount,
     categoriesLogged,
     vehicleBoughtThroughBooks,
   };

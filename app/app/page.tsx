@@ -198,6 +198,36 @@ export default async function OverviewPage() {
   // doc 103's empty test: a plumber never sees it.
   const propertyFinance = Math.max(0, optimiser.ytdPropertyFinance ?? 0);
 
+  // 🔴 AND THE SAME SENTENCE FOR A CAR, WHICH IS THE OTHER MONEY IN NONE OF THE THREE
+  // TILES. B72, 20 August 2026, found while fixing B67 and deliberately not fixed in that commit.
+  //
+  // lib/yeartodate.ts holds a written down purchase OUT of ytdTradeExpenses and its own comment has
+  // said so all along: "NOT a slice of ytdTradeExpenses like the two above it: the cost it replaces
+  // has been taken OUT of that figure." Out is trade expenses plus property expenses. So a man who
+  // bought a 60,000 car through his books watched 60,000 leave his account and appear on no tile,
+  // under a caption that promises everything he has confirmed.
+  //
+  // 🟢 TWO SCREENS ALREADY SHIP THIS SENTENCE, so nothing here is a new opinion. /app/money:
+  // "more went out on a car. That is not in Out: a car comes off over several years, never in one."
+  // /app/tax/summary says the same for a quarterly update, and its comment gives the reason this
+  // matters: taking a car out of expenses and saying nothing once put Out 72,088 and Profit 22,776
+  // on two screens of one product with nothing joining them. Home said nothing at all.
+  //
+  // ⚠️ THE ALLOWANCE IS DELIBERATELY NOT NAMED HERE, AND THAT IS A DOC 103 DECISION. These three
+  // tiles are CASH: what came in, what went out, the difference. A writing down allowance is not
+  // cash and never left his account. It belongs on the Tax page, which is where this sentence sends
+  // him, and naming it would put a second new money figure on the screen he opens to answer one
+  // question.
+  //
+  // ⚠️ AND A CAR BOUGHT LAST YEAR IS CORRECTLY SILENT HERE. Its cost is zero in this year's rows so
+  // the gate shuts. lib/incomeproof.ts met the same case and answered it the other way, on purpose:
+  // a certificate covers a range and has to explain a profit, so it names the allowance even with
+  // no purchase in range. Home covers "since 6 April" and is answering where the money went. Two
+  // different questions, and copying that answer to here would print a line about a car he bought
+  // in a year this card is not about.
+  const capitalCost = Math.max(0, optimiser.ytdCapitalCost ?? 0);
+  const capitalCount = Math.max(0, optimiser.ytdCapitalCount ?? 0);
+
   // ⚠️ A READ THAT FAILED IS NOT A QUIET WEEK, AND THIS SCREEN IS ALLOWED TO KNOW THE DIFFERENCE.
   // weekRows returns null when Supabase could not answer. Printing "£0 in, £0 out" over a timeout
   // is a lie with his own money in it.
@@ -370,8 +400,20 @@ export default async function OverviewPage() {
             BEEN MISSED. A landlord whose only confirmed row this year is his mortgage interest has
             moneyIn 0 and moneyOut 0, and this branch would have told him "Nothing confirmed since
             6 April yet" while the product held his confirmed 14,000. That is the empty state lying,
-            which is the exact fault the block above exists to have fixed. */}
-        {moneyIn === 0 && moneyOut === 0 && propertyFinance === 0 ? (
+            which is the exact fault the block above exists to have fixed.
+
+            🔴 AND B72 ADDS THE FOURTH TERM FOR THE SAME REASON, ONE CATEGORY OVER. A man
+            whose only confirmed row this year is the car he bought has moneyIn 0, moneyOut 0 and
+            propertyFinance 0, because lib/yeartodate.ts holds a written down purchase out of
+            ytdTradeExpenses. Without this term he is told nothing is confirmed while the product is
+            holding his confirmed 60,000.
+
+            ⚠️ AND THE OPERAND LIST IS NOT SOMETHING A GUARD MAY QUOTE. Three assertions in three
+            days have now gone red on this expression being made STRICTER: test/landlord.test.mjs
+            (B62), test/dayone.test.mjs (B67) and test/b67financeline.test.mjs (B72, written the day
+            before by the session that wrote the rule down). A guard here asserts that each local
+            APPEARS in the condition, never what punctuation follows it. */}
+        {moneyIn === 0 && moneyOut === 0 && propertyFinance === 0 && capitalCost === 0 ? (
           <>
             <p style={S.leadQuiet}>Nothing confirmed since 6 April yet.</p>
             <p style={S.quiet}>
@@ -406,6 +448,14 @@ export default async function OverviewPage() {
                 deliberately not in Out or Profit above. Since Section 24 it is not deducted from
                 your rent: it comes back as a 20% credit against your tax, worked out for you on the
                 Tax page.
+              </p>
+            ) : null}
+            {capitalCost > 0 ? (
+              <p style={S.quiet}>
+                A further <b>{gbp2(capitalCost)}</b> went out on{' '}
+                {capitalCount === 1 ? 'a car' : `${capitalCount} cars`}, and it is deliberately not
+                in Out or Profit above. A car comes off over several years rather than all at once,
+                so what it is worth this year is worked out for you on the Tax page.
               </p>
             ) : null}
           </>

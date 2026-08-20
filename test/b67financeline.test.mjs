@@ -158,8 +158,19 @@ ok('...and the finance figure is read into its own local rather than added to ei
 // ---------------------------------------------------------------------------------------------
 console.log('\n=== 4. a landlord whose only confirmed row is his interest ===\n');
 
+// 🔴 THIS ASSERTION WENT RED ON B72 AND THE ASSERTION IS WHAT WAS WRONG. 20 August 2026.
+//
+// It ended `\w+ === 0 \?`, which pins the operand list to exactly three by anchoring on the
+// ternary's punctuation. B72 added a fourth term for a written down car and this reddened on a
+// change that made the empty test STRICTER. That is the FOURTH instance of this shape in three
+// days, and this one was written YESTERDAY, twenty lines beneath a comment stating the rule. So
+// writing the rule down is plainly not the same as keeping it, and the rule is: assert the
+// OPERANDS, never what separates them. Found by shape, so a fifth term can never red this again.
+const emptyCond = (homeCode.match(/\{(moneyIn === 0[^?]*?)\?/) ?? [])[1] ?? '';
+ok('the empty test is found by shape rather than quoted up to its punctuation',
+  /moneyIn === 0/.test(emptyCond) && /moneyOut === 0/.test(emptyCond));
 ok('🔴 THE EMPTY TEST COUNTS THE FINANCE MONEY, so "nothing confirmed" is never said over £14,000',
-  /moneyIn === 0 && moneyOut === 0 && \w+ === 0 \?/.test(homeCode));
+  !!finLocal && new RegExp(`\\b${finLocal} === 0\\b`).test(emptyCond));
 {
   const only = Y.aggregateConfirmedRows([P(-14000, 'mortgage interest', 'HALIFAX BTL')], [], 2026);
   ok('...and that case is real: this account has 0 in, 0 out and £14,000 of confirmed finance cost',

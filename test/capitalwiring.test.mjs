@@ -729,8 +729,23 @@ ok('and every kind the product knows is covered by that answer either way',
   // words, which is the defect rather than an exception to it. So all three call isWrittenDown now
   // and lib/supabase.ts holds no hand written copy of the rule at all. The one place the string
   // still appears is a comment explaining what the answer means, which codeOnly strips.
+  // 🔴 THIS QUOTED THE STATEMENT UP TO ITS PUNCTUATION AND B72 REDDENED IT. 20 August 2026.
+  //
+  // It read `\) continue;` and so was pinned to the one line body. B72 turned that body into a
+  // block, purely so the purchase price could be COUNTED on the way past, and kept both halves of
+  // what this assertion is actually about: the loop still ASKS lib/capital.ts, and the row is still
+  // SKIPPED. It went red on a brace. That is the FIFTH assertion in three days to red on an
+  // expression being extended rather than broken (landlord B62, dayone B67, moneyweb B69,
+  // b67financeline B72, this). The shape is always the same and so is the fix: assert the CALL and
+  // the BEHAVIOUR, never the punctuation between them.
+  //
+  // ⚠️ THE WINDOW IS BOUNDED BY THE BRANCH RATHER THAN BY A CHARACTER COUNT, so it cannot drift on
+  // to a `continue` belonging to some later branch and quietly stop meaning anything.
+  const wdBranch = (ytd.match(/if \(isWrittenDown\(r\.capital_kind\)\)[\s\S]*?\n\s*(?:ytdTradeExpenses|\})/) ?? [''])[0];
   ok('🔴 the ledger loop calls it rather than spelling it out',
-    /if \(isWrittenDown\(r\.capital_kind\)\) continue;/.test(ytd));
+    /if \(isWrittenDown\(r\.capital_kind\)\)/.test(ytd));
+  ok('🔴 AND THE ROW IS SKIPPED, whether that body is one statement or a block',
+    /\bcontinue;/.test(wdBranch));
   ok('🔴 AND NO PART OF lib/supabase.ts DECIDES IT BY HAND ANY MORE',
     !/not_a_car/.test(supa));
   ok('🔴 ...AND NEITHER DOES lib/yeartodate.ts, WHERE THE LOOP LIVES NOW',

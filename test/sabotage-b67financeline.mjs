@@ -78,7 +78,17 @@ const SUITE = 'test/b67financeline.test.mjs';
 
 const LINE_OPEN = '            {propertyFinance > 0 ? (';
 const FIN_LOCAL = '  const propertyFinance = Math.max(0, optimiser.ytdPropertyFinance ?? 0);';
-const EMPTY = '{moneyIn === 0 && moneyOut === 0 && propertyFinance === 0 ? (';
+// 🔴 THIS WAS THE WHOLE TERNARY CONDITION AND B72 KILLED IT DEAD. 20 August 2026.
+//
+// It read '{moneyIn === 0 && moneyOut === 0 && propertyFinance === 0 ? (', so the moment B72 added
+// a fourth term for a written down car BOTH anchors below stopped resolving and two sabotages
+// silently stopped being sabotages. scripts/check-sabotage-anchors.mjs caught it, which is what it
+// is for, but the fault is the anchor rather than the change: an anchor that quotes an expression
+// up to its punctuation is anchored on the punctuation.
+//
+// It is now the ONE TERM this pass is about, which cannot care how many others there are or what
+// order they come in. Same lesson as the four assertions that reddened in the same three days.
+const FIN_TERM = ' && propertyFinance === 0';
 
 const SABOTAGES = [
   // ── THE SENTENCE GOES, AND THE SILENT SUBTRACTION COMES BACK. ─────────────────────────────
@@ -132,7 +142,7 @@ const SABOTAGES = [
   {
     name: '🔴 THE EMPTY TEST FORGETS IT AGAIN, so a landlord whose only confirmed row is his interest'
       + ' is told nothing has been confirmed since 6 April',
-    apply: (d) => edit(d, HP, EMPTY, '{moneyIn === 0 && moneyOut === 0 ? ('),
+    apply: (d) => edit(d, HP, FIN_TERM, ''),
   },
   // ── THE ARITHMETIC THE SENTENCE RESTS ON. ────────────────────────────────────────────────
   {
@@ -174,7 +184,7 @@ const CONTROLS = [
     name: 'CONTROL: THE LOCAL IS RENAMED throughout, and every guard here captures the name rather than typing it',
     apply: (d) => {
       edit(d, HP, FIN_LOCAL, '  const financeOut = Math.max(0, optimiser.ytdPropertyFinance ?? 0);');
-      edit(d, HP, EMPTY, '{moneyIn === 0 && moneyOut === 0 && financeOut === 0 ? (');
+      edit(d, HP, FIN_TERM, ' && financeOut === 0');
       edit(d, HP, LINE_OPEN, '            {financeOut > 0 ? (');
       edit(d, HP, 'gbp2(propertyFinance)', 'gbp2(financeOut)');
     },

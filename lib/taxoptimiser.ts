@@ -129,6 +129,24 @@ export interface OptimiserInput {
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   ytdCapitalAllowances?: number;
 
+  // ════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHAT THE CAR COST, AND IT IS NOT WHAT THE CAR IS WORTH. B72, 20 August 2026.
+  //
+  // The field above is the writing down allowance and it is the only one of the two that reaches a
+  // tax figure. This pair reaches none. It exists so a SCREEN can name money that left his account
+  // and sits in no total, which is the job B67 did for a landlord's mortgage interest.
+  //
+  // ⚠️ NO RULE IN THIS FILE MAY SUBTRACT IT. GOV.UK, claim capital allowances, business cars:
+  // "Cars do not qualify for: annual investment allowance (AIA)." The cost was taken out of
+  // ytdTradeExpenses upstream precisely so the allowance could replace it, and anything that
+  // deducted both would hand him the same car twice.
+  //
+  // Optional and defaulting to 0, so every caller written before today is unchanged to the penny.
+  // ════════════════════════════════════════════════════════════════════════════════════════
+  ytdCapitalCost?: number;
+  /** How many payments make up ytdCapitalCost. Zero whenever ytdCapitalCost is zero. */
+  ytdCapitalCount?: number;
+
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 HAS A VEHICLE'S PURCHASE GONE THROUGH HIS BOOKS. THE MILEAGE RATE IS THEN CLOSED TO IT,
   // FOR GOOD, AND THIS PRODUCT WAS ACTIVELY TELLING HIM TO USE IT.

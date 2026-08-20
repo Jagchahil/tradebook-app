@@ -1,0 +1,39 @@
+{
+  "id": "cis-twenty-percent",
+  "trade": "groundworker",
+  "mechanic": "a_number_that_shocks",
+  "promise": "money",
+  "tool": "https://lekhio.app/cis-calculator",
+  "source_tag": "cis-twenty-0821",
+  "quote": "That is not your tax bill.\nIt is a deposit against it.",
+  "frames": [
+    {
+      "h": "Your contractor\ntakes twenty percent.",
+      "s": "Thirty, if you are not registered."
+    },
+    {
+      "h": "That is not\nyour tax bill.",
+      "k": "It is a deposit against it.",
+      "s": "CIS comes off before you are paid. HMRC holds it against what you actually owe at the end of the year."
+    },
+    {
+      "h": "Most subbies are owed\nsome of it back.",
+      "s": "The deduction takes no account of your expenses, your allowance, or a quiet month on the tools."
+    },
+    {
+      "h": "Ninety seconds\nto find out.",
+      "k": "Free. No sign up.",
+      "s": "Put in what you were paid and what was taken off you. It tells you where you stand."
+    },
+    {
+      "end": true,
+      "promise": "Your first employee.",
+      "terms": [
+        "£12.99 a month.",
+        "Seven days free. No card."
+      ],
+      "door": "lekhio.app/cis-calculator"
+    }
+  ],
+  "caption": "Your contractor takes twenty percent before you see a penny. Thirty if you are not registered. Here is the bit nobody explains on site: that is not your tax bill. It is a deposit against it. CIS comes off the top and HMRC holds it against what you actually owe once the year is worked out. The deduction takes no account of your expenses, your tools, your van, your personal allowance, or the fortnight it rained and you did nothing. Which is why a lot of subbies are owed some of it back and never work out how much. Our CIS calculator is free and it does not ask you to sign up. Put in what you were paid and what was taken off you, and it tells you where you stand in about ninety seconds."
+}

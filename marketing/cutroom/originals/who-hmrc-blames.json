@@ -1,0 +1,30 @@
+{
+  "id": "who-hmrc-blames",
+  "trade": null,
+  "mechanic": "the_true_thing_nobody_else_is_allowed_to_say",
+  "promise": "honesty",
+  "tool": "https://lekhio.app",
+  "source_tag": "hmrc-blames-0821",
+  "quote": "HMRC holds you responsible.\nNot your app.",
+  "hold": 3.6,
+  "frames": [
+    { "h": "HMRC holds you\nresponsible.",
+      "k": "Not your app.",
+      "s": "Whatever software you use, the person on the hook for that return is you." },
+    { "h": "So be careful who\npromises to take\nthat away.",
+      "s": "Nobody can. It was never theirs to take." },
+    { "h": "Here is what\nwe actually do.",
+      "list": [
+        { "l": "We prepare it.", "n": "Receipts, mileage, CIS, the quarterly update." },
+        { "l": "You read it.", "n": "In plain English, before anything moves." },
+        { "l": "You send it.", "n": "Because HMRC says it has to be you." }
+      ] },
+    { "h": "That is not\na limitation.",
+      "k": "That is the product.",
+      "s": "One less button at a time. Until only one is left." },
+    { "end": true, "promise": "Approve.",
+      "terms": ["£12.99 a month.", "Seven days free. No card."],
+      "door": "lekhio.app" }
+  ],
+  "caption": "HMRC holds you responsible. Not your app, not your software, not the company that sold it to you. Whatever you use, the person on the hook for that return is you. So be careful who promises to take that away, because nobody can. It was never theirs to take. Here is what Lekhio actually does. We prepare it: receipts, mileage, CIS, the quarterly Making Tax Digital update. You read it, in plain English, before anything moves. You send it, because HMRC says it has to be you. That is not a limitation we are apologising for. That is the product. One less button at a time, until only one is left."
+}

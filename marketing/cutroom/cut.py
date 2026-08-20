@@ -239,9 +239,15 @@ def render_end(spec: dict, layout: Layout) -> Image.Image:
         y += round(f_b.size * 1.34)
     y += round(w * 0.038)
 
-    # The door. A white pill, navy text. Always lekhio.app and never anything else.
+    # The door. Always lekhio.app and never anything else. A long path (lekhio.app/cis-calculator)
+    # would otherwise run a pill the whole width of the frame and shout louder than the promise, so
+    # the type steps down until the pill sits inside about seventy percent of the canvas.
     label = spec.get("door") or "lekhio.app"
-    f_d = B.font(B.BOLD, round(w * 0.038))
+    size = round(w * 0.038)
+    f_d = B.font(B.BOLD, size)
+    while d.textlength(label, font=f_d) > w * 0.60 and size > round(w * 0.024):
+        size -= 1
+        f_d = B.font(B.BOLD, size)
     tw = d.textlength(label, font=f_d)
     pad_x, pad_y = round(w * 0.036), round(w * 0.024)
     pill = [x, y, x + tw + pad_x * 2, y + f_d.size + pad_y * 2]

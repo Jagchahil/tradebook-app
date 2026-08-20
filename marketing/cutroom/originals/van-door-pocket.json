@@ -1,0 +1,27 @@
+{
+  "id": "van-door-pocket",
+  "trade": null,
+  "mechanic": "recognition_so_specific_it_is_uncomfortable",
+  "promise": "zero_habit",
+  "tool": "https://lekhio.app/tax-calculator",
+  "source_tag": "van-pocket-0821",
+  "quote": "You are not bad at admin.\nYou are already working.",
+  "frames": [
+    { "h": "There is a receipt\nin your van\nright now." },
+    { "h": "And one in\nthe glovebox.",
+      "s": "And a few in the coat you wore on Tuesday. And one that has gone through the wash." },
+    { "h": "You are not\nbad at admin.",
+      "k": "You are already working.",
+      "s": "The job does not finish when you get in the van. It finishes at eleven at night with a carrier bag." },
+    { "h": "So stop\nstacking them.",
+      "k": "Text them.",
+      "s": "Photograph the receipt and send it. Logged, sorted and categorised before you have started the engine." },
+    { "h": "See what those\nreceipts are worth.",
+      "k": "Free. No sign up.",
+      "s": "Put your income and your expenses in and it shows you the difference they make." },
+    { "end": true, "promise": "Your first employee.",
+      "terms": ["£12.99 a month.", "Seven days free. No card."],
+      "door": "lekhio.app/tax-calculator" }
+  ],
+  "caption": "There is a receipt in the door pocket of your van right now. There is another one in the glovebox. There are a few in the coat you wore on Tuesday and there is one that has been through the wash. You are not bad at admin. You are already working. The job does not finish when you get in the van, it finishes at eleven at night with a carrier bag on the kitchen table and a laptop you did not want to open. Lekhio lives in WhatsApp. You photograph the receipt and send it, and it is logged, sorted and categorised before you have started the engine. If you want to see what those receipts are actually worth before you take our word for anything, the tax calculator is free and does not ask you to sign up."
+}

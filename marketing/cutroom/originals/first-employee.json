@@ -1,0 +1,42 @@
+{
+  "id": "first-employee",
+  "trade": null,
+  "mechanic": "a_conflict_with_a_villain_who_is_not_the_customer",
+  "promise": "money",
+  "tool": "https://lekhio.app/invoice-generator",
+  "source_tag": "first-employee-0821",
+  "quote": "An accountant answers\non Tuesday.\nThis one answers now.",
+  "frames": [
+    {
+      "h": "Every business needs\na bookkeeper."
+    },
+    {
+      "h": "Yours costs\ntwelve ninety nine\na month.",
+      "s": "It does not sleep, it does not invoice you, and it has never lost a receipt."
+    },
+    {
+      "h": "An accountant\nanswers on Tuesday.",
+      "k": "This one answers now.",
+      "s": "Text it a photo at nine at night from the van and it is logged before you are home."
+    },
+    {
+      "h": "It does not replace\nyour accountant.",
+      "s": "It makes sure they are not doing your books out of a carrier bag in January."
+    },
+    {
+      "h": "Send an invoice\nright now.",
+      "k": "Free. No sign up.",
+      "s": "Fill it in, send it as a PDF, get paid. Whether or not you ever use anything else of ours."
+    },
+    {
+      "end": true,
+      "promise": "Your first employee.",
+      "terms": [
+        "£12.99 a month.",
+        "Seven days free. No card."
+      ],
+      "door": "lekhio.app/invoice-generator"
+    }
+  ],
+  "caption": "Every business needs a bookkeeper. Yours costs twelve pounds ninety nine a month. It does not sleep, it does not invoice you for a phone call, and it has never lost a receipt. An accountant answers on Tuesday. This one answers now: text it a photo at nine at night from the van and it is logged, sorted and categorised before you are home. It does not replace your accountant and it is not trying to. It makes sure they are not doing your books out of a carrier bag in January. If you want something from us today without giving us anything, the invoice generator is free and does not ask you to sign up. Fill it in, send it as a PDF, get paid."
+}

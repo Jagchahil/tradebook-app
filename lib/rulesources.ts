@@ -122,9 +122,20 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
   // product that keeps a property stream and has a Section 24 engine. A florist letting the flat
   // above her shop found nothing there about the other half of her return.
   //
-  // VERIFIED against the live page, 13 August 2026: GOV.UK, "Work out your rental income when you
+  // VERIFIED against the live page, 21 August 2026: GOV.UK, "Work out your rental income when you
   // let property", last updated 19 March 2025. Every quote below is that page's own sentence, and
   // every claim on the four cards is one of them.
+  //
+  // 🔴 21 AUGUST: THE CAPITAL EXPENDITURE QUOTE WAS TRUNCATED AND HAD TO BE PUT BACK.
+  // It read "...cannot be claimed against your rental income." with a full stop HMRC does not have.
+  // The page carries on: "but you should keep records of them as you might be able to set them
+  // against Capital Gains Tax if you sell the property in the future." So we were quoting HMRC with
+  // the half that helps the landlord cut off, on a product that sells itself on what you are owed.
+  //
+  // Khoji's corpus checker had been reporting this every night since at least 20 August, exiting 2
+  // to say so, and nothing surfaced it. The page's "last updated" still reads 19 March 2025, so the
+  // text moved and the date did not: exactly the silent change lawwatch exists to catch. DO NOT
+  // shorten a quote to make it fit. Cut the sentence you wrote around it instead.
   'property-repairs': [
     {
       code: 'Work out your rental income when you let property',
@@ -135,7 +146,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
     {
       code: 'Capital expenditure',
       url: 'https://www.gov.uk/guidance/income-tax-when-you-rent-out-a-property-working-out-your-rental-income',
-      quote: 'Capital expenses are not allowable and cannot be claimed against your rental income.',
+      quote: 'Capital expenses are not allowable and cannot be claimed against your rental income but you should keep records of them as you might be able to set them against Capital Gains Tax if you sell the property in the future.',
       authority: 'GOV.UK, Work out your rental income when you let property',
     },
   ],

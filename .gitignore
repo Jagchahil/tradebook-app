@@ -70,3 +70,8 @@ app/.node/
 
 # Tarball drops from Cowork land here. Never committed, never type-checked.
 _to_delete_scratch/
+
+# The cutting room (marketing/cutroom). Python bytecode and rendered output are never committed.
+__pycache__/
+*.pyc
+marketing/cutroom/out/

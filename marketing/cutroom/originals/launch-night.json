@@ -1,0 +1,58 @@
+{
+  "id": "launch-night",
+  "note": "THE PROOF FIXTURE. These are the six frames that actually went out on 20 August 2026, transcribed from marketing/launch-carousel/*.png. Nothing here was written by a machine. It exists so the cutting room can be checked against something that shipped: render this, put it next to the originals, and the brand either survived the rebuild or it did not.",
+  "trade": null,
+  "mechanic": "the_true_thing_nobody_else_is_allowed_to_say",
+  "promise": "honesty",
+  "tool": "https://lekhio.app",
+  "source_tag": "launch-2026-08-20",
+  "quote": "We built in the dark.",
+  "hold": 3.4,
+  "frames": [
+    {
+      "h": "We built\nin the dark."
+    },
+    {
+      "h": "Most founders\nbuild in public.",
+      "s": "It is a traction strategy. You post the journey and by launch day you have an audience.",
+      "t": "We wanted the product\nright instead."
+    },
+    {
+      "h": "This is Lekhio.",
+      "s": "A bookkeeper for self employed people that lives in your WhatsApp."
+    },
+    {
+      "h": "Text it a photo\nof a receipt.",
+      "k": "Logged. Sorted. Done.",
+      "s": "Voice note your mileage on the drive home. CIS tracked. Invoices sent. Quarterly update prepared."
+    },
+    {
+      "h": "What it cannot do.",
+      "list": [
+        {
+          "l": "It cannot file to HMRC.",
+          "n": "We prepare it. You send it."
+        },
+        {
+          "l": "No bank connection yet.",
+          "n": "You import a statement."
+        },
+        {
+          "l": "The apps are not out.",
+          "n": "Web only for now."
+        }
+      ],
+      "t": "We would rather tell you."
+    },
+    {
+      "end": true,
+      "promise": "Your first employee.",
+      "terms": [
+        "£12.99 a month.",
+        "Seven days free. No card."
+      ],
+      "door": "lekhio.app"
+    }
+  ],
+  "caption": "Most founders build in public. We built in the dark. Building in public is a traction strategy. You post the journey, people follow the journey, and by the time you launch there is an audience waiting. It works. It is also a second job, and every hour spent narrating the work is an hour not spent doing it. We wanted one thing. For it to be right the first time somebody actually used it. It is right now. Lekhio is a bookkeeper for self employed people and it lives in WhatsApp. You text it a photo of a receipt and it is logged, sorted and categorised. Voice note your mileage on the drive home. It tracks CIS, sends your invoices, imports your bank statement, and it prepares your quarterly Making Tax Digital update. Now the part that does not usually go in a launch post. Here is what Lekhio cannot do. It cannot file to HMRC. We have sandbox access, not production access. That decision belongs to HMRC and we are not going to put a date on somebody else's decision. Lekhio prepares your update. You send it. There is no bank connection yet, so you import a statement. The apps are not out, so it is web only for now. We would rather tell you that than have you find out."
+}

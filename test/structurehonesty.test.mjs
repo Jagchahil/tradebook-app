@@ -28,6 +28,7 @@ import { readFileSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -377,14 +378,7 @@ const CH = await import(pathToFileURL(path.join(root, 'lib/companieshouse.ts')).
 // 🔴 4. THE DIRECTOR'S EMPTY PAY PAGE. The shape, deterministic, and not one invented figure.
 // ---------------------------------------------------------------------------------------------
 // Staged exactly as test/payyourselfweb.test.mjs stages the same helper.
-const payStage = mkdtempSync(path.join(tmpdir(), 'structurepay-'));
-const fixLib = (s) => s.replace(/from '\.\/([a-z]+)'/g, "from './$1.ts'");
-for (const f of [
-  'taxengine', 'nistudentloan', 'autonomy', 'ltdengine', 'personalincome', 'partnership',
-  'position', 'propertyengine', 'taxoptimiser', 'payyourself',
-]) {
-  writeFileSync(path.join(payStage, `${f}.ts`), fixLib(read(`lib/${f}.ts`)));
-}
+const payStage = stageLib('structurepay-');
 writeFileSync(
   path.join(payStage, 'plan.ts'),
   read('app/app/pay-yourself/plan.ts').replace(/from '\.\.\/\.\.\/\.\.\/lib\/([a-z]+)'/g, "from './$1.ts'"),

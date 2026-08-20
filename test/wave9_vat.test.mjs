@@ -20,10 +20,10 @@
 // nowhere to put one. The in app capture screen was already honest; the marketing was not, and one
 // of the four carried a fabricated demo bubble reading "VAT £7.10".
 
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -32,12 +32,7 @@ const read = (p) => readFileSync(path.join(root, p), 'utf8');
 // lib/agent.ts imports half a dozen other lib modules, and Node's type stripping cannot resolve an
 // extensionless relative import. So stage the whole chain and rewrite every relative import to .ts,
 // exactly as test/agent.test.mjs does. Keep this list in step with that one.
-const lib = path.resolve(here, '../lib');
-const stage = mkdtempSync(path.join(tmpdir(), 'wave9vat-'));
-const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'");
-for (const f of ['taxengine', 'money', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome', 'partnership', 'position', 'rakhamoves', 'waintents', 'scotland', 'agent']) {
-  writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
-}
+const stage = stageLib('wave9vat-');
 const A = await import(pathToFileURL(path.join(stage, 'agent.ts')).href);
 const { computeSignals } = A;
 

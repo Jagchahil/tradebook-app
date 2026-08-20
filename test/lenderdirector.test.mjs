@@ -32,10 +32,10 @@
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, readFileSync, writeFileSync, symlinkSync, readdirSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync, symlinkSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { stageLib } from './stagelib.mjs';
 
 // lib/bookshare.ts reads its signing secret once, at module load, and refuses to mint a link
 // without one. Set before the staged import below, never after.
@@ -50,21 +50,8 @@ const ok = (name, cond) => { if (cond) { pass++; console.log(`  ok   ${name}`); 
 const near = (a, b, tol = 0.51) => Math.abs(a - b) <= tol;
 
 // ── stage the real libraries, with node_modules reachable so React and Next resolve ──────────
-const fixTs = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
-const stage = mkdtempSync(path.join(tmpdir(), 'lenderdir-'));
+const stage = stageLib('lenderdir-');
 try { symlinkSync(path.join(root, 'node_modules'), path.join(stage, 'node_modules'), 'dir'); } catch { /* absent is handled below */ }
-for (const f of [
-  'taxengine', 'money', 'capital', 'nistudentloan', 'ltdengine', 'personalincome',
-  'propertyengine', 'autonomy', 'taxoptimiser', 'quarterpack', 'incomeproof', 'bookshare',
-  // lib/scotland.ts, one exported sentence with no imports of its own, printed by both lender
-  // documents staged above.
-  'tokens', 'apptheme', 'scotland',
-  // Which tax year the document is about. Staged as the REAL file and never stubbed, because it
-  // is the thing that decides whether this handler prints 2026/27 or prints tax year zero.
-  'proofyear',
-]) {
-  writeFileSync(path.join(stage, f + '.ts'), fixTs(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
-}
 const IP = await import(pathToFileURL(path.join(stage, 'incomeproof.ts')).href);
 const BS = await import(pathToFileURL(path.join(stage, 'bookshare.ts')).href);
 const QP = await import(pathToFileURL(path.join(stage, 'quarterpack.ts')).href);

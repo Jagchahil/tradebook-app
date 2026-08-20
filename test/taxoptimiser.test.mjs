@@ -3,33 +3,11 @@
 // It imports the canonical engine (extensionless), so we stage and rewrite the
 // relative imports, same as test/agent.test.mjs.
 
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const lib = path.resolve(here, '../lib');
-const stage = mkdtempSync(path.join(tmpdir(), 'opt-'));
-const fix = (s) => s
-  .replace("from './taxengine'", "from './taxengine.ts'")
-  .replace("from './autonomy'", "from './autonomy.ts'")
-  .replace("from './ltdengine'", "from './ltdengine.ts'")
-  .replace("from './personalincome'", "from './personalincome.ts'")
-  .replace("from './nistudentloan'", "from './nistudentloan.ts'")
-  .replace("from './propertyengine'", "from './propertyengine.ts'");
-writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
-// The optimiser now asks the property engine how the £1,000 allowance stands against actual
-// costs (one engine, never a second copy of the comparison), so it stages alongside.
-writeFileSync(path.join(stage, 'propertyengine.ts'), fix(readFileSync(path.join(lib, 'propertyengine.ts'), 'utf8')));
-writeFileSync(path.join(stage, 'autonomy.ts'), readFileSync(path.join(lib, 'autonomy.ts'), 'utf8'));
-// The optimiser now surfaces the WHOLE-PERSON tax (taxPosition), so its engine comes along too.
-writeFileSync(path.join(stage, 'personalincome.ts'), fix(readFileSync(path.join(lib, 'personalincome.ts'), 'utf8')));
-// The optimiser now nets the STUDENT LOAN off the CIS refund, because CIS pays that off too on
-// the real return. Without this the deck under-staged and the whole suite exploded on import.
-writeFileSync(path.join(stage, 'nistudentloan.ts'), fix(readFileSync(path.join(lib, 'nistudentloan.ts'), 'utf8')));
-writeFileSync(path.join(stage, 'ltdengine.ts'), fix(readFileSync(path.join(lib, 'ltdengine.ts'), 'utf8')));
-writeFileSync(path.join(stage, 'taxoptimiser.ts'), fix(readFileSync(path.join(lib, 'taxoptimiser.ts'), 'utf8')));
+const stage = stageLib('opt-');
 const O = await import(pathToFileURL(path.join(stage, 'taxoptimiser.ts')).href);
 
 let pass = 0, fail = 0;

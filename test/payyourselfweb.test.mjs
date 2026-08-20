@@ -24,10 +24,10 @@
 // structures, in the style of test/taxweb.test.mjs.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
-import { readFileSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -144,14 +144,7 @@ ok('a set aside bigger than the trade says so instead of a bare zero',
 // ---------------------------------------------------------------------------------------------
 // Staged with extensionless imports rewritten, the same trick as test/payyourself.test.mjs and
 // test/taxweb.test.mjs: Next resolves them, bare node type stripping does not.
-const stage = mkdtempSync(path.join(tmpdir(), 'payweb-'));
-const fixLib = (s) => s.replace(/from '\.\/([a-z]+)'/g, "from './$1.ts'");
-for (const f of [
-  'taxengine', 'nistudentloan', 'autonomy', 'ltdengine', 'personalincome', 'partnership',
-  'position', 'propertyengine', 'taxoptimiser', 'payyourself',
-]) {
-  writeFileSync(path.join(stage, `${f}.ts`), fixLib(read(`lib/${f}.ts`)));
-}
+const stage = stageLib('payweb-');
 writeFileSync(
   path.join(stage, 'plan.ts'),
   plan.replace(/from '\.\.\/\.\.\/\.\.\/lib\/([a-z]+)'/g, "from './$1.ts'"),

@@ -18,10 +18,10 @@
 // Every assertion below is either that rule, or the safety direction that keeps it from doing
 // harm in the other direction: an unknown shape is asked EVERYTHING.
 
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -39,14 +39,7 @@ const {
 // is sent rather than what a file says. lib/agent.ts has imports, so it cannot be loaded bare the
 // way the two modules above are: the chain is copied into a temp directory with every extensionless
 // relative import given its extension, exactly as test/agent.test.mjs does it.
-const stage = mkdtempSync(path.join(tmpdir(), 'persona-'));
-const fixImports = (s) => s.replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'");
-for (const f of [
-  'taxengine', 'money', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome',
-  'partnership', 'position', 'rakhamoves', 'waintents', 'scotland', 'agent',
-]) {
-  writeFileSync(path.join(stage, f + '.ts'), fixImports(read(`lib/${f}.ts`)));
-}
+const stage = stageLib('persona-');
 const AGENT = await import(pathToFileURL(path.join(stage, 'agent.ts')).href);
 
 let pass = 0;

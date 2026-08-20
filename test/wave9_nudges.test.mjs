@@ -34,9 +34,9 @@
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const lib = path.resolve(here, '../lib');
@@ -47,11 +47,7 @@ delete process.env.BANK_FEED_OFFERED;
 
 // lib/agent.ts composes the structure-aware spine, so stage the whole chain and rewrite every
 // relative import to .ts, exactly as test/agent.test.mjs and test/agentstructure.test.mjs do.
-const stage = mkdtempSync(path.join(tmpdir(), 'wave9nudge-'));
-const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'");
-for (const f of ['taxengine', 'money', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome', 'partnership', 'position', 'rakhamoves', 'waintents', 'scotland', 'agent']) {
-  writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
-}
+const stage = stageLib('wave9nudge-');
 // lib/trialnudge.ts imports lib/watemplates.ts with an extensionless specifier, so it is staged the
 // same way test/trialnudge.test.mjs stages it.
 writeFileSync(path.join(stage, 'watemplates.ts'), readFileSync(path.join(lib, 'watemplates.ts'), 'utf8'));

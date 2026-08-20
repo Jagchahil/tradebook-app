@@ -59,25 +59,13 @@
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
-const lib = path.join(root, 'lib');
-const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
-const stage = mkdtempSync(path.join(tmpdir(), 'moneyspine-'));
-for (const f of [
-  'taxengine', 'money', 'capital', 'nistudentloan', 'ltdengine', 'personalincome',
-  'propertyengine', 'autonomy', 'taxoptimiser', 'quarterpack', 'incomeproof', 'bookshare',
-  // lib/scotland.ts, one exported sentence with no imports of its own, printed by both money
-  // documents staged above. position + whatif are the FIFTH surface: /app/tax/what-if computes
-  // through lib/whatif.ts, which the guard used to leave out entirely.
-  'yeartodate', 'categories', 'scotland', 'position', 'partnership', 'whatif',
-]) {
-  writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
-}
+const stage = stageLib('moneyspine-');
 const O = await import(pathToFileURL(path.join(stage, 'taxoptimiser.ts')).href);
 const QP = await import(pathToFileURL(path.join(stage, 'quarterpack.ts')).href);
 const IP = await import(pathToFileURL(path.join(stage, 'incomeproof.ts')).href);

@@ -21,17 +21,14 @@
 //      independently from the same untouched top band and the parts exceed the whole.
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const lib = path.resolve(here, '../lib');
-const stage = mkdtempSync(path.join(tmpdir(), 'ledger-'));
+const stage = stageLib('ledger-');
 // Every extensionless relative import gets an extension, not just taxengine: ledger.ts now leans on
 // personalincome.ts, which is the same whole-person engine taxPosition uses. See the baseline note
 // in lib/ledger.ts: taxing the trade alone gave a man with a job his personal allowance twice.
-const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
 // 🔴 THE OPTIMISER IS STAGED ALONGSIDE, AND IT IS NOT DECORATION. lib/ledger.ts and
 // lib/taxoptimiser.ts each carry their own copy of the use of home rule, because a lib module may
 // not take a new lib import (a suite that stages these files by a fixed dependency list has to be
@@ -43,17 +40,6 @@ const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
 // three of them copy the WHOLE lib directory and do not care (numbers, tradingallowance,
 // wave9_useofhome). Only TWO stage a fixed list, and test/capitalwiring.test.mjs ALREADY carried
 // 'money'. So the cost of lib/ledger.ts taking lib/money.ts was one word, in this list.
-for (const f of [
-  'taxengine', 'nistudentloan', 'ltdengine', 'personalincome', 'propertyengine', 'autonomy',
-  'taxoptimiser', 'ledger', 'incomeproof', 'quarterpack', 'personal',
-  // lib/money.ts, which lib/ledger.ts's headline() formats through since B26.
-  'money',
-  // lib/scotland.ts, one exported sentence with no imports of its own. Both money documents
-  // above print it, so the fixed dependency list this suite stages has to carry it too.
-  'scotland',
-]) {
-  writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
-}
 const L = await import(pathToFileURL(path.join(stage, 'ledger.ts')).href);
 const E = await import(pathToFileURL(path.join(stage, 'taxengine.ts')).href);
 const O = await import(pathToFileURL(path.join(stage, 'taxoptimiser.ts')).href);

@@ -2,19 +2,15 @@
 // Run with: node test/agent.test.mjs   (Node 22.6+, pure type stripping)
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const lib = path.resolve(here, '../lib');
-const stage = mkdtempSync(path.join(tmpdir(), 'agent-'));
+const stage = stageLib('agent-');
 // agent.ts now composes the structure-aware spine (position.ts) and the money-moves engine
 // (rakhamoves.ts) too, so stage the whole chain and rewrite every relative import to .ts.
-const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'");
-for (const f of ['taxengine', 'money', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome', 'partnership', 'position', 'rakhamoves', 'waintents', 'scotland', 'agent']) {
-  writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
-}
 const A = await import(pathToFileURL(path.join(stage, 'agent.ts')).href);
 // 🔴 THE ENGINE'S OWN CONSTANTS AND THE ENGINE'S OWN FORMATTERS, LOADED FROM THE SAME STAGE
 // (B46, 19 August 2026). Added because an assertion in this file had typed out a figure the

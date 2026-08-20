@@ -5,17 +5,11 @@
 // 26 November 2025 and must pass to the pound. Every other case is hand
 // computed. Same discipline as the 71 case tax exam.
 
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const lib = path.resolve(here, '../lib');
-const stage = mkdtempSync(path.join(tmpdir(), 'property-'));
-const fix = (s) => s.replace("from './taxengine'", "from './taxengine.ts'");
-writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
-writeFileSync(path.join(stage, 'propertyengine.ts'), fix(readFileSync(path.join(lib, 'propertyengine.ts'), 'utf8')));
+const stage = stageLib('property-');
 const P = await import(pathToFileURL(path.join(stage, 'propertyengine.ts')).href);
 
 let pass = 0;

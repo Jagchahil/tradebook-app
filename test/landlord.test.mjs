@@ -20,13 +20,12 @@
 // Run: node test/landlord.test.mjs
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
-const lib = path.join(root, 'lib');
 const read = (p) => readFileSync(path.join(root, p), 'utf8');
 
 let pass = 0;
@@ -40,17 +39,7 @@ const ok = (name, cond) => {
 const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 // Stage the optimiser and the property engine for bare node, the taxoptimiser.test.mjs harness.
-const stage = mkdtempSync(path.join(tmpdir(), 'landlord-'));
-const fix = (s) => s
-  .replace("from './taxengine'", "from './taxengine.ts'")
-  .replace("from './autonomy'", "from './autonomy.ts'")
-  .replace("from './ltdengine'", "from './ltdengine.ts'")
-  .replace("from './personalincome'", "from './personalincome.ts'")
-  .replace("from './nistudentloan'", "from './nistudentloan.ts'")
-  .replace("from './propertyengine'", "from './propertyengine.ts'");
-for (const f of ['taxengine', 'autonomy', 'nistudentloan', 'ltdengine', 'personalincome', 'propertyengine', 'taxoptimiser', 'housestyle']) {
-  writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
-}
+const stage = stageLib('landlord-');
 const O = await import(pathToFileURL(path.join(stage, 'taxoptimiser.ts')).href);
 const P = await import(pathToFileURL(path.join(stage, 'propertyengine.ts')).href);
 const H = await import(pathToFileURL(path.join(stage, 'housestyle.ts')).href);

@@ -29,22 +29,14 @@
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const lib = path.join(root, 'lib');
-const stage = mkdtempSync(path.join(tmpdir(), 'f25-'));
-const fix = (s) => s
-  .replace("from './taxengine'", "from './taxengine.ts'")
-  .replace("from './scotland'", "from './scotland.ts'");
-writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
-writeFileSync(path.join(stage, 'scotland.ts'), readFileSync(path.join(lib, 'scotland.ts'), 'utf8'));
-writeFileSync(path.join(stage, 'quarterpack.ts'), fix(readFileSync(path.join(lib, 'quarterpack.ts'), 'utf8')));
-writeFileSync(path.join(stage, 'propertyengine.ts'), readFileSync(path.join(lib, 'propertyengine.ts'), 'utf8')
-  .replace("from './taxengine'", "from './taxengine.ts'"));
+const stage = stageLib('f25-');
 const Q = await import(pathToFileURL(path.join(stage, 'quarterpack.ts')).href);
 const P = await import(pathToFileURL(path.join(stage, 'propertyengine.ts')).href);
 

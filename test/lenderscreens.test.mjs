@@ -46,16 +46,15 @@
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, readFileSync, writeFileSync, symlinkSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync, symlinkSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { stageLib } from './stagelib.mjs';
 
 process.env.SHARE_TOKEN_SECRET = process.env.SHARE_TOKEN_SECRET || 'lenderscreens-suite-secret';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
-const lib = path.join(root, 'lib');
 
 let pass = 0, fail = 0;
 const ok = (name, cond) => { if (cond) { pass++; console.log(`  ok   ${name}`); } else { fail++; console.log(`  FAIL ${name}`); } };
@@ -63,21 +62,8 @@ const near = (a, b, tol = 0.51) => Math.abs(a - b) <= tol;
 
 // ── stage the real libraries, node_modules reachable so React and Next resolve, the same set
 // test/lenderdirector.test.mjs stages ────────────────────────────────────────────────────────────
-const fixTs = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
-const stage = mkdtempSync(path.join(tmpdir(), 'lenderscreens-'));
+const stage = stageLib('lenderscreens-');
 try { symlinkSync(path.join(root, 'node_modules'), path.join(stage, 'node_modules'), 'dir'); } catch { /* absent is handled below */ }
-for (const f of [
-  'taxengine', 'money', 'capital', 'nistudentloan', 'ltdengine', 'personalincome',
-  'propertyengine', 'autonomy', 'taxoptimiser', 'quarterpack', 'incomeproof', 'bookshare',
-  // lib/scotland.ts, one exported sentence with no imports of its own, printed by both lender
-  // documents staged above.
-  'tokens', 'apptheme', 'scotland',
-  // Which tax year the document is about. Staged as the REAL file and never stubbed, because it
-  // is the thing that decides whether this handler prints 2026/27 or prints tax year zero.
-  'proofyear',
-]) {
-  writeFileSync(path.join(stage, f + '.ts'), fixTs(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
-}
 const BS = await import(pathToFileURL(path.join(stage, 'bookshare.ts')).href);
 
 let ts = null, renderToStaticMarkup = null, NextRequest = null;

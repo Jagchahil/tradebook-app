@@ -26,6 +26,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -33,13 +34,7 @@ const lib = path.join(root, 'lib');
 const read = (p) => readFileSync(path.join(root, p), 'utf8');
 const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
 
-const stage = mkdtempSync(path.join(tmpdir(), 'capwire-'));
-for (const f of [
-  'taxengine', 'money', 'capital', 'nistudentloan', 'ltdengine', 'personalincome',
-  'propertyengine', 'autonomy', 'taxoptimiser', 'ledger', 'personal', 'receiptconfidence', 'reviewpile',
-]) {
-  writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
-}
+const stage = stageLib('capwire-');
 const C = await import(pathToFileURL(path.join(stage, 'capital.ts')).href);
 const O = await import(pathToFileURL(path.join(stage, 'taxoptimiser.ts')).href);
 const L = await import(pathToFileURL(path.join(stage, 'ledger.ts')).href);

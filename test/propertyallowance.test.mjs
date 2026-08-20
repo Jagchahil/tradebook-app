@@ -26,19 +26,14 @@
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
-const lib = path.join(root, 'lib');
 const read = (rel) => readFileSync(path.join(root, rel), 'utf8');
-const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
-const stage = mkdtempSync(path.join(tmpdir(), 'palw-'));
-for (const f of ['taxengine', 'propertyengine']) {
-  writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
-}
+const stage = stageLib('palw-');
 const P = await import(pathToFileURL(path.join(stage, 'propertyengine.ts')).href);
 
 let pass = 0, fail = 0;

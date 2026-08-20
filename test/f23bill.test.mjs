@@ -51,24 +51,15 @@
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const lib = path.join(root, 'lib');
-const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
 
-const stage = mkdtempSync(path.join(tmpdir(), 'f23-'));
-for (const f of [
-  'taxengine', 'money', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome',
-  'partnership', 'position', 'rakhamoves', 'waintents', 'scotland', 'agent',
-  // The optimiser chain, for the identity guards in section B.
-  'autonomy', 'taxoptimiser',
-]) {
-  writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
-}
+const stage = stageLib('f23-');
 const A = await import(pathToFileURL(path.join(stage, 'agent.ts')).href);
 const O = await import(pathToFileURL(path.join(stage, 'taxoptimiser.ts')).href);
 const TE = await import(pathToFileURL(path.join(stage, 'taxengine.ts')).href);

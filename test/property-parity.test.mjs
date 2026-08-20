@@ -6,23 +6,24 @@
 // grid of salaries, trades, rents, finance costs and both tax years.
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const weblib = path.resolve(here, '../lib');
 const applib = path.resolve(here, '../../tradebook-app/lib');
 
-const stage = mkdtempSync(path.join(tmpdir(), 'property-parity-'));
-const fixWeb = (s) => s.replace("from './taxengine'", "from './taxengine.ts'");
-const fixApp = (s) => s.replace("from './tax'", "from './tax.ts'");
-writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(weblib, 'taxengine.ts'), 'utf8'));
-writeFileSync(path.join(stage, 'webproperty.ts'), fixWeb(readFileSync(path.join(weblib, 'propertyengine.ts'), 'utf8')));
-writeFileSync(path.join(stage, 'tax.ts'), readFileSync(path.join(applib, 'tax.ts'), 'utf8'));
-writeFileSync(path.join(stage, 'appproperty.ts'), fixApp(readFileSync(path.join(applib, 'propertyengine.ts'), 'utf8')));
-const web = await import(pathToFileURL(path.join(stage, 'webproperty.ts')).href);
-const app = await import(pathToFileURL(path.join(stage, 'appproperty.ts')).href);
+// 🔴 TWO STAGES, ONE PER REPO, AND BOTH DERIVED. B73, 20 August 2026.
+//
+// This staged both engines into ONE directory and renamed them webproperty.ts and appproperty.ts
+// so they could not collide. The renaming meant each engine could only bring the siblings named on
+// the line that staged it, which is the same hand written list as everywhere else with a collision
+// as its excuse. Two directories remove the excuse: each engine keeps its own name and gets the
+// whole of its own lib, so either side can gain an import without this suite noticing.
+const webStage = stageLib('property-parity-web-', weblib);
+const appStage = stageLib('property-parity-app-', applib);
+const web = await import(pathToFileURL(path.join(webStage, 'propertyengine.ts')).href);
+const app = await import(pathToFileURL(path.join(appStage, 'propertyengine.ts')).href);
 
 let pass = 0;
 let fail = 0;

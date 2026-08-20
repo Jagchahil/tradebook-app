@@ -17,24 +17,14 @@
 // The optimiser imports the engine extensionlessly (Next resolves that; bare node does not), so we
 // stage a rewritten copy exactly as test/taxoptimiser.test.mjs does. One harness, not two.
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { stageLib } from './stagelib.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const lib = path.resolve(here, '../lib');
-const stage = mkdtempSync(path.join(tmpdir(), 'marriage-'));
-const fix = (s) => s
-  .replace("from './taxengine'", "from './taxengine.ts'")
-  .replace("from './autonomy'", "from './autonomy.ts'")
-  .replace("from './ltdengine'", "from './ltdengine.ts'")
-  .replace("from './personalincome'", "from './personalincome.ts'")
-  .replace("from './nistudentloan'", "from './nistudentloan.ts'")
-  .replace("from './propertyengine'", "from './propertyengine.ts'");
+const stage = stageLib('marriage-');
 // propertyengine joins the list because the optimiser now asks it about the property allowance.
-for (const f of ['taxengine', 'autonomy', 'nistudentloan', 'ltdengine', 'personalincome', 'propertyengine', 'taxoptimiser']) {
-  writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
-}
 const E = await import(pathToFileURL(path.join(stage, 'taxengine.ts')).href);
 const O = await import(pathToFileURL(path.join(stage, 'taxoptimiser.ts')).href);
 const { RULE_SOURCES } = await import(pathToFileURL(path.join(lib, 'rulesources.ts')).href);

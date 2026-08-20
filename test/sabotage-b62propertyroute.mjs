@@ -80,6 +80,9 @@ const PL = 'lib/propertylanes.ts';
 const PE = 'lib/propertyengine.ts';
 const DB = 'lib/supabase.ts';
 const SUITE = 'test/b62propertyroute.test.mjs';
+// The one line of lib/propertyengine.ts that decides a finance cost. Quoted once, here, so a
+// rewrite of that predicate breaks ONE anchor rather than several.
+const NAMES_LINE = "  const names = (s: string): boolean => s.includes('mortgage') || s.includes('interest');";
 
 const LIVE = "      income_type: direction === 'rent' || streamFor(filedAs) === 'property' ? 'property' : undefined,";
 
@@ -116,8 +119,13 @@ const SABOTAGES = [
   {
     name: '🔴 THE EXPENSIVE DIRECTION: mortgage interest stops being a finance cost, so it is deducted'
       + ' in full instead of relieved at 20% and the bill comes out 2,800.00 too LOW',
-    apply: (d) => edit(d, PE, "  return hay.includes('mortgage') || hay.includes('interest');",
-      "  return hay.includes('buy to let');"),
+    // \u26a0\ufe0f RE ANCHORED 20 August 2026 BY B68, WHICH REWROTE THIS PREDICATE. The old anchor
+    // quoted the one line body and went DEAD the moment that body grew a category branch. A dead
+    // anchor throws before the tree is run and the pass counts the throw as a CATCH, so this pass
+    // would have reported full marks while testing nothing. scripts/check-sabotage-anchors.mjs saw
+    // it in a second; the gate could not.
+    apply: (d) => edit(d, PE, NAMES_LINE,
+      "  const names = (s: string): boolean => s.includes('buy to let');"),
   },
   {
     name: '🔴 the finance list is emptied, so the rulebook and the reader disagree about Section 24',

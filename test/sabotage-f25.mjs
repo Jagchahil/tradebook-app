@@ -121,15 +121,18 @@ const SABOTAGES = [
   // ── The predicate's one owner ────────────────────────────────────────────────────────────
   {
     name: 'the predicate stops recognising a mortgage',
+    // \u26a0\ufe0f RE ANCHORED 20 August 2026 BY B68, which gave this predicate a category branch.
+    // The old anchor quoted its one line body and went DEAD, and a dead anchor scores as a catch.
     apply: (d) => edit(d, 'lib/propertyengine.ts',
-      "return hay.includes('mortgage') || hay.includes('interest');",
-      "return false;"),
+      "const names = (s: string): boolean => s.includes('mortgage') || s.includes('interest');",
+      "const names = (s: string): boolean => s.includes('zzz-recognises-nothing');"),
   },
   {
     name: 'the predicate says everything is finance, which would delete real deductions',
+    // \u26a0\ufe0f RE ANCHORED 20 August 2026 BY B68. Same reason as the one above it.
     apply: (d) => edit(d, 'lib/propertyengine.ts',
-      "return hay.includes('mortgage') || hay.includes('interest');",
-      "return true;"),
+      "const names = (s: string): boolean => s.includes('mortgage') || s.includes('interest');",
+      "const names = (s: string): boolean => s.length >= 0;"),
   },
   // ── The doctrine lock: quarterpack must stay at two relative imports ─────────────────────
   {

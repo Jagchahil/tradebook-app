@@ -79,9 +79,43 @@ export const PROPERTY_YEARS: PropertyTaxYear[] = ['2026-27', '2027-28'];
 // £17,211.80.
 //
 // A rule copied is a rule that drifts. It lives here now, once, beside the credit it belongs to.
+// ═════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B68. A VENDOR NAME COULD OVERRULE A CATEGORY HE CHOSE HIMSELF. 20 August 2026.
+//
+// This read the category and the vendor as ONE string and looked for "mortgage" or "interest"
+// anywhere in it. So a cost he filed as `property repairs`, paid to a payee whose NAME happens to
+// contain either word, was classified as a Section 24 finance cost and relieved at 20% instead of
+// being deducted.
+//
+// MEASURED: for a higher rate landlord that is £200 out of his own pocket per £1,000 of repairs.
+// It is silent, and it is in the direction that costs the customer money rather than HMRC.
+// "Interest Free Finance", "Mortgage Express", a letting agent with either word in its name: not
+// one of those is far fetched, and he would never see why his relief came out low.
+//
+// ⚠️ THE VENDOR HALF IS NOT A MISTAKE AND IT IS NOT REMOVED. It is the only signal a BANK FEED row
+// has. A statement line reading HALIFAX BTL MORTGAGE DD arrives categorised `other`, because
+// lib/categories.ts has no rule that could safely claim it (a regex on "mortgage" would sweep up a
+// man's own home, which that file says at length). Without the vendor, a landlord's interest would
+// be deducted in full against his rent, which is the same bug pointing the other way and is the
+// one Section 24 stopped in 2020.
+//
+// SO THE RULE IS THE ONE lib/yeartodate.ts ALREADY STATES FOR TOOL SPEND: HIS OWN CATEGORY
+// OUTRANKS A VENDOR NAME. A category that was CHOSEN decides on its own. Only a generic one,
+// `other`, or none at all, falls through to the vendor.
+//
+// ⚠️ AND `other` IS A LITERAL HERE RATHER THAN AN IMPORT, DELIBERATELY AND MEASURED: adding ONE
+// import to this file turns TWENTY TWO SUITES RED, because they stage it by a hand written list of
+// siblings. That is a known rot in the harness, it is written down in the operating rules, and it
+// is not this item's to fix. test/b68vendorcategory.test.mjs DERIVES the generic instead, by asking
+// categoriseBankLine what it returns for a line it cannot place, so the two cannot drift apart
+// without a guard seeing it.
+// ═════════════════════════════════════════════════════════════════════════════════════
 export function isResidentialFinanceCost(category?: string | null, vendor?: string | null): boolean {
-  const hay = `${category ?? ''} ${vendor ?? ''}`.toLowerCase();
-  return hay.includes('mortgage') || hay.includes('interest');
+  const names = (s: string): boolean => s.includes('mortgage') || s.includes('interest');
+  const cat = String(category ?? '').trim().toLowerCase();
+  // A category that was chosen is a fact about the row. The vendor is a guess about it.
+  if (cat && cat !== 'other') return names(cat);
+  return names(String(vendor ?? '').toLowerCase());
 }
 
 // Which schedule applies on a given date. The 2027/28 entry starts 6 Apr 2027;

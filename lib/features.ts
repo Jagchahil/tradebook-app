@@ -199,7 +199,7 @@ export function nudgeClause(): string {
 // something out for him, so "Email me my result" is the plain truth: there IS a result, he can see
 // it above the box, and the email carries it.
 //
-// The twelfth is /free-mtd-filing, where free MTD prep is not built yet and the page says so
+// The twelfth is /free-mtd-prep, where free MTD prep is not built yet and the page says so
 // honestly. There is no result. He is joining a list. And the button still said "Email me my
 // result", the tick box still said "email me my result", the thank you still said "We will send
 // your result over", and the confirm email still opened "You asked us to send you your result".
@@ -371,16 +371,29 @@ export function bankRouteLine(): string {
 //
 // 🔴 'soon' AND 'planned' ARE NOT THE SAME MARK, AND THE DIFFERENCE IS THE WHOLE FIX.
 //
-// 'soon' asserts a date. In a table where the competitor column shows a tick, a SOON chip tells a
-// reader the gap closes shortly, and we may only say that about something genuinely in flight. HMRC
-// production recognition IS in flight, so filing is 'soon' and stays 'soon'.
+// 'soon' asserts a DATE. In a table where the competitor column shows a tick, a SOON chip tells a
+// reader the gap closes shortly, and we may only say that about something genuinely in flight.
+// 'planned' asserts only an INTENTION, and app/compare renders it as a plain grey label in the same
+// style as "Costs extra", never as a chip, so it cannot read as a near tick.
 //
-// A bank connection is not in flight. Its provider declined on 30 July 2026 and no other has been
-// engaged, so it is 'planned', and app/compare renders that as a plain grey label in the same style
-// as "Costs extra", never as a chip, so it cannot read as a near tick.
+// 🔴 FILING LOST ITS CLAIM TO 'soon' ON 20 AUGUST 2026 (B89), AND THIS COMMENT USED TO ARGUE THE
+// OPPOSITE. It said "HMRC production recognition IS in flight, so filing is 'soon' and stays
+// 'soon'", written on 17 August when the bank connection was demoted. Three days later the Developer
+// Hub was actually read: Lekhio is listed under SANDBOX applications only, last call 6 August, and
+// the production application reads "Credentials requested". A request exists. An application does
+// not. HMRC then closed the market window for new 2026-27 quarterly update products on 10 August,
+// and the chase on ref 2026-SMT071 has had fourteen days of silence against a stated ten working
+// days. Every one of those is a reason we cannot name a date, and 'soon' is a date.
+//
+// ⚠️ SO BOTH MARKS ARE 'planned' TODAY, AND THAT IS NOT THE DISTINCTION COLLAPSING. They are
+// planned for different reasons (no provider engaged; no production access granted) and each is
+// asserted separately in test/frontdoor.test.mjs so one cannot quietly borrow the other's word.
+// 'soon' stays in the type and app/compare still renders its chip: it is the mark for the day
+// something genuinely does have a date, and deleting the machinery is how the next person ends up
+// reaching for 'planned' to mean 'soon'.
 export type CompareMark = boolean | 'soon' | 'planned';
 export function filingMark(): CompareMark {
-  return hmrcFilingLive() ? true : 'soon';
+  return hmrcFilingLive() ? true : 'planned';
 }
 export function bankMark(): CompareMark {
   return bankFeedLive() ? true : 'planned';

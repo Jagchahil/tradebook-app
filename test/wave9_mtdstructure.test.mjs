@@ -448,7 +448,7 @@ for (const [name, src] of [['hub', hub], ['summary', summary], ['ni', ni], ['nav
 
   // "Your ... quarterly update ... is due", plus the two flat assertions the 3 August rewrite
   // pushed behind stated_in. All three are claims about HIM, never about the regime: /resources
-  // and /free-mtd-filing name the same dates as the calendar's and are rightly untouched, because
+  // and /free-mtd-prep name the same dates as the calendar's and are rightly untouched, because
   // "the next quarterly update deadline" is a fact about the rule and "your next quarterly update"
   // is a fact about the man.
   const CLAIM = /(\byour\b[^\n]{0,60}\bquarterly update\b[^\n]{0,80}\bis due\b)|(Making Tax Digital applies to you)|(quarterly updates apply)/i;

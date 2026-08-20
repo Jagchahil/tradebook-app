@@ -57,7 +57,7 @@ export default function LeadCapture({
   sub?: string;
 }) {
   // 🔴 WHAT WE ARE PROMISING HIM, DECIDED BY THE SOURCE AND NOT BY THIS COMPONENT. See leadPromise
-  // in lib/features.ts for what /free-mtd-filing was saying before this existed.
+  // in lib/features.ts for what /free-mtd-prep (then /free-mtd-filing) was saying before this existed.
   const promise = leadPromise(source);
   const [email, setEmail] = useState('');
   const [consent, setConsent] = useState(false);

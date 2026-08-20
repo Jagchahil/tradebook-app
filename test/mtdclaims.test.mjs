@@ -238,7 +238,7 @@ ok('🔴 but the offer patterns are strict, so the same text still fails the bui
 console.log('\n3. THE MTD PAGE IS HONEST ABOUT WHERE IT HAS GOT TO');
 
 // Flattened for the same reason: this copy is JSX and wraps mid sentence.
-const mtd = flat(readFileSync(path.join(repo, 'app/free-mtd-filing/page.tsx'), 'utf8'));
+const mtd = flat(readFileSync(path.join(repo, 'app/free-mtd-prep/page.tsx'), 'utf8'));
 ok('it no longer just says coming soon', !/COMING SOON/i.test(strip(mtd)));
 // The allowlist is pinned at EMPTY. It held one entry until 31 Jul 2026 (lib/studioagent.ts, the AI
 // copy generator, deleted that day). Pinning the size is the whole point of it: adding a file to the

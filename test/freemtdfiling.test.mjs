@@ -10,7 +10,7 @@
 //      that pretends to file something that is not built. The only working control on the page is
 //      the email capture, and it must say plainly that this is not live yet.
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -59,7 +59,7 @@ ok('LeadCapture never sends without explicit consent (unticked by default)',
 // 2. The new page: honest, and only the capture actually works.
 // ---------------------------------------------------------------------------------------------
 
-const pageSrc = read('app/free-mtd-filing/page.tsx');
+const pageSrc = read('app/free-mtd-prep/page.tsx');
 
 ok('the page uses the shared LeadCapture component, not a bespoke form',
   /import LeadCapture from '\.\.\/\.\.\/components\/LeadCapture'/.test(pageSrc)
@@ -78,7 +78,7 @@ ok('the honest scope boundary is stated: basic profit and loss only, not propert
   /Property income, a PAYE job alongside your trade, VAT/.test(pageSrc));
 
 ok('no AI claim is made for THIS path specifically (it is what makes it free)',
-  /No AI in this path/.test(read('app/free-mtd-filing/page.tsx')) || /does not\. It is a fully deterministic engine/.test(pageSrc));
+  /No AI in this path/.test(read('app/free-mtd-prep/page.tsx')) || /does not\. It is a fully deterministic engine/.test(pageSrc));
 
 ok('an FAQPage schema is present for SEO, same pattern as the other tool pages',
   /'@type': 'FAQPage'/.test(pageSrc));
@@ -155,14 +155,40 @@ ok(`🔴 and the sweep above really ran, two checks on each of the ${CAPTURED_TO
 // 3. The page is actually reachable: registered in the sitemap and the site's own tool listings.
 // ---------------------------------------------------------------------------------------------
 
-ok('free-mtd-filing is in the public sitemap',
-  /'free-mtd-filing'/.test(read('app/sitemap.ts')));
+ok('free-mtd-prep is in the public sitemap',
+  /'free-mtd-prep'/.test(read('app/sitemap.ts')));
 
-ok('free-mtd-filing is listed on the resources (all tools) page',
-  /free-mtd-filing/.test(read('app/resources/page.tsx')));
+ok('free-mtd-prep is listed on the resources (all tools) page',
+  /free-mtd-prep/.test(read('app/resources/page.tsx')));
 
-ok('free-mtd-filing is linked from the site footer tools column',
-  /'\/free-mtd-filing', 'Free MTD prep'/.test(read('app/_shared/site.tsx')));
+ok('free-mtd-prep is linked from the site footer tools column',
+  /'\/free-mtd-prep', 'Free MTD prep'/.test(read('app/_shared/site.tsx')));
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND THE OLD URL STILL HAS TO GO SOMEWHERE. THE ROUTE MOVED ON 20 AUGUST 2026 (B89).
+//
+// The page lived at /free-mtd-filing while it promised to file a man's return. The copy was fixed
+// the same day and the slug followed it, because a slug is the grey line under the title in a
+// search result and it was still saying the word we had just removed from everything else.
+//
+// ⚠️ MOVING A LIVE INDEXED URL IS ONLY HALF A JOB. The old one is in Google, in llms.txt's sibling
+// links, and printed in every waitlist confirmation email already sent. Without the 308 those all
+// land on a 404 and the ranking splits instead of moving. This asserts the redirect exists, that it
+// is PERMANENT (a 307 tells Google to keep the old URL), and that the destination is the real page
+// rather than the home page, which is the lazy fix that loses the ranking anyway.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+const cfg = read('next.config.mjs');
+ok('🔴 the old /free-mtd-filing URL still 308s rather than 404s',
+  /\{ source: '\/free-mtd-filing', destination: '\/free-mtd-prep', permanent: true \}/.test(cfg));
+ok('...and no route file is left behind at the old path, which would beat the redirect',
+  !existsSync(path.join(root, 'app/free-mtd-filing/page.tsx')));
+
+// 🔴 THE LEAD SOURCE TAG DELIBERATELY DID NOT MOVE WITH THE URL, and that is worth a test of its
+// own, because it looks exactly like something left behind. It is the value already written on
+// every waitlist row captured since 23 July; renaming it splits one list across two source values.
+ok('🔴 the stored source tag is still free-mtd-filing, so old waitlist rows keep meaning one thing',
+  /source="free-mtd-filing"/.test(pageSrc)
+  && /WAITLIST_SOURCES = new Set\(\['free-mtd-filing'\]\)/.test(read('lib/features.ts')));
 
 console.log(`\n${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

@@ -765,7 +765,7 @@ function londonDay(now: Date): string {
 // ⚠️ THE DEADLINE DUE TODAY IS STILL DUE TODAY. The old code compared instants with `>`, so from
 // midnight on 7 August 2026 it skipped straight to 7 November and told a man his update was three
 // months away on the morning it was due. app/app/tax/due.ts's outstandingUpdate() correctly
-// reports it still open on the day (`todayIso > dueISO`), and app/free-mtd-filing compares whole
+// reports it still open on the day (`todayIso > dueISO`), and app/free-mtd-prep compares whole
 // days for the same stated reason: a man reading it on the morning of 7 August is not late yet.
 // Two surfaces, one fact, two answers. This one now agrees with those.
 function nextQuarterlyDeadline(todayIso: string): string {

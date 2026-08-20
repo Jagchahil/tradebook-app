@@ -283,7 +283,7 @@ export const REPEATING_SUBJECTS: Record<RepeatKey, (mark: string) => string> = {
   // link, which is now the expired one. See lib/leadtoken.ts.
   'lead-confirm': (mark) => `Confirm your email to get your result, ${mark}`,
 
-  // 🔴 THE SAME EMAIL, ON A PAGE WHERE THERE IS NO RESULT. /free-mtd-filing is a waitlist: free
+  // 🔴 THE SAME EMAIL, ON A PAGE WHERE THERE IS NO RESULT. /free-mtd-prep is a waitlist: free
   // MTD prep is not built, the page says so plainly, and the confirm that followed it still opened
   // "You asked us to send you your result". A subject of its own, because a man who used a
   // calculator this morning and joined this list this afternoon is confirming two different
@@ -832,7 +832,7 @@ export async function sendLeadConfirmEmail(
   // 🔴 WHICH PROMISE THIS CONFIRM IS CONFIRMING. Added 11 August 2026, RUN 0 of the customer week.
   //
   // Eleven of the twelve capture points are tools that have already worked something out, so "your
-  // result" is true. /free-mtd-filing is a waitlist for a thing that is not built, and this email
+  // result" is true. /free-mtd-prep is a waitlist for a thing that is not built, and this email
   // was telling those people they had asked for a result. See leadPromise in lib/features.ts.
   //
   // ⚠️ IT DEFAULTS TO 'result', WHICH IS THE ELEVEN. A caller that forgets to say gets the wording
@@ -865,7 +865,7 @@ export async function sendLeadConfirmEmail(
   });
 }
 
-// The same email on a page where there is no result. /free-mtd-filing is a waitlist for something
+// The same email on a page where there is no result. /free-mtd-prep is a waitlist for something
 // that is not built, and the page is honest about that; this is the confirm catching up with it.
 //
 // ⚠️ REACHED THROUGH sendLeadConfirmEmail, NEVER CALLED DIRECTLY BY A ROUTE. One door, one decision,

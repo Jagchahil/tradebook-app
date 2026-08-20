@@ -114,6 +114,15 @@ const nextConfig = {
       { source: '/signup', destination: '/start', permanent: true },
       { source: '/sign-up', destination: '/start', permanent: true },
       { source: '/register', destination: '/start', permanent: true },
+      // 🔴 B89, 20 August 2026. The page lived at /free-mtd-filing while it promised to file a man's
+      // return. The copy was corrected the same day and the route followed it, because a slug is the
+      // grey line under the title in a search result and it was still saying the corrected word.
+      //
+      // ⚠️ THIS REDIRECT IS NOT OPTIONAL AND MUST NOT BE TIDIED AWAY. The old URL is indexed, it is
+      // in llms.txt, and it is printed in every waitlist confirmation email already sent. 308 so it
+      // is cached, so Google moves the ranking across rather than splitting it, and so a link in a
+      // year old inbox still lands on the page instead of a 404.
+      { source: '/free-mtd-filing', destination: '/free-mtd-prep', permanent: true },
     ];
   },
   async headers() {

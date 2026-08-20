@@ -9,7 +9,7 @@
 //   the thank you     "We will send your result over. Check your inbox."
 //   the confirm email "You asked us to send you your result."
 //
-// There is no result on /free-mtd-filing. Free filing is not built, the page says so plainly and
+// There is no result on /free-mtd-prep. Free MTD prep is not built, the page says so plainly and
 // well, and the only thing he did was join a list. The page had already overridden its heading and
 // its sub to say exactly that, which is precisely why nobody caught the other four: they live
 // inside a shared component, on a page nobody was looking at while editing it.
@@ -58,7 +58,7 @@ const pageFiles = [
   'app/student-loan-checker/Calc.tsx', 'app/landlord-tax-calculator/Calc.tsx',
   'app/rent-a-room-checker/Calc.tsx', 'app/sole-trader-vs-limited/Calc.tsx',
   'app/invoice-generator/Generator.tsx', 'app/can-i-claim/page.tsx',
-  'app/how-mtd-works/page.tsx', 'app/free-mtd-filing/page.tsx',
+  'app/how-mtd-works/page.tsx', 'app/free-mtd-prep/page.tsx',
 ];
 for (const f of pageFiles) {
   const src = read(f);
@@ -67,7 +67,10 @@ for (const f of pageFiles) {
   if (s) sources.push(s);
 }
 
-ok('🔴 /free-mtd-filing is a WAITLIST', leadPromise('free-mtd-filing') === 'waitlist');
+// ⚠️ THE ROUTE IS /free-mtd-prep SINCE 20 AUGUST 2026, THE TAG IS STILL free-mtd-filing.
+// Deliberate: the tag is written on every waitlist row captured since 23 July, so it is data,
+// not a URL. Do not 'tidy' one to match the other. See test/freemtdfiling.test.mjs.
+ok('🔴 the free MTD prep page is a WAITLIST', leadPromise('free-mtd-filing') === 'waitlist');
 for (const s of sources.filter((x) => x !== 'free-mtd-filing')) {
   ok(`${s} is a tool that has a result to send`, leadPromise(s) === 'result');
 }
@@ -150,7 +153,7 @@ console.log('\n--- 4. The confirm email, which is the one that arrives after he 
 
 console.log('\n--- 5. The page itself still tells the truth about what is not built ---\n');
 {
-  const page = read('app/free-mtd-filing/page.tsx');
+  const page = read('app/free-mtd-prep/page.tsx');
   // 🔴 B89, 20 August 2026: the heading said "free filing opens", and filing is HMRC's to open,
   // not ours. What a stranger joins a list for has to be a thing we can actually deliver him.
   ok('the heading still says what he is joining', /Be first when free MTD prep opens/.test(page));

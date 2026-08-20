@@ -140,7 +140,7 @@ ok('deadline answer picks next date', /7 August 2026/.test(W.deadlineAnswer(new 
 ok('deadline rolls to Nov after Aug', /7 November 2026/.test(W.deadlineAnswer(new Date('2026-08-08T10:00:00Z'), STATED_IN)));
 // 🔴 AND THE DAY ITSELF IS NOT LATE. It compared instants with `>`, so from midnight on 7 August
 // 2026 it skipped to 7 November and told a man his update was three months away on the morning it
-// was due. app/app/tax/due.ts reports it still open that day and app/free-mtd-filing compares whole
+// was due. app/app/tax/due.ts reports it still open that day and app/free-mtd-prep compares whole
 // days for the same reason. Two surfaces, one fact, and this was the one that disagreed.
 ok('🔴 the deadline due TODAY is the answer today, not the next one',
   /7 August 2026/.test(W.deadlineAnswer(new Date('2026-08-07T00:05:00+01:00'), STATED_IN))

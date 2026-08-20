@@ -19,7 +19,7 @@ const ROUTES = [
   'landlord-tax-calculator',
   'rent-a-room-checker',
   'sole-trader-vs-limited',
-  'free-mtd-filing',
+  'free-mtd-prep',
   'for-landlords',
   'can-i-claim',
   'file-your-tax-return',

@@ -101,10 +101,21 @@ const SABOTAGES = [
     apply: ({ dir }) => edit(dir, 'lib/features.ts',
       "  return bankFeedLive() ? true : 'planned';", "  return bankFeedLive() ? true : 'soon';"),
   },
+  // 🔴 THIS SABOTAGE WAS INVERTED ON 20 AUGUST 2026 (B89), AND THE INVERSION IS THE POINT.
+  //
+  // It used to arm against filingMark BECOMING 'planned', on the reasoning that HMRC recognition
+  // was in flight and so genuinely dated. The Developer Hub says otherwise: SANDBOX applications
+  // only, production reading "Credentials requested", and the market window for new 2026-27
+  // quarterly update products closed on 10 August. filingMark is 'planned' now, and the defect to
+  // guard is the drift BACK to a chip that promises a date.
+  //
+  // ⚠️ A SABOTAGE THAT ARMS AGAINST THE TRUTH IS WORSE THAN NO SABOTAGE. It reads as proof while
+  // holding the wrong answer in place, exactly as test/mtdclaims.test.mjs section 3 did for the
+  // page copy. When the fact changes, the guard turns round; it does not get deleted.
   {
-    name: "⚠️ THE OTHER DIRECTION: filingMark collapses into 'planned' and the distinction is lost",
+    name: "🔴 filingMark goes back to 'soon', asserting a date HMRC has not given us",
     apply: ({ dir }) => edit(dir, 'lib/features.ts',
-      "  return hmrcFilingLive() ? true : 'soon';", "  return hmrcFilingLive() ? true : 'planned';"),
+      "  return hmrcFilingLive() ? true : 'planned';", "  return hmrcFilingLive() ? true : 'soon';"),
   },
   {
     name: "the Cell type drops 'planned', so a stray mark falls through to a raw string",

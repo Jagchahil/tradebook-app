@@ -39,7 +39,7 @@ import { filingFaqAnswer } from '../../lib/features';
 // ready. Everything else is honest "this is coming, here is what it will be."
 
 export const metadata: Metadata = {
-  alternates: { canonical: '/free-mtd-filing' },
+  alternates: { canonical: '/free-mtd-prep' },
   title: 'Free Making Tax Digital Prep, For the Basics | Lekhio',
   description:
     'For straightforward UK sole trader books, just profits, losses and the essentials, Lekhio will get your Making Tax Digital quarterly update ready for free. You send it to HMRC yourself. No AI in this path, so it costs us nothing to run. Join the list.',
@@ -228,7 +228,15 @@ export default function FreeMtdFilingPage() {
         </div>
       </section>
 
-      {/* Lead capture, the one real thing on this page */}
+      {/* Lead capture, the one real thing on this page.
+
+          🔴 THE source TAG STAYS "free-mtd-filing" THOUGH THE ROUTE IS NOW /free-mtd-prep, AND THAT
+          IS DELIBERATE. This string is not a URL. It is the value already written on every waitlist
+          row captured since 23 July, so renaming it would split one list across two source values
+          and quietly break any count run over them afterwards. lib/features.ts WAITLIST_SOURCES
+          holds the same string for the same reason, and test/freemtdfiling.test.mjs asserts both.
+          The URL is what a stranger reads. This is bookkeeping, and bookkeeping does not get
+          renamed for tidiness. */}
       <section style={{ maxWidth: 720, margin: '0 auto', padding: '8px 24px 12px' }}>
         <LeadCapture
           source="free-mtd-filing"

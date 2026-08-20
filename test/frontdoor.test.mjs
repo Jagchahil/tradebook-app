@@ -667,13 +667,22 @@ console.log('\n=== the public site sells no bank connection nobody can make ===\
   ok('🔴 ...and BUILT and SWITCHING ON SOON are gone from the code that renders it',
     !featCode.includes('BUILT · SWITCHING ON SOON') && !/switching on soon/i.test(featCode));
 
-  // 🔴 BOTH DIRECTIONS, because the whole point is that these two marks are NOT the same mark.
-  // 'soon' asserts a date and filing has one in flight (HMRC production recognition). The bank
-  // connection has no provider, so it may not borrow filing's word. Assert each carries its own.
+  // 🔴 BOTH MARKS, NAMED SEPARATELY, because the point is that neither may borrow the other's word.
+  //
+  // ⚠️ THIS BLOCK USED TO ASSERT filingMark WAS 'soon', "because HMRC recognition genuinely is in
+  // flight". That was written on 17 August. On 20 August the Developer Hub was read: SANDBOX
+  // applications only, production reading "Credentials requested", and HMRC's market window for new
+  // 2026-27 quarterly update products closed on 10 August. A request is not an application, and a
+  // SOON chip beside a competitor's tick is a claim about a date nobody has given us.
+  //
+  // They are both 'planned' today, for two different reasons, and both are still asserted one at a
+  // time so a future edit cannot flatten them into one shared constant and call it tidying.
   ok("🔴 bankMark is 'planned', because there is no provider and so no date",
     /return bankFeedLive\(\) \? true : 'planned';/.test(featCode));
-  ok("...and filingMark is STILL 'soon', because HMRC recognition genuinely is in flight",
-    /return hmrcFilingLive\(\) \? true : 'soon';/.test(featCode));
+  ok("🔴 and filingMark is 'planned' too, because HMRC has granted no production access and set no date",
+    /return hmrcFilingLive\(\) \? true : 'planned';/.test(featCode));
+  ok("🔴 neither of them says 'soon', which is the word that asserts a date",
+    !/return (bankFeedLive|hmrcFilingLive)\(\) \? true : 'soon';/.test(featCode));
 
   ok('🔴 the connection line names the missing provider and refuses to give a date',
     feat.includes('We have no open banking provider engaged, so we will not put a date on it.'));
@@ -946,7 +955,7 @@ for (const f of BANNER_PAGES) {
     !/MTD reminders|deadline reminders|deadlines that matter|nudge about your tax deadlines/i.test(leadCode));
   // ⚠️ THE ONE THAT IS STORED. consent_text is the record of what he agreed to, so it must be the
   // gated wording and never a constant sitting beside it.
-  // ⚠️ leadConsentText NOW TAKES THE PROMISE (11 August 2026): /free-mtd-filing is a waitlist and
+  // ⚠️ leadConsentText NOW TAKES THE PROMISE (11 August 2026): /free-mtd-prep is a waitlist and
   // was recording a consent to send a "result" it has none of. See leadPromise in lib/features.ts.
   // The claim here is UNCHANGED, the wording stored is the one lib/features decides and never a
   // constant sitting beside it; only the call signature moved.

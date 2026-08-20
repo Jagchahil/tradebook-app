@@ -220,7 +220,7 @@ console.log('\n=== the sole traders ===\n');
 // The second defect in the same function. It compared instants with `>`, so from one minute past
 // midnight on 7 August 2026 it skipped the deadline due that morning. app/app/tax/due.ts's
 // outstandingUpdate() reports it still open on the day (`todayIso > dueISO`), and
-// app/free-mtd-filing compares whole days for the stated reason that a man reading it on the
+// app/free-mtd-prep compares whole days for the stated reason that a man reading it on the
 // morning of 7 August is not late yet. This surface now agrees with both.
 // ---------------------------------------------------------------------------------------------
 console.log('\n=== the deadline due today ===\n');

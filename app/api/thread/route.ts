@@ -505,7 +505,7 @@ async function composeOneLane(userId: string, q: string): Promise<string> {
 
   // 4. Everything else: the guarded AI path, the same one WhatsApp falls through to.
   if (!hasClaudeConfig()) {
-    return 'I cannot answer questions just yet. Hang tight, it is coming very soon.';
+    return 'I cannot answer questions right now. That is a fault at our end, not anything you did. Try again in a little while.';
   }
   const refused = await threadAiBlocked(userId);
   if (refused) {
@@ -554,7 +554,7 @@ async function receiptReply(userId: string, part: File): Promise<string> {
     return NOT_AN_IMAGE_REPLY;
   }
   if (!hasClaudeConfig()) {
-    return 'Receipt reading is not switched on yet. Hang tight, it is coming very soon.';
+    return 'Receipt reading is not working right now. That is a fault at our end, not your photograph. Try again in a little while.';
   }
   const refused = await threadAiBlocked(userId);
   if (refused) {

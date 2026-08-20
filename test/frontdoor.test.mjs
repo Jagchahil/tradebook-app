@@ -709,9 +709,22 @@ console.log('\n=== the public site sells no bank connection nobody can make ===\
   ok('🔴 /product tells all three routes in one section', prodCode.includes('Three ways money gets in'));
   ok('...the statement import is one of the three, and it is badged as working TODAY',
     /Import your statement/.test(prodCode) && /<h3>Import your statement<\/h3>[\s\S]{0,400}rbadge live">WORKS TODAY/.test(prodCode));
-  ok('🔴 ...and the connection sits WITH the routes, above the soon grid, not inside it',
+  // ⚠️ THE ANCHOR MOVED ON 20 AUGUST 2026. This used to point at the heading "Soon, Lekhio does the
+  // lot", which was itself the defect: a heading that sold a date for the cards beneath it. It now
+  // reads "What it does not do yet", so the anchor follows. The CLAIM here is unchanged: the bank
+  // connection sits with the routes that work, above the not-yet grid rather than inside it.
+  ok('🔴 ...and the connection sits WITH the routes, above the not-yet grid, not inside it',
     prodCode.indexOf('Three ways money gets in') < prodCode.indexOf('<h3>Connect your bank</h3>')
-    && prodCode.indexOf('<h3>Connect your bank</h3>') < prodCode.indexOf('Soon, Lekhio does the lot'));
+    && prodCode.indexOf('<h3>Connect your bank</h3>') < prodCode.indexOf('What it does not do yet'));
+
+  // 🔴 AND THE GRID ITSELF MAY NOT SELL A DATE. Two of its three cards wait on an HMRC decision
+  // that has not been made, so each has to name the absence the way bankRouteLine() already does.
+  ok('🔴 the not-yet grid is a disclosure, not a roadmap: no "soon", no "on the way"',
+    /What it does not do yet/.test(prodCode) && !/Soon, Lekhio does the lot/.test(prodCode));
+  ok('🔴 the filing card names the missing HMRC access and refuses a date',
+    /<h3>File straight to HMRC<\/h3>[\s\S]{0,400}has not been granted[\s\S]{0,120}will not put a date/.test(prodCode));
+  ok('🔴 the HMRC balance card says it waits on the SAME decision, rather than wearing a soon chip',
+    /<h3>Your HMRC balance, live<\/h3>[\s\S]{0,400}same production access[\s\S]{0,200}filingBadge\(\)/.test(prodCode));
   ok('...wearing the quiet badge rather than the saffron soon chip',
     /bankBadge\(\)\.live \? 'rbadge live' : 'rbadge plan'/.test(prodCode));
 

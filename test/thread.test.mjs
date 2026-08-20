@@ -361,9 +361,19 @@ ok('🔴 a reply is composed and stored on EVERY answered path',
   && /saveLekhioThreadMessage\(user\.id, threadId, 'lekhio', reply\)/.test(routeCode));
 ok('🔴 a budget refusal stores the truthful line, the same words WhatsApp sends',
   /return busyMessage\(refused/.test(routeCode));
+// 🔴 THE WORDS CHANGED ON 20 AUGUST 2026, AND THE OLD ONES WERE TWO LIES IN ONE SENTENCE.
+//
+// They read "I cannot answer questions just yet. Hang tight, it is coming very soon." This line
+// fires when hasClaudeConfig() is false, which in production means a FAULT, not a feature that has
+// not been built. So it told a paying customer that something he is already paying for was still
+// on its way, and then put a date on it. "Very soon" is a promise about a repair nobody had
+// diagnosed yet. Found by test/externalstate.test.mjs on the first run of its fence.
+//
+// ⚠️ THE PARITY CLAIM IS UNCHANGED and is the whole point of this assertion: both channels must
+// say the IDENTICAL words, or a man gets one story on WhatsApp and another in the app.
 ok('the AI-off line is the exact WhatsApp line, so the two channels cannot drift apart',
-  routeSrc.includes('I cannot answer questions just yet. Hang tight, it is coming very soon.')
-  && waSrc.includes('I cannot answer questions just yet. Hang tight, it is coming very soon.'));
+  routeSrc.includes('I cannot answer questions right now. That is a fault at our end, not anything you did. Try again in a little while.')
+  && waSrc.includes('I cannot answer questions right now. That is a fault at our end, not anything you did. Try again in a little while.'));
 for (const reason of ['kill_switch', 'global_daily_cap', 'global_monthly_cap', 'user_daily_cap']) {
   const line = nudge.busyMessage(reason, { available: false, connected: false });
   ok(`busyMessage('${reason}') is a real sentence, not silence`, typeof line === 'string' && line.length > 20);

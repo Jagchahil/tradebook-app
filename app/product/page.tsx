@@ -333,13 +333,24 @@ export default function ProductPage() {
       <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 38 }}>
-            <div className="eyebrow" style={{ color: 'var(--on-saffron-tint)' }}>On the way</div>
-            <h2 className="h2">Soon, Lekhio does the lot.</h2>
-            <p className="lead">Every one keeps you in control, and never sends a thing without your yes.</p>
+            {/* 🔴 THIS HEADING READ "On the way / Soon, Lekhio does the lot." UNTIL 20 AUGUST 2026,
+                AND THE HEADING WAS MAKING THE CLAIM FOR THE CARDS UNDER IT.
+                test/sabotage-b1banktruth.mjs already knew that: it arms against the bank card being
+                moved back INTO this grid, on the stated ground that "the heading makes the claim for
+                it". The bank card was rescued on 17 August and the heading was left standing over
+                two cards that both wait on the same HMRC decision, which on 20 August turned out not
+                to have been made at all. B89 fixed that sentence everywhere else on the site; this
+                grid is where it survived, on the page a man reads BEFORE he pays £12.99.
+                ⚠️ THE SECTION IS NOW A DISCLOSURE, NOT A ROADMAP. Naming what a product cannot do
+                is worth more to him than a promise, and it is the only version of this section that
+                cannot go stale when somebody else changes their mind. */}
+            <div className="eyebrow" style={{ color: 'var(--on-saffron-tint)' }}>Not yet</div>
+            <h2 className="h2">What it does not do yet.</h2>
+            <p className="lead">We would rather name these than let you find one out. Every one keeps you in control, and none of them sends a thing without your yes.</p>
           </div>
           <div className="trio reveal">
-            <div className="sooncard"><div className="se"><Ic e="📤" color="var(--river)" size={24} /></div><h3>File straight to HMRC</h3><p>Submit your quarterly updates and return from Lekhio, when you approve, through a recognised route.</p><span className={filingBadge().live ? 'rbadge live' : 'rbadge prog'}>{filingBadge().text}</span></div>
-            <div className="sooncard"><div className="se"><Ic e="📊" color="var(--on-saffron-tint)" size={24} /></div><h3>Your HMRC balance, live</h3><p>See exactly what you owe, what is due, and any refund building, right in the app.</p><span className="rbadge soon">COMING SOON</span></div>
+            <div className="sooncard"><div className="se"><Ic e="📤" color="var(--river)" size={24} /></div><h3>File straight to HMRC</h3><p>Your quarterly update sent from Lekhio, when you approve, through a recognised route. That needs HMRC production access. We have asked for it and it has not been granted, so we will not put a date on it. Until then Lekhio prepares everything and you send it, which takes minutes.</p><span className={filingBadge().live ? 'rbadge live' : 'rbadge prog'}>{filingBadge().text}</span></div>
+            <div className="sooncard"><div className="se"><Ic e="📊" color="var(--on-saffron-tint)" size={24} /></div><h3>Your HMRC balance, live</h3><p>What you owe, what is due, and any refund building, read from HMRC and shown in the app. It needs the same production access as filing, so it waits on the same decision and gets the same answer about dates.</p><span className={filingBadge().live ? 'rbadge live' : 'rbadge prog'}>{filingBadge().text}</span></div>
             <div className="sooncard"><div className="se"><Ic e="🛡️" color="var(--river)" size={24} /></div><h3>Rakha gets sharper</h3><p>Rakha already watches your thresholds. Soon it reads HMRC updates and the Budget the moment they land, and tells you exactly what changes for you.</p><span className="rbadge soon">COMING SOON</span></div>
           </div>
         </div>

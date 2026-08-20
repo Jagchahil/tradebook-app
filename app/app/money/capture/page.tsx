@@ -55,7 +55,7 @@ function notice(done: string | undefined, problem: string | undefined): string |
     case 'type':
       return 'I cannot read that kind of file. A JPEG or PNG photograph works.';
     case 'off':
-      return 'Receipt reading is not switched on yet. Hang tight, it is coming very soon.';
+      return 'Receipt reading is not working right now. That is a fault at our end, not your photograph. Try again in a little while.';
     case 'budget':
       // The bank offer returns with bankFeedOffered(); until then the way out is one he can take.
       return bankFeedOffered()

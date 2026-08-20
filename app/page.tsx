@@ -445,7 +445,7 @@ export default async function HomePage() {
                   wordings come from filingBadge(), so the day it is granted this upgrades itself
                   and until then the caption underneath says exactly where we stand. */}
               <div className="approvebtn">{filing.live ? 'Approve and send to HMRC →' : 'Approve my figures →'}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--tx-mut)', textAlign: 'center', marginTop: 2 }}>{filing.live ? 'Sent through a recognised route, only when you say so.' : 'HMRC recognition in progress. You approve, always.'}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--tx-mut)', textAlign: 'center', marginTop: 2 }}>{filing.live ? 'Sent through a recognised route, only when you say so.' : 'HMRC has not granted this yet. You approve, always.'}</div>
             </div>
           </div>
 

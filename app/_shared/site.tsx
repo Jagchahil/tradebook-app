@@ -519,7 +519,10 @@ export const claimExamples = [
 export const comingSoon = [
   ...(hmrcFilingLive()
     ? []
-    : [{ icon: '📤', title: 'File straight to HMRC', body: 'Submit your quarterly updates and your return from Lekhio, when you approve, through a recognised route.' }]),
+    // ⚠️ THIS EXPORT HAS NO CALLER TODAY. It is kept as the shape a future roadmap list would take,
+    // so the wording is held to the same standard as the live one on /product: name the absence,
+    // never a date. An unused string is exactly the kind that gets copied somewhere real.
+    : [{ icon: '📤', title: 'File straight to HMRC', body: 'Your quarterly update sent from Lekhio, when you approve, through a recognised route. That needs HMRC production access, which we have asked for and have not been granted, so we will not put a date on it.' }]),
   { icon: '📊', title: 'Your HMRC balance, live', body: 'See exactly what you owe, what is due, and any refund building, right in the app.' },
   // 🔴 THE BANK CONNECTION CAME OUT OF THIS LIST ON 17 AUGUST 2026, AND NOT BECAUSE IT WAS DROPPED.
   // This export is named comingSoon, so anything in it is sold as imminent by the list it sits in

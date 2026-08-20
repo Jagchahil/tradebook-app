@@ -151,7 +151,11 @@ const SABOTAGES = [
       '<h3>Import your statement</h3><p>Export a CSV from your bank and upload it under Money. A whole month lands in one go, and eleven UK banks are read exactly as they hand it out.</p><span className="rbadge soon">COMING SOON</span>'),
   },
   {
-    name: '🔴 THE BANK CARD MOVES BACK INTO THE "Soon, Lekhio does the lot" GRID, where the heading makes the claim for it',
+    // ⚠️ THE HEADING THIS SABOTAGE NAMED IS ITSELF GONE, 20 AUGUST 2026. It read "Soon, Lekhio does
+    // the lot" and this entry already said out loud that the heading made the claim for the cards
+    // under it. That was true of the two HMRC cards left in the grid too, and B89 finished the job:
+    // the grid is now headed "What it does not do yet". The defect guarded here is unchanged.
+    name: '🔴 THE BANK CARD MOVES BACK INTO THE "What it does not do yet" GRID, where the heading makes the claim for it',
     apply: ({ dir }) => moveLine(dir, 'app/product/page.tsx',
       '<h3>Connect your bank</h3>', '<h3>Rakha gets sharper</h3>', 1),
   },

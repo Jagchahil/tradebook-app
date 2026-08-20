@@ -328,10 +328,17 @@ export function filingFaqAnswer(): string {
 }
 
 // The badge on the "File straight to HMRC" card.
+//
+// 🔴 IT SAID "HMRC RECOGNITION IN PROGRESS" UNTIL 20 AUGUST 2026, AND "IN PROGRESS" IS MOTION.
+// It describes a process moving along. What is true is that a request was submitted on 6 August,
+// that HMRC's own Hub still shows the production application as "Credentials requested" with Lekhio
+// listed under Sandbox only, and that the chase has had fourteen days of silence against a stated
+// ten working days. Waiting is not progress. "AWAITING HMRC" says who holds the decision, which is
+// the only useful thing this badge can tell a man, and it stops being true the day they answer.
 export function filingBadge(): { text: string; live: boolean } {
   return hmrcFilingLive()
     ? { text: 'LIVE', live: true }
-    : { text: 'HMRC RECOGNITION IN PROGRESS', live: false };
+    : { text: 'AWAITING HMRC', live: false };
 }
 
 // The credibility chip on /compare and /how-mtd-works. One wording for both pages, so they
@@ -339,7 +346,11 @@ export function filingBadge(): { text: string; live: boolean } {
 export function filingChip(): string {
   return hmrcFilingLive()
     ? 'Files straight to HMRC, live'
-    : 'HMRC recognition in progress';
+    // ⚠️ THIS ONE SITS IN A CREDIBILITY LIST, beside "Checked against HMRC's 2026/27 rules" and
+    // "A real UK company", which are both plain facts. A chip that reads "in progress" in that
+    // company reads as a credential half earned. "Applied for" is the whole of what is true, and
+    // it is still worth saying: doing it properly is the claim, not being nearly finished.
+    : 'HMRC recognition applied for';
 }
 
 // The badge on the "Connect your bank" route card on /product.

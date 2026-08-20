@@ -1379,7 +1379,7 @@ async function receiptSentence(from: string, messageId: string, mediaId: string)
   }
 
   if (!hasClaudeConfig()) {
-    return 'Receipt reading is not switched on yet. Hang tight, it is coming very soon.';
+    return 'Receipt reading is not working right now. That is a fault at our end, not your photograph. Try again in a little while.';
   }
 
   const media = await downloadMedia(mediaId);
@@ -3199,7 +3199,7 @@ async function scheduleSentence(from: string, body: string): Promise<string | nu
     return 'Open the app and add your number first, then I can keep your diary.';
   }
   if (!hasClaudeConfig()) {
-    return 'Reminders are not switched on yet. Hang tight, they are coming very soon.';
+    return 'Reminders are not switched on yet, and I will not give you a date for them. Keep an eye on your own deadlines for now.';
   }
   const refused = await aiBudgetBlocked(from);
   if (refused) {
@@ -3291,7 +3291,7 @@ async function handleMoneyQuestion(from: string, body: string): Promise<void> {
     return;
   }
   if (!hasClaudeConfig()) {
-    await sendText(from, 'I cannot answer questions just yet. Hang tight, it is coming very soon.');
+    await sendText(from, 'I cannot answer questions right now. That is a fault at our end, not anything you did. Try again in a little while.');
     return;
   }
   const refused = await aiBudgetBlocked(from);

@@ -93,17 +93,118 @@ export function hashOf(text) {
   return createHash('sha256').update(text || '').digest('hex').slice(0, 16);
 }
 
-// legislation.gov.uk exposes a stable, licensed data view at <url>/data.xml. We hash the BODY of that
-// (the enacted/revised text), not the rendered HTML page furniture, so a site redesign is not read as
-// a change in the law. gov.uk pages use their content API. Both reduce to "the text, hashed".
+// 🔴 21 AUGUST 2026: THIS FILE USED TO HASH THE WHOLE RESPONSE, AND IT CRIED WOLF EVERY NIGHT.
+//
+// The comment here promised it hashed "the BODY... not the rendered HTML page furniture" and that
+// "gov.uk pages use their content API". IT DID NEITHER. fetchBody returned res.text() and that went
+// straight into the hash. The result, measured over 21 consecutive nights in khoji_runs:
+//
+//     drifted never dropped below 13 of 24. Mean about 16. On 18 August it was 24 of 24.
+//
+// Laws do not move like that. What moved was the response. Diffing two gov.uk renders two seconds
+// apart named it exactly: a fresh `csrf-token`, a fresh `csp-nonce`, that same nonce again on a
+// <script> tag, and randomised element ids like `search-main-e973ffa7`. None of it is the law and
+// all of it was in the hash. legislation.gov.uk was byte identical back to back but drifted over
+// hours, which is CDN or serialisation variance rather than a nonce, and the same cure fixes both.
+//
+// AND IT COST US SOMETHING REAL. The corpus checker found a genuinely truncated HMRC quote live on
+// /can-i-claim, and it had been sat under three weeks of this noise. A watcher that fires every
+// night is worse than no watcher, because it hides the night something true comes through.
+//
+// 🔴 THE CURE: STOP HASHING THE RESPONSE. HASH THE LAW.
+//
+// The header of this file says the exam bank answers with PROVISIONS rather than thresholds,
+// precisely so a figure moving underneath does not make it quietly wrong, and that only works if
+// something watches the provision. So watch the provision. extractSignal() below pulls the table of
+// contents, the section numbers and titles, and hashes THAT. It is immune to nonces, whitespace,
+// attribute order and CDN variants by construction, and it fires on the one thing we care about,
+// which is a provision moving.
+
+export function hostOf(url) {
+  try { return new URL(url).host.toLowerCase(); } catch { return ''; }
+}
+
+// legislation.gov.uk exposes a stable, licensed data view at <url>/data.xml. gov.uk has a content
+// API that returns JSON with no CSRF token and no nonce in it. Use both, as this comment always
+// claimed we did.
 export function dataUrlFor(url) {
   try {
     const u = new URL(url);
     if (u.host.endsWith('legislation.gov.uk')) {
       return url.replace(/\/contents.*$/, '/contents/data.xml');
     }
+    if (u.host === 'www.gov.uk') {
+      return `https://www.gov.uk/api/content${u.pathname.replace(/\/+$/, '')}`;
+    }
     return url;
   } catch { return url; }
+}
+
+// Keys whose value is a time, a render token or a visit counter. None of them is the law.
+const VOLATILE_KEYS = new Set([
+  'updated_at', 'public_updated_at', 'first_published_at', 'last_updated', 'updated',
+  'published_at', 'expanded_links', 'analytics_identifier', 'csrf_token', 'nonce',
+]);
+
+// The smallest signal we will believe. Below BOTH of these the page shape has changed under us and
+// we are NOT looking at the law any more, whatever came back.
+//
+// Two floors rather than one, because gov.uk has two shapes. An HMRC manual is a long LIST of
+// section titles, so items is the right measure. An ordinary guide like national-minimum-wage-rates
+// is ONE long body, which is plenty of signal and would fail an item count. Requiring both would
+// have left that source silently unwatched, which is the failure this whole fix exists to stop.
+export const MIN_SIGNAL_ITEMS = 5;
+export const MIN_SIGNAL_CHARS = 200;
+
+/** Markup is not the law. Strip tags so a class name changing is not read as a rate changing. */
+export function textOf(s) {
+  return String(s).includes('<')
+    ? String(s).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    : String(s).trim();
+}
+
+/** legislation.gov.uk CLML: the provision list. IdURIs, numbers and titles, in document order. */
+export function legislationToc(xml) {
+  const t = String(xml || '');
+  const ids = [...t.matchAll(/\bIdURI="([^"]+)"/g)].map((m) => m[1]);
+  const nums = [...t.matchAll(/<ContentsNumber[^>]*>([\s\S]*?)<\/ContentsNumber>/g)].map((m) => m[1].trim());
+  const titles = [...t.matchAll(/<ContentsTitle[^>]*>([\s\S]*?)<\/ContentsTitle>/g)].map((m) => m[1].trim());
+  const items = [...ids, ...nums, ...titles].filter(Boolean);
+  const joined = items.join('\n');
+  return (items.length >= MIN_SIGNAL_ITEMS || joined.length >= MIN_SIGNAL_CHARS) ? joined : null;
+}
+
+/** gov.uk content API: every stable string under details, plus the title. No nonces exist here. */
+export function govukSignal(json) {
+  let doc;
+  try { doc = JSON.parse(String(json || '')); } catch { return null; }
+  const out = [];
+  const walk = (n) => {
+    if (Array.isArray(n)) { n.forEach(walk); return; }
+    if (n && typeof n === 'object') {
+      for (const k of Object.keys(n).sort()) {
+        if (VOLATILE_KEYS.has(k)) continue;
+        walk(n[k]);
+      }
+      return;
+    }
+    if (typeof n === 'string') { const t = textOf(n); if (t) out.push(t); }
+  };
+  if (typeof doc.title === 'string') out.push(textOf(doc.title));
+  walk(doc.details ?? doc);
+  const joined = out.filter(Boolean).join('\n');
+  return (out.length >= MIN_SIGNAL_ITEMS || joined.length >= MIN_SIGNAL_CHARS) ? joined : null;
+}
+
+/**
+ * THE LAW, extracted from the response. null means WE COULD NOT READ IT, which is blind, never
+ * 'unchanged'. That distinction is the whole point: not knowing is not the same as being fine.
+ */
+export function extractSignal(url, text) {
+  const host = hostOf(url);
+  if (host.endsWith('legislation.gov.uk')) return legislationToc(text);
+  if (host === 'www.gov.uk') return govukSignal(text);
+  return null;
 }
 
 // 🔴 THE COMPARISON. Identical spirit to khoji/amend.mjs. Three verdicts, and 'silent' is the one
@@ -164,6 +265,23 @@ async function fetchBody(url) {
   return res.text();
 }
 
+// 🔴 A RESPONSE WE CANNOT READ AS A PROVISION LIST IS BLIND, NEVER 'unchanged'.
+//
+// This is the file's own rule and it matters more here than anywhere else. If a regex below stops
+// matching because a source changed shape, the signal would become the empty string for every
+// source, every hash would agree, and the watcher would report a serene green forever. That is a
+// far worse failure than the noise we just fixed, because nobody would ever look again.
+//
+// So an unreadable shape THROWS, and the caller counts it blind and says so out loud.
+async function readSignal(url) {
+  const raw = await fetchBody(url);
+  const signal = extractSignal(url, raw);
+  if (signal === null) {
+    throw new Error('no provision list in this response, so it cannot be watched for a silent change');
+  }
+  return signal;
+}
+
 async function main() {
   if (!DB_URL) {
     log('🔴 NO KHOJI_DB_URL. This run cannot record anything, so it is not a run.');
@@ -185,8 +303,8 @@ async function main() {
   const failed = [];
   for (const w of WATCHED_LEGAL) {
     try {
-      const body = await fetchBody(w.url);
-      read.push({ url: w.url, field: w.field, kind: w.kind, bodyHash: hashOf(body) });
+      const signal = await readSignal(w.url);
+      read.push({ url: w.url, field: w.field, kind: w.kind, bodyHash: hashOf(signal) });
     } catch (e) {
       failed.push({ url: w.url, field: w.field });
       log(`  BLIND ${w.field.padEnd(20)} ${w.url}  (${e.message})`);

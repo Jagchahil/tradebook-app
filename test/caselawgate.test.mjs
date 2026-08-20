@@ -304,9 +304,14 @@ ok('rubbish is not caselaw', C.isCaselawRow(null) === false && C.isCaselawRow('x
   // claim is that what is stored is a hash OF the body, never the body, so it is pointed at the
   // value actually passed and at the column list.
   const ins = code.indexOf('insert into public.khoji_law');
+  // ⚠️ 21 AUGUST 2026: THE HASHED VALUE IS NO LONGER CALLED `body`, AND THIS TEST CAUGHT IT.
+  // lawwatch stopped hashing the whole response (it cried wolf on 13 to 24 of 24 sources a night)
+  // and now hashes an EXTRACTED PROVISION LIST, so the variable is `signal`. The licence claim is
+  // unchanged and the guard is tightened rather than relaxed: the insert must carry a hashed value
+  // and must refuse `signal` and `raw` and `text` as well as `body`.
   ok('🔴 the law watcher stores a HASH and never the body of a record',
-    /createHash/.test(code) && /hashOf\(body\)/.test(code) && /body_hash/.test(code)
-    && !/[(,]\s*body\s*[,)]/.test(code.slice(ins, ins + 400)));
+    /createHash/.test(code) && /hashOf\((?:body|signal)\)/.test(code) && /body_hash/.test(code)
+    && !/[(,]\s*(?:body|signal|raw|text)\s*[,)]/.test(code.slice(ins, ins + 400)));
 }
 {
   // Indexing. knowledge_items is served only from session gated routes, and robots disallows the

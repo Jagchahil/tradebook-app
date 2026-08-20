@@ -13,7 +13,11 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { compare, isAllowed, dataUrlFor, watchedUrls, WATCHED_LEGAL } from './lawwatch.mjs';
+import {
+  compare, isAllowed, dataUrlFor, watchedUrls, WATCHED_LEGAL,
+  extractSignal, legislationToc, govukSignal, hostOf, textOf,
+  MIN_SIGNAL_ITEMS, MIN_SIGNAL_CHARS,
+} from './lawwatch.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -53,6 +57,108 @@ ok('...and an unlicensed host is correctly refused',
 
 ok('legislation.gov.uk contents pages are hashed via the licensed /data.xml view, not the HTML furniture',
   dataUrlFor('https://www.legislation.gov.uk/ukpga/1996/18/contents') === 'https://www.legislation.gov.uk/ukpga/1996/18/contents/data.xml');
+
+// --- 2b. 🔴 WE HASH THE LAW, NOT THE RESPONSE. Added 21 Aug 2026. --------------------------
+//
+// This watcher cried wolf on 13 to 24 of 24 sources every night for three weeks because it hashed
+// the whole response. Two seconds apart, a gov.uk render differs by a csrf-token, a csp-nonce, the
+// same nonce on a script tag and randomised element ids. These tests are the ones that would have
+// caught it, so they are written against the exact bytes that moved.
+
+ok('gov.uk goes to the CONTENT API, which has no csrf token and no nonce in it',
+  dataUrlFor('https://www.gov.uk/hmrc-internal-manuals/business-income-manual')
+    === 'https://www.gov.uk/api/content/hmrc-internal-manuals/business-income-manual');
+
+ok('...and a trailing slash does not produce a double slash in the api path',
+  dataUrlFor('https://www.gov.uk/national-minimum-wage-rates/')
+    === 'https://www.gov.uk/api/content/national-minimum-wage-rates');
+
+ok('legislation.gov.uk still goes to the licensed /data.xml view',
+  dataUrlFor('https://www.legislation.gov.uk/ukpga/1996/18/contents')
+    === 'https://www.legislation.gov.uk/ukpga/1996/18/contents/data.xml');
+
+const CLML = `<Contents>
+  <ContentsItem IdURI="http://www.legislation.gov.uk/id/ukpga/1996/18/section/1">
+    <ContentsNumber>1</ContentsNumber><ContentsTitle>Meaning of employee</ContentsTitle></ContentsItem>
+  <ContentsItem IdURI="http://www.legislation.gov.uk/id/ukpga/1996/18/section/108">
+    <ContentsNumber>108</ContentsNumber><ContentsTitle>Qualifying period of employment</ContentsTitle></ContentsItem>
+  <ContentsItem IdURI="http://www.legislation.gov.uk/id/ukpga/1996/18/section/230">
+    <ContentsNumber>230</ContentsNumber><ContentsTitle>Employees and workers</ContentsTitle></ContentsItem>
+</Contents>`;
+
+ok('🔴 the legislation signal is the PROVISION LIST, and s108 is in it',
+  /section\/108/.test(legislationToc(CLML)) && /Qualifying period/.test(legislationToc(CLML)));
+
+ok('🔴 reserialising the SAME provisions does not move the signal',
+  legislationToc(CLML) === legislationToc(CLML.replace(/\n\s+/g, ' ').replace(/> </g, '><')));
+
+ok('🔴 ...but a provision actually moving DOES move it',
+  legislationToc(CLML) !== legislationToc(CLML.replace('108', '109')));
+
+const GOVUK = JSON.stringify({
+  title: 'Business Income Manual',
+  updated_at: '2026-08-20T18:00:00Z',
+  public_updated_at: '2026-08-14T18:51:23Z',
+  details: {
+    child_section_groups: [{ title: 'Contents', child_sections: [
+      { title: 'BIM37910 Wholly and exclusively' }, { title: 'BIM42701 Bad and doubtful debts' },
+      { title: 'BIM46351 Pre trading expenditure' }, { title: 'BIM45000 Specific deductions' },
+      { title: 'BIM31000 Computing the amount to assess' },
+    ] }],
+  },
+});
+
+ok('🔴 the gov.uk signal carries the section codes',
+  /BIM42701/.test(govukSignal(GOVUK)) && /Pre trading/.test(govukSignal(GOVUK)));
+
+ok('🔴 A REPUBLISH IS NOT A CHANGE: updated_at moving does not move the signal',
+  govukSignal(GOVUK) === govukSignal(GOVUK.replace('2026-08-20T18:00:00Z', '2026-08-21T04:00:00Z')));
+
+ok('🔴 ...nor does public_updated_at, which is the one that moved under us',
+  govukSignal(GOVUK) === govukSignal(GOVUK.replace('2026-08-14T18:51:23Z', '2026-08-21T09:00:00Z')));
+
+ok('🔴 ...but a section appearing DOES move it',
+  govukSignal(GOVUK) !== govukSignal(GOVUK.replace('BIM45000', 'BIM45001')));
+
+// 🔴 THE FAILURE THAT WOULD BE WORSE THAN THE NOISE. If an extractor stops matching, every source
+// yields the same empty signal, every hash agrees, and the watcher goes serenely green forever.
+ok('🔴 AN UNREADABLE SHAPE IS null, NOT AN EMPTY SIGNAL. Blind, never unchanged.',
+  legislationToc('<html>a redesign</html>') === null
+  && govukSignal('<!doctype html><p>not json</p>') === null
+  && govukSignal('{"details":{}}') === null);
+
+ok('...and a thin response is refused rather than believed',
+  legislationToc('<Contents><ContentsItem IdURI="x"/></Contents>') === null && MIN_SIGNAL_ITEMS >= 5);
+
+// 🔴 gov.uk has TWO shapes and requiring an item count left one of them silently unwatched. The
+// national minimum wage page is ONE long body, not a list of section titles, and it read BLIND.
+const GUIDE = JSON.stringify({
+  title: 'National Minimum Wage and National Living Wage rates',
+  public_updated_at: '2026-08-14T18:51:23Z',
+  details: { body: '<h2 class="gem-c-heading">Current rates</h2><p>These rates are for the National '
+    + 'Living Wage for those aged 21 and over, and the National Minimum Wage for those under 21 and '
+    + 'apprentices. Rates change every April, and the apprentice rate applies to apprentices aged '
+    + 'under 19 or in the first year of their apprenticeship.</p>' },
+});
+
+ok('🔴 AN ORDINARY GUIDE IS ONE LONG BODY, and a character floor keeps it watched',
+  govukSignal(GUIDE) !== null && /National Living Wage/.test(govukSignal(GUIDE)) && MIN_SIGNAL_CHARS >= 200);
+
+ok('🔴 MARKUP IS NOT THE LAW. A class name changing does not move the signal.',
+  govukSignal(GUIDE) === govukSignal(GUIDE.replace('gem-c-heading', 'gem-c-heading govuk-!-mt-4')));
+
+ok('...but the rate wording changing DOES move it',
+  govukSignal(GUIDE) !== govukSignal(GUIDE.replace('aged 21 and over', 'aged 20 and over')));
+
+ok('textOf strips tags and squashes whitespace, and leaves plain text alone',
+  textOf('<p>a   b</p>') === 'a b' && textOf('  plain  ') === 'plain');
+
+ok('🔴 an INDEX PAGE cannot be watched for a silent law change, and says so with null',
+  extractSignal('https://caselaw.nationalarchives.gov.uk/', '<html>newest judgments</html>') === null);
+
+ok('extractSignal routes by host',
+  hostOf('https://www.gov.uk/x') === 'www.gov.uk'
+  && extractSignal('https://www.legislation.gov.uk/ukpga/1996/18/contents', CLML) === legislationToc(CLML));
 
 // --- 3. 🔴 PARITY with lib/lawsources.ts -----------------------------------------------------
 // The mini's list and the web app's list are the SAME law or one of them is lying. Load lawsources

@@ -553,7 +553,7 @@ export const freeTools = [
   { href: '/rent-a-room-checker', icon: '🛏️', title: 'Rent a Room checker', body: 'Lodger income and the £7,500 rule: tax free or not, and the election most people miss.' },
   { href: '/sole-trader-vs-limited', icon: '⚖️', title: 'Sole trader vs limited', body: 'Which keeps you more on 2026/27 rates, honestly, including the costs the folklore forgets.' },
   { href: '/how-mtd-works', icon: '📅', title: 'MTD checker', body: 'Which line your income sits above, when it starts, and the return HMRC actually tests. No signup.' },
-  { href: '/free-mtd-filing', icon: '🆓', title: 'Free MTD filing', body: 'A straightforward return, prepared and filed free, forever. Join the list to be first.' },
+  { href: '/free-mtd-filing', icon: '🆓', title: 'Free MTD prep', body: 'A straightforward quarterly update, prepared free, forever. You send it. Join the list to be first.' },
 ];
 
 // 🔴 RENAMED FROM oldAccountant AND REWRITTEN, 3 AUGUST 2026, ON JAG'S STEER: do not pick a fight
@@ -1403,7 +1403,7 @@ export function SiteFooter() {
       <div style={{ maxWidth: 1320, margin: '0 auto', padding: '52px 24px 40px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 32, marginBottom: 40 }}>
           {col('Product', [['/product', 'How it works'], ['/how-mtd-works', 'How MTD works'], ['/compare', 'Compare'], ['/pricing', 'Pricing'], ['/start', 'Sign up'], ['/app/you/billing', 'Manage subscription']])}
-          {col('Free tools', [['/tax-calculator', 'Tax calculator'], ['/cis-calculator', 'CIS refund calculator'], ['/landlord-tax-calculator', 'Landlord tax calculator'], ['/rent-a-room-checker', 'Rent a Room checker'], ['/sole-trader-vs-limited', 'Sole trader vs limited'], ['/invoice-generator', 'Invoice maker'], ['/ni-checker', 'NI checker'], ['/student-loan-checker', 'Student loan checker'], ['/can-i-claim', 'Can I claim it?'], ['/file-your-tax-return', 'File your return'], ['/free-mtd-filing', 'Free MTD filing'], ['/resources', 'All tools']])}
+          {col('Free tools', [['/tax-calculator', 'Tax calculator'], ['/cis-calculator', 'CIS refund calculator'], ['/landlord-tax-calculator', 'Landlord tax calculator'], ['/rent-a-room-checker', 'Rent a Room checker'], ['/sole-trader-vs-limited', 'Sole trader vs limited'], ['/invoice-generator', 'Invoice maker'], ['/ni-checker', 'NI checker'], ['/student-loan-checker', 'Student loan checker'], ['/can-i-claim', 'Can I claim it?'], ['/file-your-tax-return', 'File your return'], ['/free-mtd-filing', 'Free MTD prep'], ['/resources', 'All tools']])}
           {col('For your trade', [...TRADES.slice(0, 5).map((t) => [`/for/${t.slug}`, `For ${t.plural}`] as [string, string]), ['/for-landlords', 'For landlords'] as [string, string]])}
           {/*
             The team door lives HERE now, in Company, not tucked in the copyright line.

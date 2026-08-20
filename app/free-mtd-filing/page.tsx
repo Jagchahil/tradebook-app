@@ -5,10 +5,32 @@ import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 import { filingFaqAnswer } from '../../lib/features';
 
-// THE FREE MTD FILING MAGNET, THE PAGE ONLY. Board card: "Free MTD filing magnet" (Growth
-// foundation). This is deliberately just the page and the lead capture, NOT the filing path
-// itself. The actual basic filing tool (profits and losses in, HMRC's essentials, fully
-// deterministic, no AI in the loop) is separate work, not started here.
+// THE FREE MTD PREP MAGNET, THE PAGE ONLY. Board card: "Free MTD filing magnet" (Growth
+// foundation). This is deliberately just the page and the lead capture, NOT the tool itself. The
+// actual basic prep tool (profits and losses in, HMRC's essentials, fully deterministic, no AI in
+// the loop) is separate work, not started here.
+//
+// 🔴 B89, 20 AUGUST 2026: THIS PAGE PROMISED TO FILE A MAN'S RETURN, AND WE CANNOT FILE ANYTHING.
+//
+// It went out reading "Free Making Tax Digital filing", "we will prepare and file it for free",
+// "prepared and filed free, forever", and a step three headed "You approve, we send it". It was
+// live, public and indexed, and it was caught forty minutes before the first outreach went to a
+// phone full of tradesmen.
+//
+// The check that settled it, on HMRC's own Developer Hub: Lekhio appears under SANDBOX
+// applications only, last call 6 August 2026, and the production application reads "Credentials
+// requested". There is no production application. lib/hmrc.ts says the same from our side: it
+// points at test-api.service.hmrc.gov.uk and must never submit to the live one. No credential or
+// secret was read to establish any of that, and none may ever be.
+//
+// So the offer is now the part that is OURS TO GIVE: we prepare the quarterly update, free,
+// forever, and he sends it. Preparing needs nobody's permission. Filing needs HMRC's, and a
+// promise about another man's tax obligation is not a marketing decision.
+//
+// ⚠️ THE WORD "FILE" MAY NOT COME BACK TO THIS PAGE as something Lekhio does, in any tense.
+// "We will file" is the same promise as "we file" to the man reading it; the future tense is not
+// a hedge, it is a delivery date. test/mtdclaims.test.mjs now fails the build over the shape of
+// the claim rather than the pronoun, because the pronoun is what it missed.
 //
 // Doc 103, the honesty test: a button whose only function is an alert saying the feature does not
 // exist yet is an advert for our roadmap, not a button. So there is no fake calculator here and no
@@ -18,12 +40,12 @@ import { filingFaqAnswer } from '../../lib/features';
 
 export const metadata: Metadata = {
   alternates: { canonical: '/free-mtd-filing' },
-  title: 'Free Making Tax Digital Filing, Built and In Testing | Lekhio',
+  title: 'Free Making Tax Digital Prep, For the Basics | Lekhio',
   description:
-    'For straightforward UK sole trader returns, just profits, losses and the essentials, Lekhio will prepare and file your Making Tax Digital return for free. No AI in this path, so it costs us nothing to run. Join the list.',
+    'For straightforward UK sole trader books, just profits, losses and the essentials, Lekhio will get your Making Tax Digital quarterly update ready for free. You send it to HMRC yourself. No AI in this path, so it costs us nothing to run. Join the list.',
   openGraph: {
-    title: 'Free Making Tax Digital Filing, Built and In Testing',
-    description: 'Basic Self Assessment, prepared and filed free, forever. No AI, no catch. Join the list to be first.',
+    title: 'Free Making Tax Digital Prep, For the Basics',
+    description: 'Your basic quarterly update, prepared free, forever. No AI, no catch. You send it to HMRC yourself. Join the list to be first.',
     type: 'website',
   },
 };
@@ -43,12 +65,13 @@ const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sa
 
 const steps = [
   { n: '1', title: 'Answer the basics', body: 'Your profits, your losses, and the few essentials HMRC needs from a straightforward return. Nothing more.' },
-  { n: '2', title: 'We prepare it', body: 'A fully deterministic engine works out your figures. No AI touches this path, which is exactly why it can stay free.' },
-  { n: '3', title: 'You approve, we send it', body: 'You review the numbers and say yes. HMRC holds your taxpayer relationship throughout, always. We never file anything without your say so.' },
+  { n: '2', title: 'We prepare it', body: 'A fully deterministic engine works out your figures and checks them against the rules HMRC actually tests. No AI touches this path, which is exactly why it can stay free.' },
+  { n: '3', title: 'You check it and you send it', body: 'You get a quarterly update that is ready, every figure shown. You send it to HMRC yourself, with whatever you use today. HMRC holds your taxpayer relationship throughout, always.' },
 ];
 
 const faqs = [
-  { q: 'Is it actually free?', a: 'Yes, for the basic path: profits, losses, and the essentials HMRC asks for. It costs us nothing to run because no AI is involved, so there is no reason to charge for it.' },
+  { q: 'Is it actually free?', a: 'Yes, for the basic path: getting your figures ready for a straightforward quarterly update, profits, losses, and the essentials HMRC asks for. It costs us nothing to run because no AI is involved, so there is no reason to charge for it.' },
+  { q: 'So do I still send it to HMRC myself?', a: 'Yes. Lekhio gets the update ready, to the penny, and you send it the way you send one today. Sending straight from Lekhio needs HMRC production access, which we have asked for and have not been granted. We will not put a date on a decision that is not ours to make, and this page will say so the day it changes.' },
   { q: 'Do I have to be a paying Lekhio customer?', a: 'No. This basic path is built to stand on its own. If your situation is simple, this alone may be all you need.' },
   { q: 'What if my situation is not simple, property income, a PAYE job alongside my trade, VAT?', a: 'The free basic path covers straightforward sole trader profit and loss only. Anything with more moving parts is exactly what the full Lekhio service, bookkeeping and tax prep all year, is built for.' },
   { q: 'Does Lekhio file my tax for me?', a: filingFaqAnswer() },
@@ -112,10 +135,10 @@ export default function FreeMtdFilingPage() {
       {/* Hero */}
       <section style={{ maxWidth: 1080, margin: '0 auto', padding: '30px 24px 8px' }}>
         <div style={{ maxWidth: 720 }}>
-          <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: ON_SAFFRON_TINT, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>FREE, FOREVER &middot; BUILT AND IN TESTING</span>
-          <h1 className="h1c" style={{ fontWeight: 700, margin: '0 0 16px' }}>Free Making Tax Digital filing. For the basics, at no cost, ever.</h1>
+          <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: ON_SAFFRON_TINT, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>FREE, FOREVER &middot; JOIN THE LIST</span>
+          <h1 className="h1c" style={{ fontWeight: 700, margin: '0 0 16px' }}>Free Making Tax Digital prep. For the basics, at no cost, ever.</h1>
           <p style={{ fontSize: 18, color: MUTED, lineHeight: 1.6, margin: 0 }}>
-            If your return is straightforward, just profits, losses and the essentials HMRC asks for, we will prepare and file it for free. Not a trial, not a taster. Free because it costs us nothing to run.
+            If your books are straightforward, just profits, losses and the essentials HMRC asks for, we will get your quarterly update ready for free. You send it to HMRC yourself, the way you do now. Not a trial, not a taster. Free because it costs us nothing to run.
           </p>
         </div>
       </section>
@@ -124,10 +147,18 @@ export default function FreeMtdFilingPage() {
           WHERE THIS HAS ACTUALLY GOT TO.
 
           "Coming soon" is what you write when you have nothing to say. We have something to say,
-          and it is more reassuring than a date would be: the filing is BUILT, and it has been
-          tested against HMRC's own sandbox with valid fraud prevention headers. What is missing is
-          HMRC's permission, not the software, and when it arrives it is an environment change
-          rather than a build.
+          and it is better than a date: the part he is joining the list for is preparation, and
+          preparation needs nobody's permission but his.
+
+          🔴 WHAT THIS PANEL SAID UNTIL 20 AUGUST, AND WHY IT COULD NOT STAY. It said the filing was
+          built, that what was left was "HMRC's permission ... a switch rather than a build", and
+          that we were "deliberately taking the extra time over it". The pipeline being built is
+          true and stays. The rest read as a man's own choosing, and it was not: production access
+          was asked for on 6 August, HMRC's own Hub still shows the application as "Credentials
+          requested" with Lekhio listed under Sandbox only, and on 10 August HMRC announced the
+          market window for new 2026-27 quarterly update products had closed. A switch we do not
+          hold is not a switch. So the panel now names the absence instead of hinting at it, the
+          same discipline lib/features.ts bankRouteLine() already applies to the bank feed.
 
           ⚠️ THREE THINGS THIS COPY MAY NEVER DO, and test/mtdclaims.test.mjs fails the build over
           each of them:
@@ -141,16 +172,19 @@ export default function FreeMtdFilingPage() {
         <div style={{ maxWidth: 720, background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 16, padding: '22px 24px' }}>
           <h2 style={{ fontSize: 19, fontWeight: 700, margin: '0 0 10px', letterSpacing: '-0.3px' }}>Where this has got to</h2>
           <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.65, margin: '0 0 12px' }}>
-            The filing itself is built. Every step it needs has been run against HMRC&rsquo;s own test
-            systems, end to end, with the fraud prevention headers HMRC requires on every call. What
-            is left is HMRC&rsquo;s permission to connect to the live service, and that is a switch
-            rather than a build.
+            The preparation is the part that needs nobody&rsquo;s permission but yours. It works out
+            your figures from what you type in, checks them against the rules HMRC actually tests,
+            and hands you a quarterly update that is ready to go. That is what this list is for, and
+            it is not open yet.
           </p>
           <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.65, margin: '0 0 12px' }}>
-            We are deliberately taking the extra time over it. Getting a man&rsquo;s tax return right
-            matters more than being first to say we can send one, and a return is not a thing to
-            rush. Until that permission lands, Lekhio prepares everything and you keep filing the way
-            you do now.
+            Sending it to HMRC from inside Lekhio is a different thing, and we will not blur the two.
+            That needs HMRC production access. We have built the pipeline and run it end to end
+            against HMRC&rsquo;s own test systems, with the fraud prevention headers HMRC requires on
+            every call, and we have asked for that access. It has not been granted. We will not put a
+            date on a decision that is not ours to make, and getting your tax right matters more than
+            being first to say we can send it. Until it is granted you file the way you file today,
+            and Lekhio does the work that gets you there.
           </p>
           <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.65, margin: 0 }}>
             The date worth having in your head is <strong style={{ color: INK }}>{nextQuarterlyDeadline()}</strong>,
@@ -182,7 +216,7 @@ export default function FreeMtdFilingPage() {
           <div>
             <h2 style={{ fontSize: 21, fontWeight: 700, margin: '0 0 10px' }}>Why it is free</h2>
             <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.65, margin: 0 }}>
-              Every other part of Lekhio uses AI to read a photo of a receipt or answer a question about your figures. This basic filing path does not. It is a fully deterministic engine working from numbers you type in, so it costs us nothing to run whether one person uses it or a million do. That is the whole reason we can keep it free rather than a promotion that ends.
+              Every other part of Lekhio uses AI to read a photo of a receipt or answer a question about your figures. This basic preparation path does not. It is a fully deterministic engine working from numbers you type in, so it costs us nothing to run whether one person uses it or a million do. That is the whole reason we can keep it free rather than a promotion that ends.
             </p>
           </div>
           <div>
@@ -198,8 +232,8 @@ export default function FreeMtdFilingPage() {
       <section style={{ maxWidth: 720, margin: '0 auto', padding: '8px 24px 12px' }}>
         <LeadCapture
           source="free-mtd-filing"
-          heading="Be first when free filing opens"
-          sub="Pop your email in and we will tell you the moment you can file your basic return free, before anyone else. No spam, unsubscribe any time."
+          heading="Be first when free MTD prep opens"
+          sub="Pop your email in and we will tell you the moment you can get your basic quarterly update prepared free, before anyone else. No spam, unsubscribe any time."
         />
       </section>
 

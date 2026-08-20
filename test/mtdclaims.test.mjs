@@ -127,6 +127,114 @@ for (const { re, why } of FILING_CLAIMS) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
+console.log('\n2b. AND THE PROMISE OF A FILING, WHICH IS THE SAME CLAIM IN THE FUTURE TENSE.');
+
+// 🔴 THE HOLE THIS SUITE HAD UNTIL 20 AUGUST 2026, AND EXACTLY WHAT WALKED THROUGH IT.
+//
+// Every pattern in section 2 requires our PRONOUN and HMRC's OBJECT in one clause: "we file your
+// tax return". /free-mtd-filing was live, public and indexed saying "we will prepare and file it
+// for free", "prepared and filed free, forever", "Free Making Tax Digital filing", and a step
+// three headed "You approve, we send it". Not one of them matched. The suite reported clean for
+// weeks over the one claim a tax company does not get to make twice, and it was caught by a human
+// forty minutes before the first outreach went out.
+//
+// Two lessons, and the second is the one worth keeping:
+//   1. THE FUTURE TENSE IS NOT A HEDGE. "We will file it" is a delivery date, not a disclaimer.
+//      To the man reading it there is no difference between that and "we file it".
+//   2. A PROMISE DOES NOT NEED OUR GRAMMAR. "prepared and filed free, forever" has no subject at
+//      all and promises more than either sentence above. So these match the SHAPE of the offer:
+//      a verb of sending with anything as its object, and the free-filing offer in any wording.
+//
+// ⚠️ WHY THESE ARE NOT JUST ADDED TO FILING_CLAIMS. That list is about who carries the liability
+// and it is deliberately narrow, so "we prepare it and you file it" stays legal. This list is
+// about a capability we do not have at all. Two different wrongs, kept apart so neither gets
+// loosened to make room for the other.
+const FILING_PROMISES = [
+  { re: /\bwe\s+(will\s+)?(prepare\s+and\s+)?(file|submit)\s+it\b/i, why: '"we will prepare and file it" is still we file it' },
+  { re: /\byou\s+approve,?\s+we\s+(send|file|submit)\b/i, why: 'his approval is not our licence to send' },
+  // 🔴 strict: THESE THREE IGNORE THE NEGATION ESCAPE HATCH, AND HERE IS WHY THEY HAVE TO.
+  //
+  // claimsIn() forgives any sentence containing "not" or "no", because our own disclaimer reads
+  // "not endorsed by, affiliated with, or approved by HMRC" and a guard that fails the build over
+  // that gets switched off by Friday. Sound rule, real hole: after whitespace flattening, a JSX
+  // "sentence" is whatever sits between two full stops in the SOURCE, and the hero here reads
+  // "...at no cost, ever.</h1>...we will prepare and file it for free." Two lines of markup apart,
+  // one chunk to this regex, and the "no" in "no cost" pardoned the claim underneath it. That is
+  // how "we will prepare and file it" passed while three of its neighbours failed.
+  //
+  // The three below are shapes of an OFFER, not of a sentence. There is no truthful negative use
+  // of "prepared and filed", "filed free, forever" or "free MTD filing" in our copy: you cannot
+  // disclaim a thing by naming it as the product. So they read the raw text and no "no" saves them.
+  // The pronoun patterns keep the escape hatch, because "Lekhio does not file your return" is a
+  // sentence we genuinely want to be able to write.
+  { re: /\b(prepared|prepare)\s+and\s+(filed?|sent?|submitted?)\b/i, strict: true, why: 'we prepare; the sending is his' },
+  { re: /\bfiled?\s+free,?\s+forever\b/i, strict: true, why: 'filing is not ours to give away, because it is not ours' },
+  { re: /\bfree\s+(mtd|making\s+tax\s+digital)\s+filing\b/i, strict: true, why: 'the offer itself may not be named as a filing' },
+  { re: /\bLekhio\s+will\s+(prepare\s+and\s+)?(file|submit|send)\b/i, why: 'a future tense is a delivery date, not a hedge' },
+  { re: /\b(when|the\s+moment)\s+you\s+can\s+(file|submit|send)\b[^.]{0,60}\bfree\b/i, why: 'promises a free filing date nobody has given us' },
+];
+
+// ⚠️ AND THE SENTENCE HAS TO BE ABOUT TAX BEFORE ANY OF THAT COUNTS.
+//
+// The first run of this list failed the build on lib/signupcode.ts: "Ask for a new one and we will
+// send it straight away", about a six digit sign in code. That is a true sentence about a text
+// message and it has nothing to do with HMRC. A compliance guard that fires on it is a guard
+// somebody deletes by Friday, and then the real claim goes through the hole where it used to be.
+//
+// This list is about ONE capability we do not have. A sentence that never mentions tax cannot be
+// claiming it, so the tax word is the price of entry. Note "filing" is NOT in this list: it is in
+// half the patterns above, so admitting it here would let a sentence qualify itself.
+const ABOUT_TAX = /\b(hmrc|tax|return|returns|self\s*assessment|making\s+tax\s+digital|mtd|quarterly\s+update)\b/i;
+function promisesIn(text, re, strict) {
+  const sentences = strict
+    ? text.split(/(?<=[.!?])\s+/).filter((s) => re.test(s)).map((s) => s.trim().slice(0, 90))
+    : claimsIn(text, re);
+  return sentences.filter((c) => ABOUT_TAX.test(c));
+}
+
+for (const { re, why, strict } of FILING_PROMISES) {
+  const hits = sources
+    .filter(([f]) => !QUOTES_THE_RULES.has(f))
+    .flatMap(([f, s]) => promisesIn(s, re, strict).map((c) => `${f}: ${c}`));
+  ok(`nothing promises ${re.source.slice(0, 38)}  (${why})${hits.length ? `\n     ${hits.join('\n     ')}` : ''}`, hits.length === 0);
+}
+
+// 🔴 AND THE NEW PATTERNS MUST BITE ON THE REAL BYTES THAT SHIPPED, not on a tidy specimen written
+// to pass. Every string below is verbatim from the live page on the morning of 20 August 2026.
+const SHIPPED = [
+  'If your return is straightforward, just profits, losses and the essentials HMRC asks for, we will prepare and file it for free.',
+  'Basic Self Assessment, prepared and filed free, forever.',
+  'Free Making Tax Digital filing. For the basics, at no cost, ever.',
+  'Lekhio will prepare and file your Making Tax Digital return for free.',
+  'Pop your email in and we will tell you the moment you can file your basic return free, before anyone else.',
+];
+for (const line of SHIPPED) {
+  ok(`🔴 the guard now catches what shipped: "${line.slice(0, 52)}..."`,
+    FILING_PROMISES.some(({ re, strict }) => promisesIn(line, re, strict).length > 0));
+}
+// And it still forgives the true sentence, which is the whole point of a guard that stays on.
+const forgives = (line) => FILING_PROMISES.every(({ re, strict }) => promisesIn(line, re, strict).length === 0);
+ok('the guard FORGIVES the honest version, so it cannot be switched off as noise',
+  forgives('Lekhio gets your quarterly update ready and you send it to HMRC yourself.'));
+// 🔴 AND IT FORGIVES THE SENTENCES THAT WOULD OTHERWISE GET IT DELETED. A compliance guard earns
+// its place by being quiet on true copy; each of these failed a draft of this list on 20 August.
+ok('the guard FORGIVES a sign in code, which has nothing to do with HMRC',
+  forgives('Ask for a new one and we will send it straight away.'));
+ok('the guard FORGIVES our own plain disclaimer about filing',
+  forgives('Lekhio does not file your tax return for you, and nothing is ever sent to HMRC without your approval.'));
+ok('the guard FORGIVES telling him to file it himself, which is the whole offer',
+  forgives('You file the normal Self Assessment return once a year, and Lekhio prepares every figure in it.'));
+
+// 🔴 AND THE strict FLAG MUST ACTUALLY DO SOMETHING, or it is decoration on a comment.
+// This is the real hero, flattened the way the walker flattens it: a "no" two lines of markup
+// above the claim. The lenient path pardons it. The strict path does not, and that gap is the bug.
+const MASKED = 'Free Making Tax Digital filing. For the basics, at no cost, ever. we will prepare and file it for free.';
+ok('🔴 a nearby "no" still pardons the pronoun patterns, which is the known limit',
+  promisesIn(MASKED, FILING_PROMISES[0].re, false).length === 0);
+ok('🔴 but the offer patterns are strict, so the same text still fails the build',
+  promisesIn(MASKED, FILING_PROMISES[4].re, true).length === 1);
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
 console.log('\n3. THE MTD PAGE IS HONEST ABOUT WHERE IT HAS GOT TO');
 
 // Flattened for the same reason: this copy is JSX and wraps mid sentence.
@@ -144,10 +252,20 @@ ok('the guard CATCHES a real claim', claimsIn('Lekhio is HMRC approved.', FORBID
 ok('the guard FORGIVES our real disclaimer',
   claimsIn('Lekhio is not endorsed by, affiliated with, or approved by HMRC.', FORBIDDEN[1].re).length === 0);
 ok('the guard CATCHES a real filing claim', claimsIn('We file your tax return for you.', FILING_CLAIMS[0].re).length === 1);
-ok('it says the filing is built', /filing itself is built/i.test(mtd));
+// 🔴 THESE FOUR USED TO REQUIRE THE VERY WORDING THAT WAS WRONG. Until 20 August 2026 this suite
+// asserted the page said "the filing itself is built" and that what was left was "permission ...
+// rather than a build". Both read as a switch in our own hand. HMRC's Developer Hub says
+// otherwise: Lekhio is listed under Sandbox applications only and the production application
+// reads "Credentials requested". A test that PINS an optimistic claim in place is worse than a
+// missing test, because the next person to tell the truth has to delete a passing assertion first.
+ok('it still says the pipeline is built, which is true and worth saying', /built the pipeline/i.test(mtd));
 ok('it says it has been tested against HMRC systems', /own test systems/i.test(mtd));
 ok('it names the fraud prevention headers, which is the hard part', /fraud prevention headers/i.test(mtd));
-ok('it says what is missing is permission, not software', /permission/i.test(mtd) && /rather than a build/i.test(mtd));
+ok('🔴 it says production access has NOT been granted', /has not been granted/i.test(mtd));
+ok('🔴 it refuses to put a date on a decision that is not ours', /will not put a date/i.test(mtd));
+ok('🔴 it tells him plainly that HE is the one who sends it', /you send it to HMRC yourself/i.test(mtd));
+ok('🔴 the offer on this page is preparation, and is never named as a filing',
+  !/free (mtd|making tax digital) filing/i.test(strip(mtd)) && !/prepared and filed/i.test(strip(mtd)));
 ok('it explains WHY we are taking the time, rather than apologising', /matters more than being first/i.test(mtd));
 // 🔴 THIS USED TO ASSERT THE PAGE NAMED 7 NOVEMBER 2026. It did, and on 31 July 2026 that was
 // four months early: the next quarterly update was 7 AUGUST, one week away, and the page was

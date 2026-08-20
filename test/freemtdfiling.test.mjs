@@ -162,7 +162,7 @@ ok('free-mtd-filing is listed on the resources (all tools) page',
   /free-mtd-filing/.test(read('app/resources/page.tsx')));
 
 ok('free-mtd-filing is linked from the site footer tools column',
-  /'\/free-mtd-filing', 'Free MTD filing'/.test(read('app/_shared/site.tsx')));
+  /'\/free-mtd-filing', 'Free MTD prep'/.test(read('app/_shared/site.tsx')));
 
 console.log(`\n${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

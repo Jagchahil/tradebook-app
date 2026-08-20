@@ -284,11 +284,11 @@ export const REPEATING_SUBJECTS: Record<RepeatKey, (mark: string) => string> = {
   'lead-confirm': (mark) => `Confirm your email to get your result, ${mark}`,
 
   // 🔴 THE SAME EMAIL, ON A PAGE WHERE THERE IS NO RESULT. /free-mtd-filing is a waitlist: free
-  // filing is not built, the page says so plainly, and the confirm that followed it still opened
+  // MTD prep is not built, the page says so plainly, and the confirm that followed it still opened
   // "You asked us to send you your result". A subject of its own, because a man who used a
   // calculator this morning and joined this list this afternoon is confirming two different
   // things and must not have them collapse into one Gmail conversation.
-  'lead-confirm-list': (mark) => `Confirm your email to join the free filing list, ${mark}`,
+  'lead-confirm-list': (mark) => `Confirm your email to join the free MTD prep list, ${mark}`,
 
   // Every confirm.
   'lead-result': (mark) => `Your result from Lekhio, ${mark}`,
@@ -878,7 +878,7 @@ export async function sendLeadListConfirmEmail(
 ): Promise<boolean> {
   const inner = `
     ${h1('One quick tap to confirm.')}
-    ${p('You asked to be told when free filing opens. Tap below to confirm your address and you are on the list.')}
+    ${p('You asked to be told when free MTD prep opens. Tap below to confirm your address and you are on the list.')}
     ${button(confirmLink, 'Confirm my email')}
     ${pMuted('This link works for a week. After that, join again from the page and we will send you a fresh one.')}
     ${pMuted('If you didn’t request this, ignore this email and nothing will happen.')}`;

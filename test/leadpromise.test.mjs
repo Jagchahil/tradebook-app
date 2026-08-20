@@ -126,7 +126,7 @@ console.log('\n--- 4. The confirm email, which is the one that arrives after he 
   ok('🔴 and it hands a waitlist straight to the waitlist sender',
     /if \(promise === 'waitlist'\) return sendLeadListConfirmEmail\(/.test(fn));
   ok('🔴 the waitlist body does not say "result"',
-    /You asked to be told when free filing opens/.test(listFn) && !/your result/.test(listFn));
+    /You asked to be told when free MTD prep opens/.test(listFn) && !/your result/.test(listFn));
   ok('and the tool body still does', /You asked us to send you your result/.test(fn));
   ok('the waitlist preheader does not say it either',
     /One tap and you are on the list/.test(listFn) && !/result is on its way/.test(listFn));
@@ -137,11 +137,11 @@ console.log('\n--- 4. The confirm email, which is the one that arrives after he 
   // joined this list this afternoon is confirming two different things. Same argument as the
   // 9 August thread collision, which is why the subject is registered rather than inlined.
   ok('the waitlist confirm has its own repeating subject key',
-    /'lead-confirm-list': \(mark\) => `Confirm your email to join the free filing list/.test(email));
+    /'lead-confirm-list': \(mark\) => `Confirm your email to join the free MTD prep list/.test(email));
   ok('and it is declared in the RepeatKey union, so tsc sees it', /\| 'lead-confirm-list'/.test(email));
   ok('and it declares where its mark comes from', /'lead-confirm-list': \{\s*\n\s*source: 'moment'/.test(email));
   ok('the two subjects are different strings, which is the whole point',
-    /Confirm your email to get your result/.test(email) && /Confirm your email to join the free filing list/.test(email));
+    /Confirm your email to get your result/.test(email) && /Confirm your email to join the free MTD prep list/.test(email));
 
   const route = read('app/api/lead/route.ts');
   ok('🔴 THE ROUTE PASSES THE SOURCE THROUGH rather than trusting the default',
@@ -151,8 +151,11 @@ console.log('\n--- 4. The confirm email, which is the one that arrives after he 
 console.log('\n--- 5. The page itself still tells the truth about what is not built ---\n');
 {
   const page = read('app/free-mtd-filing/page.tsx');
-  ok('the heading still says what he is joining', /Be first when free filing opens/.test(page));
-  ok('and the sub still promises only that', /we will tell you the moment you can file/.test(page));
+  // 🔴 B89, 20 August 2026: the heading said "free filing opens", and filing is HMRC's to open,
+  // not ours. What a stranger joins a list for has to be a thing we can actually deliver him.
+  ok('the heading still says what he is joining', /Be first when free MTD prep opens/.test(page));
+  ok('and the sub still promises only that',
+    /we will tell you the moment you can get your basic quarterly update prepared free/.test(page));
   ok('🔴 and nothing on the page claims filing is live',
     !/file your return (now|today)|filing is live/i.test(page));
 }

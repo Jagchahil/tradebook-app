@@ -199,7 +199,7 @@ export function nudgeClause(): string {
 // something out for him, so "Email me my result" is the plain truth: there IS a result, he can see
 // it above the box, and the email carries it.
 //
-// The twelfth is /free-mtd-filing, where free filing is not built yet and the page says so
+// The twelfth is /free-mtd-filing, where free MTD prep is not built yet and the page says so
 // honestly. There is no result. He is joining a list. And the button still said "Email me my
 // result", the tick box still said "email me my result", the thank you still said "We will send
 // your result over", and the confirm email still opened "You asked us to send you your result".
@@ -209,7 +209,7 @@ export function nudgeClause(): string {
 // with the component, which is how this kind of lie always arrives.
 //
 // ⚠️ THE PAGE ALREADY OVERRODE ITS HEADING AND SUB, WHICH IS WHY THIS WAS INVISIBLE. The two lines
-// somebody thinks to change were changed and read correctly ("Be first when free filing opens").
+// somebody thinks to change were changed and read correctly ("Be first when free MTD prep opens").
 // The four that live inside the component were not, because nobody opens a shared component to
 // check what it promises on a page they are not looking at.
 //
@@ -255,9 +255,10 @@ export function leadSub(): string {
 // have to be a thing this product does when he ticks it.
 export function leadConsentText(promise: LeadPromise = 'result'): string {
   // ⚠️ THE WAITLIST WORDING PROMISES NOTHING WE CANNOT DO. It is stored as the proof of what he
-  // agreed to, so it has to be true on the day he ticks it, and free filing is not built.
+  // agreed to, so it has to be true on the day he ticks it. It said "free filing" until 20 August
+  // 2026 (B89), and filing is HMRC's to open, not ours. Preparation is ours, so that is the offer.
   if (promise === 'waitlist') {
-    return 'Yes, tell me when free filing opens, plus occasional money saving tips from Lekhio. I can unsubscribe at any time.';
+    return 'Yes, tell me when free MTD prep opens, plus occasional money saving tips from Lekhio. I can unsubscribe at any time.';
   }
   return remindersLive()
     ? 'Yes, email me my result plus occasional tax deadline reminders and money saving tips from Lekhio. I can unsubscribe at any time.'
@@ -268,7 +269,7 @@ export function leadConsentText(promise: LeadPromise = 'result'): string {
 // AFTER he has handed the address over, which is the point at which a promise costs him something.
 export function leadDoneLine(promise: LeadPromise = 'result'): string {
   if (promise === 'waitlist') {
-    return 'We will email you the moment free filing opens. Check your inbox to confirm your address.';
+    return 'We will email you the moment free MTD prep opens. Check your inbox to confirm your address.';
   }
   return remindersLive()
     ? 'We will send your result and keep you right on the deadlines that matter. Check your inbox.'
@@ -320,7 +321,10 @@ export const WHATSAPP_NUMBER = (process.env.WHATSAPP_NUMBER ?? '').replace(/[^0-
 export function filingFaqAnswer(): string {
   return hmrcFilingLive()
     ? 'Lekhio prepares your figures and gets them ready, then files them straight to HMRC through an HMRC recognised route once you approve. You always review and approve first, and you stay responsible for your tax.'
-    : 'Lekhio prepares your figures and gets them ready. You always review and approve before anything is sent, and you stay responsible for your tax. Filing straight from Lekhio is coming: our HMRC recognition is in progress. Until it lands, Lekhio does all the preparation so filing takes minutes.';
+    // 🔴 "is coming" WAS A DELIVERY DATE IN A SOFT COAT (B89, 20 August 2026). Production access
+    // has been asked for and not granted, and HMRC closed the market window for new 2026-27
+    // quarterly update products on 10 August. Naming the absence is the only honest shape.
+    : 'Lekhio prepares your figures and gets them ready. You always review and approve before anything is sent, and you stay responsible for your tax. Sending straight from Lekhio to HMRC is not switched on: that needs HMRC production access, which we have asked for and have not been granted. Until it is, Lekhio does all the preparation and you send the update yourself, which takes minutes.';
 }
 
 // The badge on the "File straight to HMRC" card.

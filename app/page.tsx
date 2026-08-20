@@ -434,7 +434,7 @@ export default async function HomePage() {
           <div className="drow flip reveal">
             <div className="dtext">
               <h3>Prepared for you. Sent by you.</h3>
-              <p>Your quarterly figures sit there ready. You check them and you send them. Nothing reaches HMRC without your yes. That is the line we never cross.{filing.live ? '' : ' Filing straight from Lekhio is coming, and our HMRC recognition is in progress. Until it lands, Lekhio prepares everything so filing takes minutes.'}</p>
+              <p>Your quarterly figures sit there ready. You check them and you send them. Nothing reaches HMRC without your yes. That is the line we never cross.{filing.live ? '' : ' Sending straight from Lekhio to HMRC is not switched on: that needs HMRC production access, which we have asked for and have not been granted. Until it is, Lekhio prepares everything so filing takes minutes.'}</p>
             </div>
             <div className="dvis">
               <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--tx-mut)', marginBottom: 2 }}>Q2 SUMMARY · READY TO APPROVE</div>

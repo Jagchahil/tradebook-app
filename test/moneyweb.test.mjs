@@ -320,7 +320,20 @@ ok('both directions are on the form and money out is the default',
   /name="direction" value="out" defaultChecked/.test(pageAdd) && /name="direction" value="in"/.test(pageAdd));
 ok('the date defaults to today and cannot be tomorrow',
   /defaultValue=\{today\}/.test(pageAdd) && /max=\{today\}/.test(pageAdd));
-ok('🔴 THE CATEGORY LIST HAS ONE HOME', /CATEGORIES\.map/.test(pageAdd) && !/const CATEGORIES\s*=/.test(pageAdd));
+// 🔴 THIS PINNED THE RENDER SHAPE, NOT THE PROMISE, AND WENT RED ON B69. 20 August 2026.
+//
+// It read /CATEGORIES\.map/, so it failed the moment the list was correctly WRAPPED in
+// categoriesFor() to stop drawing four property rows to a plumber. The promise it exists to hold is
+// that this page keeps no list of its own, and that promise was never in danger.
+//
+// ⚠️ THAT IS THE THIRD GUARD IN TWO DAYS TO RED ON BEING EXTENDED RATHER THAN BROKEN:
+// test/landlord.test.mjs froze an income_type expression character for character (B62),
+// test/dayone.test.mjs quoted an operand list up to its punctuation (B67), and this one quoted a
+// call site. All three were green on the defect and red on the fix.
+ok('🔴 THE CATEGORY LIST HAS ONE HOME',
+  /import \{ CATEGORIES \} from '(\.\.\/)+lib\/categories'/.test(pageAdd)
+  && /CATEGORIES[^;]*\.map\(/.test(pageAdd)
+  && !/const CATEGORIES\s*=/.test(pageAdd));
 ok('🔴 the weight of money in is said BEFORE the press',
   /Money in goes straight into your income figures, and nothing takes it out again\s+quietly/.test(pageAdd));
 ok('the page ships no client script',

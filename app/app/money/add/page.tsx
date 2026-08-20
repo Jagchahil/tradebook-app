@@ -5,6 +5,10 @@ import { SESSION_COOKIE } from '../../../../lib/websession';
 import { accountHasRental, readVatProfile } from '../../../../lib/supabase';
 import { bankFeedOffered } from '../../../../lib/bankfeed';
 import { CATEGORIES } from '../../../../lib/categories';
+// 🔴 B69. The four property categories are drawn only for somebody who lets something, the
+// same gate the rent button below already uses. app/app/pile/page.tsx has done this since
+// RUN 2 and this screen never got it. See lib/propertylanes.ts.
+import { categoriesFor } from '../../../../lib/propertylanes';
 import { isMonthKey } from '../../../../lib/moneylog';
 import { gbp0 } from '../../../../lib/money';
 import { gateForUser } from '../../../../lib/gateserver';
@@ -272,10 +276,28 @@ export default async function AddEntryPage({
                 is the drift that broke the undo once already, so there is no second list. Money in
                 ignores this on the server: income is income, and asking him to categorise it would
                 be a question with one sensible answer. */}
+            {/* ═══════════════════════════════════════════════════════════════════════════════
+                🔴 B69. THE FOUR PROPERTY CATEGORIES WERE DRAWN FOR EVERYBODY. 20 August 2026.
+
+                This mapped the whole of CATEGORIES, so a plumber in a van was offered `mortgage
+                interest`, `letting agent`, `property repairs` and `ground rent`: four rows he has
+                to read past to reach the one he wants, on the screen he uses most. Doc 103's empty
+                test, on a list rather than on a card.
+
+                ⚠️ AND IT IS NOT ONLY TIDINESS, WHICH IS WHY IT IS FILED AGAINST B62 RATHER THAN
+                AGAINST THE STYLE. Those four were offered to everyone AND filed into the trade for
+                everyone, which is how a dead end came to be a P1: the door was open on every
+                account and led nowhere on all of them.
+
+                lib/propertylanes.ts has exported categoriesFor for exactly this since RUN 2 and
+                app/app/pile/page.tsx has used it since then. This screen never got it. The gate is
+                the SAME `rental` the rent button above uses, so the two halves of the property
+                story appear together or not at all.
+                ═══════════════════════════════════════════════════════════════════════════════ */}
             <label htmlFor="cat" style={S.label}>What it was, if it went out</label>
             <select id="cat" name="category" defaultValue="" className="lek-field">
               <option value="">Nothing fits. File it as other</option>
-              {CATEGORIES.map((c) => (
+              {categoriesFor(CATEGORIES, rental).map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>

@@ -174,6 +174,29 @@ export default async function OverviewPage() {
   const moneyIn = Math.max(0, optimiser.ytdTradeIncome) + Math.max(0, optimiser.ytdPropertyIncome ?? 0);
   const moneyOut = Math.max(0, optimiser.ytdTradeExpenses) + Math.max(0, optimiser.ytdPropertyExpenses ?? 0);
   const profit = moneyIn - moneyOut;
+  // 🔴 B67. THE MONEY THAT LEFT HIS ACCOUNT AND IS IN NONE OF THE THREE TILES. 20 August 2026.
+  //
+  // Mortgage interest on a residential let is not an allowable expense, so lib/yeartodate.ts holds
+  // it out of ytdPropertyExpenses and it is therefore in neither Out nor Profit above. That is
+  // correct arithmetic and it was, until today, a silent subtraction under a caption that promises
+  // "everything you have confirmed".
+  //
+  // ⚠️ B62 IS WHAT MADE IT REACHABLE. Before 20 August a typed mortgage interest payment
+  // filed as a TRADE cost, so it sat inside Out and inside Profit. Now it routes correctly, and the
+  // first thing a landlord meets is Out falling by the whole of his interest and Profit rising by
+  // it, on the same money, on a day he changed nothing.
+  //
+  // ⚠️ THE ANSWER IS NOT TO PUT IT BACK INTO THE TILES. It is not deducted, and a Profit
+  // that netted it off would understate his profit by the whole of the interest and describe a
+  // submission nobody should make. app/app/tax/summary already decided this and its comment says
+  // why: taking a car out of expenses and saying nothing once put "Out 72,088" and "Profit 22,776"
+  // on two screens of one product with nothing joining them. A landlord who paid his lender must
+  // be able to see where it went.
+  //
+  // So this is the same sentence that screen already ships, on the screen he opens first, in the
+  // register /app/money already uses for a written down car. Drawn only when there is one, which is
+  // doc 103's empty test: a plumber never sees it.
+  const propertyFinance = Math.max(0, optimiser.ytdPropertyFinance ?? 0);
 
   // ⚠️ A READ THAT FAILED IS NOT A QUIET WEEK, AND THIS SCREEN IS ALLOWED TO KNOW THE DIFFERENCE.
   // weekRows returns null when Supabase could not answer. Printing "£0 in, £0 out" over a timeout
@@ -343,7 +366,12 @@ export default async function OverviewPage() {
             August 2026" in the very next card. Home did neither, and Home is the screen everybody
             opens first and most often.
             ═══════════════════════════════════════════════════════════════════════════════════ */}
-        {moneyIn === 0 && moneyOut === 0 ? (
+        {/* 🔴 AND THE EMPTY TEST HAS TO KNOW ABOUT IT TOO, WHICH IS THE HALF THAT WOULD HAVE
+            BEEN MISSED. A landlord whose only confirmed row this year is his mortgage interest has
+            moneyIn 0 and moneyOut 0, and this branch would have told him "Nothing confirmed since
+            6 April yet" while the product held his confirmed 14,000. That is the empty state lying,
+            which is the exact fault the block above exists to have fixed. */}
+        {moneyIn === 0 && moneyOut === 0 && propertyFinance === 0 ? (
           <>
             <p style={S.leadQuiet}>Nothing confirmed since 6 April yet.</p>
             <p style={S.quiet}>
@@ -372,6 +400,14 @@ export default async function OverviewPage() {
             <p style={S.quiet}>
               Since 6 April, on everything you have confirmed.{shareCap ? ` ${shareCap}` : ''}
             </p>
+            {propertyFinance > 0 ? (
+              <p style={S.quiet}>
+                A further <b>{gbp2(propertyFinance)}</b> went out on mortgage interest, and it is
+                deliberately not in Out or Profit above. Since Section 24 it is not deducted from
+                your rent: it comes back as a 20% credit against your tax, worked out for you on the
+                Tax page.
+              </p>
+            ) : null}
           </>
         )}
       </section>

@@ -194,10 +194,25 @@ const flat = (s) => s.replace(/\s+/g, ' ');
   ok('🔴 THE "ALL LOGGED" REASSURANCE CANNOT REACH A MAN WHO HAS LOGGED NOTHING',
     /weeklyLine\(weekSaid\)/.test(home) && iGuard < homeCode.indexOf('weeklyLine(weekSaid)'));
 
+  // 🔴 THIS USED TO END `&& moneyOut === 0 \?`, PINNING THE OPERAND LIST TO EXACTLY TWO.
+  // B67 correctly ADDED a third on 20 August and this assertion went red on a change that made the
+  // empty test stricter rather than weaker. That is the second guard in two days to red on being
+  // extended (see test/landlord.test.mjs, B62), and the shape is the same both times: an assertion
+  // that quotes an expression up to its punctuation is defending the punctuation.
   ok('🔴 AND THE YEAR CARD DOES NOT DRAW In £0, Out £0, Profit £0',
-    /moneyIn === 0 && moneyOut === 0 \?/.test(home)
+    /moneyIn === 0 && moneyOut === 0/.test(home)
     && /Nothing confirmed since 6 April yet\./.test(home));
-  const iYear = homeCode.indexOf('moneyIn === 0 && moneyOut === 0 ?');
+  // 🔴 AND THE EMPTY TEST COUNTS THE MONEY THAT IS IN NONE OF THE THREE TILES. B67.
+  //
+  // A landlord whose only confirmed row this year is his mortgage interest has moneyIn 0 and
+  // moneyOut 0, because lib/yeartodate.ts holds finance costs out of ytdPropertyExpenses. Without
+  // this third term the branch tells him "Nothing confirmed since 6 April yet" while the product is
+  // holding his confirmed £14,000, which is the empty state lying on the screen he opens first.
+  //
+  // ⚠️ NAME AGNOSTIC ON THE LOCAL, DELIBERATELY, WHICH IS THE WHOLE LESSON OF THE COMMENT ABOVE.
+  ok('🔴 AND IT COUNTS THE PROPERTY FINANCE THAT SITS IN NEITHER TILE',
+    /moneyIn === 0 && moneyOut === 0 && \w+ === 0/.test(homeCode));
+  const iYear = homeCode.indexOf('moneyIn === 0 && moneyOut === 0');
   const iGrid = homeCode.indexOf('className="lek-grid"');
   ok('the year markers exist', iYear >= 0 && iGrid >= 0);
   ok('🔴 AND THAT GUARD COMES BEFORE THE GRID', iYear < iGrid);

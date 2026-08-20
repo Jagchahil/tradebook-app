@@ -591,3 +591,97 @@ export function signupLinkAlarm(
 export function signupLinksServing(health: SignupLinkHealth | null, now: Date = new Date()): boolean {
   return signupLinkAlarm(health, now) === null;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B70. A ROW FILED BEFORE B62 KEEPS A WRONG BILL FOR EVER, AND NOTHING WOULD EVER SAY SO.
+// 20 August 2026.
+//
+// B62 fixed the door: a typed property cost now reaches the property stream. It cannot touch a row
+// that was already written. So a landlord who typed his letting agent fee on 18 August still has it
+// deducted against a trade he does not have, his bill is still wrong, and no screen anywhere knows.
+//
+// ⚠️ THERE IS NO SUCH CUSTOMER TODAY. Every account in the estate carrying rent is a persona, and
+// `+norah`'s three misfiled rows are the B62 EVIDENCE that rule 9 says never to tidy. This exists
+// because the day there IS one, the only way anybody finds out is if something looks.
+//
+// 🔴 AND THE SPLIT IS THE WHOLE DESIGN, BECAUSE ONE NUMBER HERE WOULD BE PERMANENTLY RED.
+//
+//   `misfiled` counts every confirmed row carrying a property category that is not in the property
+//   stream, whenever it was written. Norah is in it. It is REPORTED, behind the bearer, as a to do
+//   list: these are the accounts that need the backfill in
+//   supabase/APPLY_2026-08-20_property_stream_backfill.sql run for them, one account at a time.
+//
+//   `sinceFix` counts only those written AFTER B62 shipped. That number must be ZERO for ever. A
+//   row written today that carries `letting agent` and is not in the property stream means the
+//   routing has REGRESSED in production, on a real customer's money, and that is an outage by this
+//   file's own taxonomy: something that was working has stopped.
+//
+// ONLY THE SECOND ONE ALARMS. A watch that is red because of a fixture we are forbidden to fix is a
+// watch somebody mutes in a week, and this file's header has said so since the day it was written.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+// WHEN B62 SHIPPED, AND WHY IT IS MIDNIGHT RATHER THAN THE COMMIT MINUTE.
+//
+// The commit is `6a475135`, authored 2026-08-19T22:18:41Z, and the deploy landed a couple of
+// minutes later. Rows written in the gap between the two could not have routed and are not this
+// watch's business, so the boundary is the midnight AFTER the deploy: conservative in the only
+// direction that matters, because it can never accuse the product of a regression that predates the
+// fix being live.
+export const PROPERTY_STREAM_SINCE = '2026-08-20T00:00:00.000Z';
+
+export interface PropertyStreamHealth {
+  /** Confirmed rows carrying a property category that are NOT in the property stream, all time. */
+  misfiled: number;
+  /** How many accounts they belong to, so a to do list has a length rather than a volume. */
+  accounts: number;
+  /** Of those, how many were written after B62 shipped. This one must be zero for ever. */
+  sinceFix: number;
+  /** The boundary used, so no reader has to assume it. */
+  since: string;
+  /** True when the read hit its row limit. A partial answer must never read as a clean one. */
+  capped: boolean;
+}
+
+// 🔴 null IN, ALARM OUT. The rule cronsServing, reminderAlarm, authSendAlarm and signupLinkAlarm
+// all follow, and the fifth time it is written down in this file.
+export function misfiledPropertyAlarm(health: PropertyStreamHealth | null): CronAlarm | null {
+  if (health === null) {
+    return {
+      job: 'property',
+      reason: 'unreadable',
+      hoursQuiet: null,
+      detail: 'the property stream could not be checked, so nothing here can say whether a typed '
+        + 'property cost is still reaching it',
+    };
+  }
+
+  // A READ THAT RAN OUT OF ROOM IS NOT A CLEAN READ, and it is reported before the count because a
+  // capped read with zero regressions is the answer that looks like good news and is not one.
+  if (health.capped) {
+    return {
+      job: 'property',
+      reason: 'unreadable',
+      hoursQuiet: null,
+      detail: 'the property stream check hit its row limit, so it has outgrown a single read and is '
+        + 'no longer looking at all of them',
+    };
+  }
+
+  // ⚠️ THE HISTORICAL COUNT IS DELIBERATELY NOT AN ALARM. See the block above.
+  if (health.sinceFix === 0) return null;
+
+  return {
+    job: 'property',
+    reason: 'failed',
+    hoursQuiet: null,
+    detail: `${health.sinceFix} confirmed cost${health.sinceFix === 1 ? '' : 's'} filed under a `
+      + 'property category since the routing was fixed did NOT reach the property stream. A '
+      + 'landlord is being charged National Insurance on rent and losing the Section 24 credit, on '
+      + 'money he typed in himself.',
+  };
+}
+
+/** Is a typed property cost still reaching the property stream? A check we cannot run is a no. */
+export function propertyStreamServing(health: PropertyStreamHealth | null): boolean {
+  return misfiledPropertyAlarm(health) === null;
+}

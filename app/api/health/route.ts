@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { listCronRuns, readKnowledgeState, getReminderBacklog, getAuthSendHealth, getSignupLinkHealth } from '../../../lib/supabase';
+import { listCronRuns, readKnowledgeState, getReminderBacklog, getAuthSendHealth, getSignupLinkHealth, getPropertyStreamHealth } from '../../../lib/supabase';
 import { cronAlarms, blockingAlarms, unseenAlarms, cronsServing, reminderAlarm, remindersServing, authSendAlarm, authSendsServing, signupLinkAlarm, signupLinksServing,
-  SIGNUP_LINK_GRACE_MINUTES, SIGNUP_LINK_LOOKBACK_DAYS } from '../../../lib/cronwatch';
+  SIGNUP_LINK_GRACE_MINUTES, SIGNUP_LINK_LOOKBACK_DAYS,
+  misfiledPropertyAlarm, propertyStreamServing, PROPERTY_STREAM_SINCE } from '../../../lib/cronwatch';
+// 🔴 B70. The four the watch asks about are lib/propertylanes.ts's to name, exactly as they
+// are for the picker and for the routing. Handed to the reader rather than imported by it: see
+// the block above getPropertyStreamHealth for why that file cannot take a value import.
+import { PROPERTY_CATEGORIES } from '../../../lib/propertylanes';
 import { knowledgeAlarms, knowledgeStatus } from '../../../lib/knowledgewatch';
 
 // A tiny health check for uptime monitoring. Reports whether the app is up and
@@ -116,6 +121,10 @@ export async function GET(req: NextRequest) {
     // a man locked out if the address never reaches the account, and until today nothing looked.
     const signupLinks = await getSignupLinkHealth(SIGNUP_LINK_GRACE_MINUTES, SIGNUP_LINK_LOOKBACK_DAYS);
     const strandedSignups = signupLinkAlarm(signupLinks);
+    // 🔴 AND IS A TYPED PROPERTY COST STILL REACHING THE PROPERTY STREAM. B70. Two counts and
+    // only one of them alarms: see lib/cronwatch.ts, misfiledPropertyAlarm.
+    const propertyStream = await getPropertyStreamHealth(PROPERTY_CATEGORIES, PROPERTY_STREAM_SINCE);
+    const misfiledProperty = misfiledPropertyAlarm(propertyStream);
     // ⚠️ THE OPERATOR VIEW IS STRICT ON PURPOSE, and differs from the public one. This body is a
     // to-do list for whoever is holding the pager, so a cron that has never run belongs in its
     // `ok: false`. The PUBLIC body answers a different question, "is the site serving", and a job
@@ -128,7 +137,7 @@ export async function GET(req: NextRequest) {
     // spot the public path had. brain !== null was already here; the crons half was missing it. An
     // operator who cannot read the history has a problem, and the strict view is where it belongs.
     const ok = missing.length === 0 && runs !== null && alarms.length === 0 && brain !== null && brainAlarms.length === 0
-      && lateReminders === null && deadMailer === null && strandedSignups === null;
+      && lateReminders === null && deadMailer === null && strandedSignups === null && misfiledProperty === null;
     return NextResponse.json(
       {
         ok,
@@ -147,7 +156,7 @@ export async function GET(req: NextRequest) {
           bankTokenKey: Boolean(process.env.BANK_TOKEN_KEY),
         },
         crons: runs ?? 'unreadable',
-        alarms: [...blockingAlarms(alarms), ...(lateReminders ? [lateReminders] : []), ...(deadMailer ? [deadMailer] : []), ...(strandedSignups ? [strandedSignups] : [])],
+        alarms: [...blockingAlarms(alarms), ...(lateReminders ? [lateReminders] : []), ...(deadMailer ? [deadMailer] : []), ...(strandedSignups ? [strandedSignups] : []), ...(misfiledProperty ? [misfiledProperty] : [])],
         // WHAT IS ACTUALLY WAITING. The operator side names it because naming it is the whole use
         // of the row: a count and an age tell whoever holds the pager whether this is a gate that
         // shut a minute ago or an engine that stopped in the night.
@@ -164,6 +173,17 @@ export async function GET(req: NextRequest) {
           graceMinutes: signupLinks.graceMinutes,
           lookbackDays: signupLinks.lookbackDays,
           capped: signupLinks.capped,
+        },
+        // THE PROPERTY STREAM, AND IT IS A TO DO LIST RATHER THAN A PAGER. `misfiled` and
+        // `accounts` name work that needs the backfill in
+        // supabase/APPLY_2026-08-20_property_stream_backfill.sql run for them, one account at a
+        // time. `sinceFix` is the one that must stay at zero, and it is the only one in `ok` above.
+        property: propertyStream === null ? 'unreadable' : {
+          misfiled: propertyStream.misfiled,
+          accounts: propertyStream.accounts,
+          sinceFix: propertyStream.sinceFix,
+          since: propertyStream.since,
+          capped: propertyStream.capped,
         },
         // Registered, never seen. Not an outage; a wiring question. Named here because this side
         // is behind the bearer and naming it is the entire use of the row.
@@ -316,6 +336,27 @@ export async function GET(req: NextRequest) {
   const signupLinks = await getSignupLinkHealth(SIGNUP_LINK_GRACE_MINUTES, SIGNUP_LINK_LOOKBACK_DAYS);
   const signupsOk = signupLinksServing(signupLinks);
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 IS A TYPED PROPERTY COST STILL REACHING THE PROPERTY STREAM. B70, 20 August 2026.
+  //
+  // B62 fixed the door on 19 August. This is the canary on it, in production, on real rows. A
+  // confirmed cost filed under a property category that is NOT in the property stream, written
+  // AFTER that fix shipped, means the routing has regressed: a landlord is paying Class 4 National
+  // Insurance on rent and losing the Section 24 credit, on money he typed himself.
+  //
+  // ⚠️ THIS IS AN OUTAGE AND IT IS A 503, by this file's own taxonomy. Something that was
+  // working has stopped, and it is wrong in the direction that costs the customer.
+  //
+  // ⚠️ AND THE HISTORICAL COUNT IS NOT IN THIS VERDICT. Rows written BEFORE the fix could
+  // not have routed and are not a regression; they are a backfill, they are named behind the
+  // bearer, and a watch that went red over `+norah`'s fixture rows would be muted within a week.
+  //
+  // ⚠️ AND THE COUNT IS NOT PUBLIC. How many of our customers have a wrong bill is our
+  // business. One word here, the counts behind the bearer, the same rule as every row above.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const propertyStream = await getPropertyStreamHealth(PROPERTY_CATEGORIES, PROPERTY_STREAM_SINCE);
+  const propertyOk = propertyStreamServing(propertyStream);
+
   // THE BRAIN (docs/105). Three ways this goes red, and the first one is why Khoji exists at all.
   //
   //   drift   a constant in lib/taxengine.ts DISAGREES WITH GOV.UK right now. Our tax engine is
@@ -339,7 +380,7 @@ export async function GET(req: NextRequest) {
   const brainAlarms = brain ? knowledgeAlarms(brain) : [];
   const brainOk = brain !== null && brainAlarms.length === 0;
 
-  const healthy = db && cronsOk && brainOk && remindersOk && signInOk && signupsOk;
+  const healthy = db && cronsOk && brainOk && remindersOk && signInOk && signupsOk && propertyOk;
   return NextResponse.json(
     {
       ok: healthy,
@@ -377,6 +418,8 @@ export async function GET(req: NextRequest) {
       signin: authSends === null ? 'unknown' : signInOk ? 'ok' : 'failing',
       // One word, never a count. See the block above signupsOk.
       signups: signupLinks === null ? 'unknown' : signupsOk ? 'ok' : 'stranded',
+      // One word, never a count. See the block above propertyOk.
+      property: propertyStream === null ? 'unknown' : propertyOk ? 'ok' : 'misfiled',
       // A count, never a name. Zero is omitted rather than printed, so this row appears only when
       // there is genuinely something not yet seen. See the block above.
       ...(unseen.length ? { cronsUnseen: unseen.length } : {}),

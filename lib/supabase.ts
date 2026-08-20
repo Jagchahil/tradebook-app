@@ -11897,7 +11897,7 @@ export async function mintSignInCode(email: string): Promise<string | null> {
   }
 }
 
-import type { AuthSendHealth, SignupLinkHealth } from './cronwatch';
+import type { AuthSendHealth, SignupLinkHealth, PropertyStreamHealth } from './cronwatch';
 
 // 🔴 THE PROBE THE P0 DID NOT HAVE. Four codes were asked for and none arrived, and /api/health
 // said 200 the whole time, because nothing in the product was watching the one email a locked out
@@ -12033,6 +12033,62 @@ export async function getSignupLinkHealth(
       if (oldestProvedAt === null || at < oldestProvedAt) oldestProvedAt = at;
     }
     return { proved, unlinked, oldestProvedAt, ...shape, capped };
+  } catch {
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B70. IS A TYPED PROPERTY COST STILL REACHING THE PROPERTY STREAM, AND WHO IS STILL
+// WAITING FOR THE BACKFILL. 20 August 2026.
+//
+// The argument for the two counts and why only one of them alarms is in lib/cronwatch.ts above
+// misfiledPropertyAlarm. This is the read, and it is one request.
+//
+// ⚠️ THE CATEGORIES ARE PASSED IN RATHER THAN IMPORTED, FOR THE SAME REASON THE SIGNUP
+// WINDOW IS. This function sits in the part of lib/supabase.ts that three suites stage on their own
+// as a bare accessors file, and a VALUE import down here broke five unrelated suites on 19 August.
+// lib/propertylanes.ts owns the list and app/api/health/route.ts hands it over, which is also where
+// it is easiest to see that the watch and the picker are asking about the same four things.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+// The row ceiling. Exported so the guard can drive the capped boundary exactly rather than guessing.
+export const PROPERTY_STREAM_READ_LIMIT = 500;
+
+export async function getPropertyStreamHealth(
+  categories: readonly string[],
+  sinceISO: string,
+): Promise<PropertyStreamHealth | null> {
+  const { url } = config();
+  if (!url) return null;
+  // A quote or a comma would break out of the in.() list. No category in this product carries one,
+  // and one that did is skipped rather than escaped, because escaping is where injections come from.
+  const wanted = categories.map((c) => String(c ?? '').trim().toLowerCase()).filter((c) => c && !/["',]/.test(c));
+  if (wanted.length === 0) return null;
+  const list = wanted.map((c) => `"${c}"`).join(',');
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/transactions?select=user_id,created_at&confirmed=eq.true`
+        + `&income_type=neq.property&category=in.(${encodeURIComponent(list)})`
+        + `&limit=${PROPERTY_STREAM_READ_LIMIT}`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{ user_id?: string; created_at?: string }> | null;
+    if (!Array.isArray(rows)) return null;
+    const capped = rows.length >= PROPERTY_STREAM_READ_LIMIT;
+    const accounts = new Set<string>();
+    let sinceFix = 0;
+    for (const r of rows) {
+      const owner = String(r?.user_id ?? '');
+      if (owner) accounts.add(owner);
+      // A row with no created_at cannot be shown to be AFTER the fix, so it is not counted as one.
+      // The safe direction here is the quiet one: this count exists to accuse the product of a
+      // regression, and it must never do that on a missing field.
+      const at = String(r?.created_at ?? '');
+      if (at && at >= sinceISO) sinceFix += 1;
+    }
+    return { misfiled: rows.length, accounts: accounts.size, sinceFix, since: sinceISO, capped };
   } catch {
     return null;
   }

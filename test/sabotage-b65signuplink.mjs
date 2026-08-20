@@ -86,17 +86,21 @@ const SABOTAGES = [
   // ── IT NEVER FIRES. ───────────────────────────────────────────────────────────────────────
   {
     name: '🔴 the public verdict stops depending on it, so a locked out customer keeps a 200',
-    apply: (d) => edit(d, HL, 'const healthy = db && cronsOk && brainOk && remindersOk && signInOk && signupsOk;',
-      'const healthy = db && cronsOk && brainOk && remindersOk && signInOk;'),
+    // \u26a0\ufe0f RE ANCHORED 20 August 2026 BY B70, AND THE LESSON IS BIGGER THAN THE REPAIR.
+    // These quoted the WHOLE `healthy =` conjunction, so the next check added to /api/health killed
+    // them, silently, and a dead anchor throws before the tree runs and scores as a CATCH. That is
+    // the backlog's "an anchor that quotes the edge of a list breaks" rule on a line that is
+    // GUARANTEED to grow: every new watch adds a conjunct. The anchors are now the smallest stable
+    // substring, so the next one costs nobody anything.
+    apply: (d) => edit(d, HL, ' && signupsOk', ''),
   },
   {
     name: '🔴 the operator verdict stops depending on it, so the strict question answers ok too',
-    apply: (d) => edit(d, HL, '&& lateReminders === null && deadMailer === null && strandedSignups === null;',
-      '&& lateReminders === null && deadMailer === null;'),
+    apply: (d) => edit(d, HL, ' && strandedSignups === null', ''),
   },
   {
     name: '🔴 the alarm is dropped from the operator list, so whoever holds the pager is never told what it is',
-    apply: (d) => edit(d, HL, ', ...(strandedSignups ? [strandedSignups] : [])],', '],'),
+    apply: (d) => edit(d, HL, ', ...(strandedSignups ? [strandedSignups] : [])', ''),
   },
   {
     name: '🔴 a stranded person stops being an alarm at all',
@@ -218,8 +222,7 @@ const CONTROLS = [
   },
   {
     name: 'CONTROL: the two verdict conjuncts are REORDERED, which changes the source and no behaviour',
-    apply: (d) => edit(d, HL, 'const healthy = db && cronsOk && brainOk && remindersOk && signInOk && signupsOk;',
-      'const healthy = db && cronsOk && brainOk && remindersOk && signupsOk && signInOk;'),
+    apply: (d) => edit(d, HL, '&& signInOk && signupsOk', '&& signupsOk && signInOk'),
   },
   {
     name: 'CONTROL: a COMMENT is reworded and it names email_norm, code_hash and the counts in prose, on purpose',

@@ -13,6 +13,7 @@ const ROUTES = [
   'pricing',
   'tax-calculator',
   'cis-calculator',
+  'mileage-calculator',
   'invoice-generator',
   'ni-checker',
   'student-loan-checker',

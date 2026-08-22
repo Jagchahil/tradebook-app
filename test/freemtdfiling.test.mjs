@@ -31,6 +31,7 @@ console.log('\nfree MTD filing magnet: the page, not the tool');
 const CAPTURED_TOOLS = [
   ['app/tax-calculator/Calc.tsx', 'tax-calculator'],
   ['app/cis-calculator/Calc.tsx', 'cis-calculator'],
+  ['app/mileage-calculator/Calc.tsx', 'mileage-calculator'],
   ['app/ni-checker/Calc.tsx', 'ni-checker'],
   ['app/student-loan-checker/Calc.tsx', 'student-loan-checker'],
   ['app/rent-a-room-checker/Calc.tsx', 'rent-a-room-checker'],
@@ -149,7 +150,7 @@ for (const [file] of CAPTURED_TOOLS) {
     /ld\+json/.test(src) && /JSON\.stringify\(faqSchema\)/.test(src));
 }
 ok(`🔴 and the sweep above really ran, two checks on each of the ${CAPTURED_TOOLS.length} tools`,
-  pass + fail - beforeSweep === CAPTURED_TOOLS.length * 2 && CAPTURED_TOOLS.length === 8);
+  pass + fail - beforeSweep === CAPTURED_TOOLS.length * 2 && CAPTURED_TOOLS.length === 9);
 
 // ---------------------------------------------------------------------------------------------
 // 3. The page is actually reachable: registered in the sitemap and the site's own tool listings.

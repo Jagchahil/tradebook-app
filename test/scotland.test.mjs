@@ -174,6 +174,12 @@ const DISCLOSED = [
   'app/landlord-tax-calculator/Calc.tsx',
   'app/sole-trader-vs-limited/Calc.tsx',
   'app/tax-calculator/Calc.tsx',
+  // 🔴 THE FIFTH FREE TOOL, ADDED 22 August 2026 WITH /mileage-calculator.
+  // The mileage RATE is UK wide and would need nothing. The second figure on that screen is the
+  // TAX the claim saves, run through soleTraderTax() twice, and that is band derived like every
+  // other figure on this list. Same reasoning as its four siblings above: a stranger off a search
+  // gets one screen, one figure, and no account to read a caveat on later.
+  'app/mileage-calculator/Calc.tsx',
   // What the machines read. Not a screen, so it costs no row, and it is where an assistant turns
   // our rates into an answer for somebody in Aberdeen.
   'app/llms.txt/route.ts',

@@ -90,6 +90,7 @@ const SIGNED_IN = ['/app', '/app/tax', '/app/tax/ni', '/app/money', '/app/thread
 const PUBLIC = [
   '/', '/pricing', '/how-mtd-works', '/team', '/start', '/privacy', '/terms',
   '/tax-calculator', '/cis-calculator', '/landlord-tax-calculator', '/ni-checker',
+  '/mileage-calculator',
 ];
 const uncovered = SIGNED_IN.filter((p) => !matches(p));
 ok(`🔴 ALL ${SIGNED_IN.length} SIGNED IN PATHS ARE COVERED BY THE MATCHER${uncovered.length ? `, MISSED: ${uncovered.join(', ')}` : ''}`,
@@ -101,8 +102,8 @@ ok('the api is still covered, because CORS lives here too and was here first',
   matches('/api/health') && matches('/api/whatsapp'));
 // ⚠️ THE CORPUS SIZES ARE PINNED. A sabotage that DELETES the public pages at risk leaves a corpus
 // that still passes, which is how a both directions check quietly stops checking one direction.
-ok('the signed in and public corpora are the size they were measured at, 6 and 11',
-  SIGNED_IN.length === 6 && PUBLIC.length === 11);
+ok('the signed in and public corpora are the size they were measured at, 6 and 12',
+  SIGNED_IN.length === 6 && PUBLIC.length === 12);
 // 🔴 AND EVERY PUBLIC PATH IN THAT CORPUS IS A REAL PAGE ON DISK. Two of the first draft's entries
 // 404 on production, which was found by probing rather than by reading, and a corpus of pages that
 // do not exist is a both directions check testing one imaginary direction.

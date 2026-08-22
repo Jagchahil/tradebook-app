@@ -103,6 +103,7 @@ ${SCOTLAND_LINE} National Insurance, VAT, student loan repayments and the person
 ## Free tools (no signup)
 - CIS tax refund calculator: ${SITE}/cis-calculator
 - Income tax calculator for the self employed: ${SITE}/tax-calculator
+- Mileage claim calculator, ${p(FACTS.mileageCarFirst10k)} a mile banded, and mileage against buying the vehicle through the business: ${SITE}/mileage-calculator
 - Invoice and quote generator: ${SITE}/invoice-generator
 - Can I claim it, an allowable expenses guide: ${SITE}/can-i-claim
 - National Insurance checker, Class 1, 2 and 4 with State Pension year status: ${SITE}/ni-checker
